@@ -1,0 +1,20 @@
+{
+  "at": "2026-10-31T05:15:12.792Z",
+  "results": [
+    {
+      "file": "overview.png",
+      "stats": {
+        "calls": 113,
+        "triangles": 378170
+      }
+    },
+    {
+      "file": "overview-mobile.png",
+      "stats": {
+        "calls": 92,
+        "triangles": 343122
+      }
+    }
+  ],
+  "errors": []
+}

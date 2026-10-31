@@ -3,33 +3,50 @@
 세션 간 인수인계 문서. 단계마다 "한 일 / 확인 방법 / 남은 일"을 적는다.
 기준: SPEC-v3.md 13장. 계획 상세는 PLAN.md.
 
-현재 상태: **세션 1 — 계획 승인 대기**
+현재 상태: **세션 1 완료 — 단계 1·2 통과. 다음은 세션 2(단계 3~5)** (저장소 yonghee0330/readplace_v2)
 
 ---
 
 ## 단계 1 — 스캐폴딩, 시드 난수, 품질 설정, 로딩 화면, 빈 장면
-- [ ] Vite + TS + three(버전 고정) 스캐폴딩, npm 스크립트(dev/build/preview/typecheck/capture/server/test:e2e)
-- [ ] `core/rng.ts` mulberry32 + 하위 시드, `?seed=`
-- [ ] `core/params.ts` URL 파라미터 전부
-- [ ] `core/quality.ts` 낮음/보통/높음 + 기기 자동 판별
-- [ ] `core/loop.ts` 루프 + `?debug=1` FPS 표시
-- [ ] `ui/loading.ts` 베이지 + Noto Serif KR "서점 문을 여는 중" + 실제 진행률 + 0.6초 페이드(모션 줄이기면 즉시)
-- [ ] 글꼴 로컬 번들(@fontsource/noto-serif-kr, pretendard)
-- [ ] 빈 방 렌더 + `window.__BBOOKS_READY = true`
+- [x] Vite + TS + three(버전 고정) 스캐폴딩, npm 스크립트(dev/build/preview/typecheck/capture/server/test:e2e)
+- [x] `core/rng.ts` mulberry32 + 하위 시드, `?seed=`
+- [x] `core/params.ts` URL 파라미터 전부
+- [x] `core/quality.ts` 낮음/보통/높음 + 기기 자동 판별
+- [x] `core/loop.ts` 루프 + `?debug=1` FPS 표시
+- [x] `ui/loading.ts` 베이지 + Noto Serif KR "서점 문을 여는 중" + 실제 진행률 + 0.6초 페이드(모션 줄이기면 즉시)
+- [x] 글꼴 로컬 번들(@fontsource/noto-serif-kr, pretendard)
+- [x] 빈 방 렌더 + `window.__BBOOKS_READY = true`
 - 통과 조건: 로딩 진행률이 실제로 오르고 빈 방이 렌더됨 / typecheck·build 통과
 
 ## 단계 2 — 텍스처, 공간, 소품 전부, 조명, 후처리, 창밖, 캡처 스크립트
-- [ ] `textures.ts` 나뭇결 3종, 마루(+거칠기), 회벽, 징두리, 패브릭, 러그
-- [ ] 공간 8×6×2.8m, 창 2, 문 1, 징두리, 천장 보
-- [ ] 소품: 서가 5, 책 400~700(InstancedMesh), 평대, 테이블+의자 2, 소파(쿠션·담요), 스탠드 2, 펜던트 3, 계산대, 창틀 2, 화분 3~4, 러그, 벽 장식 2~3
-- [ ] `seat` 앵커 데이터
-- [ ] 조명: 키라이트(그림자), 실내 전구(그림자 1), 반구광, 창빛 패치, 노출 조정
-- [ ] 후처리: GTAO/SAO → Bloom → Output, 품질별
-- [ ] 창밖: 하늘, 건물 3겹, 가로등, 나무, (높음) 빗방울
-- [ ] `loadOrFallback`
-- [ ] `scripts/capture.ts` + `?cam=overview|avatar|window`
-- [ ] overview.png 데스크톱·모바일 캡처 → REVIEW.md에 7장 1~9 판정
-- 통과 조건: 체크리스트 1~9 통과
+- [x] `textures.ts` 나뭇결 3종, 마루(+거칠기), 회벽, 징두리, 패브릭, 러그
+- [x] 공간 8×6×2.8m, 창 2, 문 1, 징두리, 천장 보
+- [x] 소품: 서가 5, 책 400~700(InstancedMesh), 평대, 테이블+의자 2, 소파(쿠션·담요), 스탠드 2, 펜던트 3, 계산대, 창틀 2, 화분 3~4, 러그, 벽 장식 2~3
+- [x] `seat` 앵커 데이터
+- [x] 조명: 키라이트(그림자), 실내 전구(그림자 1), 반구광, 창빛 패치, 노출 조정
+- [x] 후처리: GTAO/SAO → Bloom → Output, 품질별
+- [x] 창밖: 하늘, 건물 3겹, 가로등, 나무 — (높음) 창유리 빗방울 셰이더는 미구현, 단계 7 성능 튜닝 때 추가 검토
+- [x] `loadOrFallback`
+- [x] `scripts/capture.ts` + `?cam=overview|avatar|window`
+- [x] overview.png 데스크톱·모바일 캡처 → REVIEW.md에 7장 1~9 판정
+- 통과 조건: 체크리스트 1~9 통과 → **통과** (docs/screens/REVIEW.md)
+
+### 단계 1·2 결과 (세션 1)
+- 한 일: Vite 8 + TS + three 0.187.0 스캐폴딩, 시작 화면 → 로딩(실제 7단계 진행률) → 서점 장면. 절차 텍스처 9종, 소품 전부(서가 5·책 530~700·평대·독서 테이블·의자 2·소파·러그·낮은 테이블·창가 벤치·스탠드 2·펜던트 3·계산대·창틀 2·출입문·화분 6·액자 3·안내판·벽시계), 조명(키라이트 + SpotLight 그림자, 전구 PointLight, 반구광, 창빛 패치, 약한 환경 반사), 후처리(SAO/GTAO → Bloom → Output), 창밖(하늘·건물 3겹·나무·가로등·빗줄기), loadOrFallback, 캡처 스크립트.
+- 확인 방법: `npm run typecheck && npm run build` 통과. `npm run capture -- overview` → 콘솔 에러 0개. 로딩 진행률 0→14→29→43→57→71→86→100% 확인(Playwright로 aria-valuenow 관찰).
+- 성능(헤드리스, 보통 품질, 프레임 전체 기준): 드로우콜 113, 삼각형 37.8만 → 예산(150 / 60만) 안. 높음 품질 110콜 / 39만.
+- SPEC과 달라진 점:
+  - three r187에서 `PCFSoftShadowMap`이 없어져 `PCFShadowMap` + `shadow.radius` 사용.
+  - 실내 그림자 광원은 SpotLight(운영자 승인).
+  - `?autostart=1`(또는 `cam`·`autoread` 파라미터)이면 시작 화면을 건너뜀 — 캡처·테스트용.
+  - 단계 3 전 임시로 OrbitControls 둘러보기(`cam` 파라미터 없을 때). 단계 3에서 아바타 3인칭 카메라로 교체.
+  - 진단용 파라미터: `?fx=noao,nobloom`, `?campos=x,y,z&camtgt=x,y,z`.
+- 남은 일(단계 2 관련): 높음 품질 창유리 빗방울 셰이더, 마루 결 차분하게.
+
+### 세션 2 시작할 때 알아둘 것
+- 헤드리스 SwiftShader는 한 프레임이 수 초 걸린다. 캡처 스크립트는 준비 완료 후 `window.__BBOOKS_LOOP.stop()`으로 루프를 멈추고 찍는다. e2e 테스트도 같은 방식이 필요할 수 있다.
+- 법선(normal) 없는 지오메트리를 장면에 넣으면 AO 패스에서 NaN → Bloom이 화면 전체를 검게 만든다. 새 메시는 반드시 법선 포함.
+- 바닥 클릭 판정용 메시: `store.floor`(merged:floor). 앉을 자리·충돌 박스: `src/scene/layout.ts`의 `SEATS`, `colliders()`.
 
 ## 단계 3 — 아바타, 애니메이션, 경로 탐색 이동, 카메라, 앉기, NPC
 - [ ] 절차 아바타(큰 머리, 옷 8색, 머리 3종)
@@ -55,12 +72,12 @@
 - [ ] e2e: 탭 2개 동기화(Local, ws)
 - 통과 조건: 탭 2개에서 아바타·이름표·눈인사·접속자 수 동기화, ws 동일
 
-## 단계 6 — 책 데이터, 리더, 페이지 분할, 넘김, 저장, 3D 펼침 연출
-- [ ] 공개 원문 5~8권(저자 사망 연도·source URL 표를 여기에 기록)
-- [ ] catalog.ts, 서가의 읽을 수 있는 책 은은한 빛
-- [ ] 리더: 양면/한 면, 페이지 분할(글자 오프셋 유지), 넘김(드래그·키·클릭), 상하단 UI, 저장
-- [ ] 3D 책 날아와 펼침 → 크로스페이드
-- 통과 조건: 서가 클릭 → 읽기 → 이어 읽기 → 돌아가기
+## 단계 6 — 읽기 모드(집중 독서 화면, SPEC v3.1)
+- [ ] 진입(버튼·키 3) → 읽기 자세 + 카메라 어깨 너머 0.8초 전환, UI 옅게
+- [ ] "함께 읽는 중 N명", 이번 독서 타이머, 오늘 읽은 시간
+- [ ] localStorage 누적·오늘 시간(날짜 바뀌면 초기화)
+- [ ] Esc·돌아가기 → 원래 시점, presence 상태 read ↔ stand/sit
+- 통과 조건: 읽기 모드 진입 → 타이머 동작 → 돌아가기, 다른 탭에서 읽는 모습 보임
 
 ## 단계 7 — 소리, PWA, 접근성, 성능 튜닝
 - [ ] Web Audio 합성(비, 공기음, 패드, 넘김 소리), 1.5초 페이드
@@ -80,3 +97,5 @@
 
 ## 기록
 - 세션 1: 폴더 준비, PLAN.md 작성. 환경 확인 결과 — npm 열림, Playwright 1.63 + 크로미움 설치됨, ko.wikisource.org·gongu.copyright.or.kr 차단, GitHub 저장소 미연결.
+- 세션 1: 단계 1·2 완료, 커밋·푸시.
+- 결정(운영자): 실제 책 본문 없음 → 9장 삭제, 3-9는 집중 독서 화면. 실내 그림자 광원은 SpotLight. 기본 구조는 산사와 같게.

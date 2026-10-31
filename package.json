@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc --noEmit",
-    "capture": "tsx scripts/capture.ts",
+    "capture": "vite build && tsx scripts/capture.ts",
     "server": "tsx server/index.ts",
     "test:e2e": "playwright test"
   },
