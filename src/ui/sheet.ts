@@ -56,7 +56,8 @@ export class Sheet {
   }
 
   private focusables(): HTMLElement[] {
-    return [...this.el.querySelectorAll<HTMLElement>('button, select, input, [tabindex]:not([tabindex="-1"])')].filter((e) => !e.hasAttribute('disabled'));
+    return [...this.el.querySelectorAll<HTMLElement>('button, select, input, textarea, [tabindex]:not([tabindex="-1"])')]
+      .filter((e) => !e.hasAttribute('disabled') && !(e as HTMLButtonElement).disabled);
   }
 
   private trap(e: KeyboardEvent): void {

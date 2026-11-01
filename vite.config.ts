@@ -38,6 +38,19 @@ export default defineConfig({
       },
     },
   },
-  server: { port: 5173 },
-  preview: { port: 4173 },
+  server: {
+    port: 5173,
+    proxy: {
+      // 카카오 책 표지 검색(중계 서버가 키·CORS를 대신 처리). npm run server 필요.
+      '/api/kakao': { target: 'http://localhost:8787', changeOrigin: true },
+      '/api/book': { target: 'http://localhost:8787', changeOrigin: true },
+    },
+  },
+  preview: {
+    port: 4173,
+    proxy: {
+      '/api/kakao': { target: 'http://localhost:8787', changeOrigin: true },
+      '/api/book': { target: 'http://localhost:8787', changeOrigin: true },
+    },
+  },
 });

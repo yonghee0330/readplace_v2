@@ -1,8 +1,11 @@
-// NPC 독자: 로컬 연출. 자리에 앉아 책을 읽고 가끔 페이지를 넘긴다. 접속자 수·알림에서 빠진다.
+// NPC 독자: 로컬 연출. 자리에 앉아 최근 베스트셀러를 읽고, 가끔 페이지를 넘긴다.
+// 접속자 수·알림에서 빠진다. 이름표에 닉네임·책 제목을 보여 진짜 독자처럼 보이게 한다.
 import { Rng } from '../core/rng';
 import { HAIR_STYLES, OUTFIT_COLORS } from '../core/storage';
+import { randomNickname } from '../net/nickname';
 import { SEATS, type Seat } from '../scene/layout';
 import { HIP_Y } from './avatar';
+import { BESTSELLERS } from './bestsellers';
 import type { Actor, Crowd } from './crowd';
 
 export function placeAtSeat(actor: Actor, seat: Seat): void {
@@ -10,7 +13,7 @@ export function placeAtSeat(actor: Actor, seat: Seat): void {
   actor.root.rotation.y = seat.ry;
 }
 
-/** 시드로 2~4명을 고른 자리에 앉힌다. */
+/** 시드로 2~4명을 고른 자리에 앉히고, 서로 다른 베스트셀러를 쥐게 한다. */
 export function spawnNpcs(crowd: Crowd, rng: Rng): Actor[] {
   const r = rng.fork('npc');
   const count = r.int(2, 4);
@@ -23,10 +26,21 @@ export function spawnNpcs(crowd: Crowd, rng: Rng): Actor[] {
     if (s.id === 'sofa-2' || (s.id === 'chair-2' && picked.some((p) => p.id === 'chair-1'))) continue;
     if (r.chance(0.8)) picked.push(s);
   }
+
+  // 같은 책이 겹치지 않게 후보를 섞은 뒤 앞에서부터 쓴다
+  const shelf = [...BESTSELLERS];
+  for (let i = shelf.length - 1; i > 0; i--) {
+    const j = Math.floor(r.float() * (i + 1));
+    [shelf[i], shelf[j]] = [shelf[j], shelf[i]];
+  }
+
   return picked.map((seat, i) => {
-    const a = crowd.add(`npc-${i}`, 'npc', '', { color: r.pick(OUTFIT_COLORS), hair: r.pick(HAIR_STYLES) }, false);
+    const book = shelf[i % shelf.length]!;
+    const nick = randomNickname(() => r.float());
+    const a = crowd.add(`npc-${i}`, 'npc', nick, { color: r.pick(OUTFIT_COLORS), hair: r.pick(HAIR_STYLES) }, true);
     placeAtSeat(a, seat);
     a.setState('read', seat.id);
+    a.setBookTitle(book.title);
     return a;
   });
 }

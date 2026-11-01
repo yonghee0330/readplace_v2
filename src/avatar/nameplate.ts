@@ -1,29 +1,55 @@
 // 이름표와 머리 위 책 아이콘: 항상 카메라를 보는 빌보드. 거리에 따라 크기를 조절해 멀리서도 읽힌다.
 // 오버레이 레이어(1)에 두어 AO 패스에서 빠진다(투명 판이 AO에 사각형 자국을 남기지 않게).
+// 읽기 중이면 닉네임 아래에 책 제목을 한 줄 더 그린다.
 import * as THREE from 'three';
 
 export const OVERLAY_LAYER = 1;
 const FONT = '"Pretendard Variable", Pretendard, system-ui, sans-serif';
+const W = 640;
+const H_SINGLE = 160;
+const H_DUAL = 220;
 
-function drawPill(ctx: CanvasRenderingContext2D, w: number, h: number, text: string, accent: string): void {
+function drawPill(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  text: string,
+  accent: string,
+  subtitle: string,
+): void {
   ctx.clearRect(0, 0, w, h);
+  const dual = !!subtitle;
   ctx.font = `600 46px ${FONT}`;
-  const tw = Math.min(w - 60, ctx.measureText(text).width);
-  const pw = tw + 64, ph = 76;
-  const x = (w - pw) / 2, y = (h - ph) / 2;
+  const nickTw = Math.min(w - 60, ctx.measureText(text).width);
+  let subTw = 0;
+  if (dual) {
+    ctx.font = `500 32px ${FONT}`;
+    subTw = Math.min(w - 60, ctx.measureText(subtitle).width);
+  }
+  const innerW = Math.max(nickTw, subTw);
+  const pw = innerW + 64;
+  const ph = dual ? 118 : 76;
+  const x = (w - pw) / 2;
+  const y = (h - ph) / 2;
   ctx.fillStyle = 'rgba(36,37,31,0.72)';
   ctx.beginPath();
-  ctx.roundRect(x, y, pw, ph, ph / 2);
+  ctx.roundRect(x, y, pw, ph, dual ? 28 : ph / 2);
   ctx.fill();
   // 옷 색 점
   ctx.fillStyle = accent;
   ctx.beginPath();
-  ctx.arc(x + 30, h / 2, 9, 0, Math.PI * 2);
+  ctx.arc(x + 30, dual ? y + 36 : h / 2, 9, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = '#fbf6ec';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, x + 48, h / 2 + 2, tw);
+  ctx.font = `600 46px ${FONT}`;
+  ctx.fillText(text, x + 48, dual ? y + 38 : h / 2 + 2, nickTw);
+  if (dual) {
+    ctx.font = `500 32px ${FONT}`;
+    ctx.fillStyle = 'rgba(251,246,236,0.82)';
+    ctx.fillText(subtitle, x + 48, y + 84, subTw);
+  }
 }
 
 export class Nameplate {
@@ -31,17 +57,19 @@ export class Nameplate {
   private canvas = document.createElement('canvas');
   private tex: THREE.CanvasTexture;
   private text = '';
+  private subtitle = '';
   private accent = '#ffffff';
-  private static aspect = 4;
+  private dual = false;
+  private static width = 0.48;
 
   constructor(text: string, accent: string) {
-    this.canvas.width = 640;
-    this.canvas.height = 160;
+    this.canvas.width = W;
+    this.canvas.height = H_SINGLE;
     this.tex = new THREE.CanvasTexture(this.canvas);
     this.tex.colorSpace = THREE.SRGBColorSpace;
     this.tex.anisotropy = 4;
     const mat = new THREE.MeshBasicMaterial({ map: this.tex, transparent: true, depthTest: false, depthWrite: false });
-    const g = new THREE.PlaneGeometry(Nameplate.aspect * 0.12, 0.12);
+    const g = new THREE.PlaneGeometry(Nameplate.width, Nameplate.width * (H_SINGLE / W));
     this.mesh = new THREE.Mesh(g, mat);
     this.mesh.renderOrder = 20;
     this.mesh.layers.set(OVERLAY_LAYER);
@@ -51,15 +79,27 @@ export class Nameplate {
     document.fonts?.ready.then(() => this.redraw());
   }
 
-  set(text: string, accent: string): void {
-    if (text === this.text && accent === this.accent) return;
+  set(text: string, accent: string, subtitle = ''): void {
+    const sub = subtitle.trim();
+    if (text === this.text && accent === this.accent && sub === this.subtitle) return;
     this.text = text;
     this.accent = accent;
+    this.subtitle = sub;
     this.redraw();
   }
 
   private redraw(): void {
-    drawPill(this.canvas.getContext('2d')!, this.canvas.width, this.canvas.height, this.text, this.accent);
+    const dual = !!this.subtitle;
+    if (dual !== this.dual) {
+      this.dual = dual;
+      this.canvas.height = dual ? H_DUAL : H_SINGLE;
+      this.mesh.geometry.dispose();
+      this.mesh.geometry = new THREE.PlaneGeometry(
+        Nameplate.width,
+        Nameplate.width * (this.canvas.height / W),
+      );
+    }
+    drawPill(this.canvas.getContext('2d')!, this.canvas.width, this.canvas.height, this.text, this.accent, this.subtitle);
     this.tex.needsUpdate = true;
   }
 

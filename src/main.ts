@@ -4,7 +4,7 @@ import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 import './style.css';
 
 import { startApp } from './app';
-import { readParams, roomLabel } from './core/params';
+import { ROOM_CAPACITY, readParams, roomLabel } from './core/params';
 import { registerServiceWorker } from './pwa/register';
 import { LoadingScreen } from './ui/loading';
 
@@ -20,7 +20,8 @@ const params = readParams();
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 const startEl = document.getElementById('start')!;
-document.getElementById('start-room')!.textContent = roomLabel(params.instance);
+document.getElementById('start-room')!.textContent = roomLabel();
+document.getElementById('start-note')!.textContent = `한 번에 ${ROOM_CAPACITY}명까지`;
 
 let entered = false;
 

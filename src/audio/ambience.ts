@@ -1,18 +1,27 @@
 // 서점 소리(SPEC 3-10): 외부 음원 없이 Web Audio로 직접 합성한다.
-// 빗소리(노이즈 → 밴드패스·로우패스, 느린 랜덤 진폭 + 가끔 물방울), 실내 공기음(아주 낮은 핑크 노이즈),
-// 패드(디튠된 사인·삼각파, 로우패스, 4마디 코드 루프). 기본 꺼짐, 켜고 끌 때 1.5초 페이드.
-// AudioContext는 사용자가 처음 누른 뒤에만 만든다(자동 재생 정책).
+// 창밖 빗소리·실내 공기음은 작게, 본 줄기는 책 읽기 좋은 잔잔한 패드·멜로디.
+// 기본 꺼짐, 켜고 끌 때 1.5초 페이드. AudioContext는 사용자가 처음 누른 뒤에만 만든다.
 
 const FADE = 1.5;
 const LEVEL = 0.8;
-/** 패드 한 마디 길이(초). 4마디 = 19.2초 루프 */
-const BAR = 4.8;
-/** 4마디 코드 진행(Hz): Fmaj9 → Em7 → Dm9 → Cmaj7, 낮은 음역에서 부드럽게 */
+/** 패드 한 마디 길이(초). 4마디 ≈ 22초 루프 */
+const BAR = 5.5;
+/**
+ * 따뜻한 서점 코드(Hz): Fmaj9 → Am7 → Dm9 → Cmaj7.
+ * 낮은 음역 + 9th로 잔잔하게.
+ */
 const CHORDS: number[][] = [
   [174.61, 220.0, 261.63, 329.63, 392.0],
-  [164.81, 196.0, 246.94, 293.66],
+  [220.0, 261.63, 329.63, 392.0],
   [146.83, 174.61, 220.0, 261.63, 329.63],
-  [130.81, 196.0, 246.94, 329.63],
+  [130.81, 164.81, 196.0, 246.94, 329.63],
+];
+/** 코드 위 느린 멜로디(상대 Hz). 마디마다 2~3음만 띄운다. */
+const MELODY: number[][] = [
+  [523.25, 587.33, 659.25],
+  [659.25, 587.33, 523.25],
+  [440.0, 523.25, 587.33],
+  [523.25, 493.88, 392.0],
 ];
 
 export class Ambience {
@@ -20,6 +29,8 @@ export class Ambience {
   private master: GainNode | null = null;
   /** 효과음 버스(소리를 켠 상태에서만 들린다) */
   sfxBus: GainNode | null = null;
+  private weatherBus: GainNode | null = null;
+  private musicBus: GainNode | null = null;
   private padTimer = 0;
   private nextBar = 0;
   private bar = 0;
@@ -43,9 +54,16 @@ export class Ambience {
     this.sfxBus = ctx.createGain();
     this.sfxBus.gain.value = 0.9;
     this.sfxBus.connect(this.master);
-    this.buildRain(ctx, this.master);
-    this.buildAir(ctx, this.master);
-    this.buildPad(ctx, this.master);
+    // 날씨(비·공기음)는 작게, 음악은 또렷하게
+    this.weatherBus = ctx.createGain();
+    this.weatherBus.gain.value = 0.32;
+    this.weatherBus.connect(this.master);
+    this.musicBus = ctx.createGain();
+    this.musicBus.gain.value = 1;
+    this.musicBus.connect(this.master);
+    this.buildRain(ctx, this.weatherBus);
+    this.buildAir(ctx, this.weatherBus);
+    this.buildPad(ctx, this.musicBus);
     return ctx;
   }
 
@@ -79,40 +97,36 @@ export class Ambience {
     return { enabled: this.enabled, state: this.ctx?.state ?? 'none', gain: this.master?.gain.value ?? 0 };
   }
 
-  // ---------- 빗소리 ----------
+  // ---------- 빗소리(창밖, 작게) ----------
   private buildRain(ctx: AudioContext, out: AudioNode): void {
     const noise = loopSource(ctx, whiteNoise(ctx, 3));
-    // 쏴아 하는 몸통: 밴드패스 + 로우패스
     const band = ctx.createBiquadFilter();
     band.type = 'bandpass';
     band.frequency.value = 1400;
     band.Q.value = 0.5;
     const low = ctx.createBiquadFilter();
     low.type = 'lowpass';
-    low.frequency.value = 5200;
+    low.frequency.value = 4800;
     const body = ctx.createGain();
-    body.gain.value = 0.16;
+    body.gain.value = 0.07;
     noise.connect(band).connect(low).connect(body).connect(out);
-    // 처마·유리에 닿는 낮은 웅웅거림
     const rumbleLp = ctx.createBiquadFilter();
     rumbleLp.type = 'lowpass';
-    rumbleLp.frequency.value = 380;
+    rumbleLp.frequency.value = 340;
     const rumble = ctx.createGain();
-    rumble.gain.value = 0.1;
+    rumble.gain.value = 0.035;
     noise.connect(rumbleLp).connect(rumble).connect(out);
     noise.start();
 
-    // 진폭에 느린 랜덤 변조(빗발이 세졌다 약해졌다)
     const sway = () => {
       const t = ctx.currentTime;
       body.gain.cancelScheduledValues(t);
       body.gain.setValueAtTime(body.gain.value, t);
-      body.gain.linearRampToValueAtTime(0.1 + Math.random() * 0.1, t + 2.5);
+      body.gain.linearRampToValueAtTime(0.04 + Math.random() * 0.045, t + 2.5);
       band.frequency.setTargetAtTime(1100 + Math.random() * 700, t, 1.5);
     };
     window.setInterval(() => this.enabled && sway(), 2500);
 
-    // 가끔 물방울: 짧은 사인 + 빠른 감쇠, 높이가 아래로 살짝 미끄러짐
     const drop = () => {
       if (this.enabled) {
         const t = ctx.currentTime + 0.02;
@@ -123,7 +137,7 @@ export class Ambience {
         o.frequency.setValueAtTime(f, t);
         o.frequency.exponentialRampToValueAtTime(f * 0.55, t + 0.07);
         g.gain.setValueAtTime(0.0001, t);
-        g.gain.exponentialRampToValueAtTime(0.03 + Math.random() * 0.04, t + 0.004);
+        g.gain.exponentialRampToValueAtTime(0.012 + Math.random() * 0.014, t + 0.004);
         g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
         const pan = ctx.createStereoPanner();
         pan.pan.value = Math.random() * 1.6 - 0.8;
@@ -131,7 +145,7 @@ export class Ambience {
         o.start(t);
         o.stop(t + 0.12);
       }
-      window.setTimeout(drop, 250 + Math.random() * 1400);
+      window.setTimeout(drop, 450 + Math.random() * 1800);
     };
     drop();
   }
@@ -141,31 +155,46 @@ export class Ambience {
     const src = loopSource(ctx, pinkNoise(ctx, 4));
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = 260;
+    lp.frequency.value = 240;
     const g = ctx.createGain();
-    g.gain.value = 0.09;
+    g.gain.value = 0.05;
     src.connect(lp).connect(g).connect(out);
     src.start();
   }
 
-  // ---------- 패드 ----------
+  // ---------- 잔잔한 서점 음악(패드 + 느린 멜로디) ----------
   private padOut: GainNode | null = null;
+  private melodyOut: GainNode | null = null;
 
   private buildPad(ctx: AudioContext, out: AudioNode): void {
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = 900;
-    lp.Q.value = 0.3;
-    // 아주 느린 필터 흔들림
+    lp.frequency.value = 1100;
+    lp.Q.value = 0.25;
     const lfo = ctx.createOscillator();
-    lfo.frequency.value = 0.05;
+    lfo.frequency.value = 0.04;
     const lfoAmt = ctx.createGain();
-    lfoAmt.gain.value = 220;
+    lfoAmt.gain.value = 180;
     lfo.connect(lfoAmt).connect(lp.frequency);
     lfo.start();
     this.padOut = ctx.createGain();
-    this.padOut.gain.value = 0.05;
+    this.padOut.gain.value = 0.085;
     this.padOut.connect(lp).connect(out);
+
+    // 멜로디는 조금 더 밝게, 짧은 리버브 느낌의 딜레이
+    const melLp = ctx.createBiquadFilter();
+    melLp.type = 'lowpass';
+    melLp.frequency.value = 2400;
+    this.melodyOut = ctx.createGain();
+    this.melodyOut.gain.value = 0.055;
+    const delay = ctx.createDelay(1.2);
+    delay.delayTime.value = 0.42;
+    const fb = ctx.createGain();
+    fb.gain.value = 0.28;
+    this.melodyOut.connect(melLp);
+    melLp.connect(out);
+    melLp.connect(delay).connect(fb).connect(delay);
+    delay.connect(out);
   }
 
   /** 마디가 시작되기 1.5초 전에 미리 예약한다(타이머가 늦어도 끊기지 않게). */
@@ -175,7 +204,9 @@ export class Ambience {
     this.nextBar = Math.max(this.nextBar, ctx.currentTime + 0.1);
     const schedule = () => {
       while (this.nextBar < ctx.currentTime + 1.5) {
-        this.playChord(CHORDS[this.bar % CHORDS.length], this.nextBar);
+        const i = this.bar % CHORDS.length;
+        this.playChord(CHORDS[i], this.nextBar);
+        this.playMelody(MELODY[i], this.nextBar);
         this.bar++;
         this.nextBar += BAR;
       }
@@ -192,19 +223,20 @@ export class Ambience {
   /** 한 마디: 음마다 사인 + 디튠된 삼각파, 느린 어택·릴리스로 다음 마디와 겹쳐 이어진다. */
   private playChord(freqs: number[], t: number): void {
     const ctx = this.ctx!;
-    const end = t + BAR + 1.6;
+    const end = t + BAR + 1.8;
     for (const [i, f] of freqs.entries()) {
       const g = ctx.createGain();
-      const peak = 0.22 / freqs.length;
+      const peak = 0.28 / freqs.length;
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.linearRampToValueAtTime(peak, t + 1.6);
-      g.gain.setValueAtTime(peak, t + BAR - 0.4);
+      g.gain.linearRampToValueAtTime(peak, t + 1.9);
+      g.gain.setValueAtTime(peak, t + BAR - 0.5);
       g.gain.linearRampToValueAtTime(0.0001, end);
       g.connect(this.padOut!);
       const voices: [OscillatorType, number, number][] = [
         ['sine', 0, 1],
-        ['triangle', 6 + i, 0.45],
-        ['triangle', -7 - i, 0.45],
+        ['triangle', 5 + i, 0.38],
+        ['triangle', -6 - i, 0.38],
+        ['sine', 12, 0.22],
       ];
       for (const [type, cents, amp] of voices) {
         const o = ctx.createOscillator();
@@ -217,6 +249,38 @@ export class Ambience {
         o.start(t);
         o.stop(end + 0.05);
       }
+    }
+  }
+
+  /** 마디 안 느린 멜로디: 부드러운 사인, 읽기를 방해하지 않게 띄엄띄엄. */
+  private playMelody(notes: number[], t0: number): void {
+    if (!this.melodyOut) return;
+    const ctx = this.ctx!;
+    const steps = [0.35, 0.48, 0.72];
+    for (const [i, f] of notes.entries()) {
+      const t = t0 + BAR * (steps[i] ?? 0.5);
+      const g = ctx.createGain();
+      const peak = 0.11;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(peak, t + 0.35);
+      g.gain.linearRampToValueAtTime(peak * 0.55, t + 1.1);
+      g.gain.linearRampToValueAtTime(0.0001, t + 2.2);
+      g.connect(this.melodyOut);
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = f;
+      const soft = ctx.createOscillator();
+      soft.type = 'triangle';
+      soft.frequency.value = f;
+      soft.detune.value = 4;
+      const sg = ctx.createGain();
+      sg.gain.value = 0.35;
+      o.connect(g);
+      soft.connect(sg).connect(g);
+      o.start(t);
+      soft.start(t);
+      o.stop(t + 2.3);
+      soft.stop(t + 2.3);
     }
   }
 }

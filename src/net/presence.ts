@@ -4,6 +4,14 @@
 export type AvatarState = 'stand' | 'walk' | 'sit' | 'read';
 export type HairStyle = 'bangs' | 'bob' | 'short';
 
+/** 다른 사람에게 보이는 "지금 읽는 책"(본문 없음). coverUrl은 https만, data:는 보내지 않는다. */
+export interface SharedBook {
+  title: string;
+  author: string;
+  publisher: string;
+  coverUrl: string | null;
+}
+
 export interface PlayerState {
   id: string;
   nickname: string;
@@ -14,6 +22,8 @@ export interface PlayerState {
   state: AvatarState;
   /** 앉아 있으면 자리 id. 읽기 상태에서도 앉아 있으면 유지된다. */
   seatId: string | null;
+  /** 읽기 중일 때만 채운다. 아니면 null. */
+  book: SharedBook | null;
   t: number;
 }
 
@@ -28,7 +38,8 @@ export interface ActionEvent {
 export type PresenceStatus = 'connecting' | 'connected' | 'reconnecting';
 
 export interface Presence {
-  connect(room: string, instance: number, me: PlayerState): Promise<void>;
+  /** 'full'이면 정원이 차서 들어오지 못한 것이다. 구현이 연결을 정리한 뒤 반환한다. */
+  connect(room: string, instance: number, me: PlayerState): Promise<'ok' | 'full'>;
   disconnect(): void;
   /** 10Hz 이하로 부른다(구현이 한 번 더 걸러 준다). */
   sendState(s: PlayerState): void;
@@ -46,19 +57,60 @@ export function channelName(room: string, instance: number): string {
   return `bbooks:${room}:${instance}`;
 }
 
+/**
+ * 먼저 들어온 사람이 남는다. 같은 시각이면 id가 앞선 쪽이 남는다.
+ * self가 정원 안이면 true.
+ */
+export function fitsCapacity(
+  selfId: string,
+  selfAt: number,
+  others: Iterable<[string, number]>,
+  capacity: number,
+): boolean {
+  const roster = [{ id: selfId, at: selfAt }];
+  for (const [id, at] of others) if (id !== selfId) roster.push({ id, at });
+  roster.sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return roster.findIndex((r) => r.id === selfId) < capacity;
+}
+
 export function newId(): string {
   const a = new Uint8Array(8);
   crypto.getRandomValues(a);
   return Array.from(a, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/** 네트워크로 온 책 메타를 잘라 안전한 SharedBook으로 만든다. */
+export function sanitizeSharedBook(v: unknown): SharedBook | null {
+  if (!v || typeof v !== 'object') return null;
+  const b = v as Record<string, unknown>;
+  if (typeof b.title !== 'string' || !b.title.trim()) return null;
+  const rawCover = typeof b.coverUrl === 'string' ? b.coverUrl.trim() : '';
+  // 표지는 https만(짧은 CDN URL). data:·거대 문자열은 중계 한도를 넘기므로 버린다.
+  const coverUrl = rawCover.startsWith('https://') && rawCover.length <= 500 ? rawCover : null;
+  return {
+    title: b.title.trim().slice(0, 120),
+    author: String(b.author ?? '').trim().slice(0, 80),
+    publisher: String(b.publisher ?? '').trim().slice(0, 80),
+    coverUrl,
+  };
+}
+
+/** 받은 상태의 book 필드를 정리한다(옛 클라이언트는 book이 없을 수 있다). */
+export function sanitizePlayerState(s: PlayerState): PlayerState {
+  const book = s.state === 'read' ? sanitizeSharedBook(s.book) : null;
+  return { ...s, book };
+}
+
 /** 받은 데이터가 PlayerState 모양인지 확인한다(다른 탭·서버에서 온 값은 믿지 않는다). */
 export function isPlayerState(v: unknown): v is PlayerState {
   const s = v as PlayerState;
-  return !!s && typeof s.id === 'string' && typeof s.nickname === 'string' && typeof s.color === 'string'
-    && Array.isArray(s.position) && s.position.length === 3 && s.position.every(Number.isFinite)
-    && Number.isFinite(s.rotationY) && ['stand', 'walk', 'sit', 'read'].includes(s.state)
-    && ['bangs', 'bob', 'short'].includes(s.hair) && s.nickname.length <= 40;
+  if (!s || typeof s.id !== 'string' || typeof s.nickname !== 'string' || typeof s.color !== 'string') return false;
+  if (!Array.isArray(s.position) || s.position.length !== 3 || !s.position.every(Number.isFinite)) return false;
+  if (!Number.isFinite(s.rotationY) || !['stand', 'walk', 'sit', 'read'].includes(s.state)) return false;
+  if (!['bangs', 'bob', 'short'].includes(s.hair) || s.nickname.length > 40) return false;
+  // book은 없거나 null이거나 객체. 내용은 sanitizeSharedBook에서 다시 검사한다.
+  if (s.book != null && typeof s.book !== 'object') return false;
+  return true;
 }
 
 /**
@@ -100,10 +152,11 @@ export class PeerTracker {
   /** silent: 다시 연결하며 받은 목록처럼 알림을 띄우지 않을 때 */
   upsert(s: PlayerState, silent = Date.now() < this.quietUntil): void {
     if (s.id === this.selfId) return;
-    const isNew = !this.peers.has(s.id);
-    this.peers.set(s.id, s);
-    this.seen.set(s.id, Date.now());
-    if (isNew && !silent) this.emitAction({ type: 'join', from: s.id, nickname: s.nickname, t: Date.now() });
+    const clean = sanitizePlayerState(s);
+    const isNew = !this.peers.has(clean.id);
+    this.peers.set(clean.id, clean);
+    this.seen.set(clean.id, Date.now());
+    if (isNew && !silent) this.emitAction({ type: 'join', from: clean.id, nickname: clean.nickname, t: Date.now() });
     this.emitPeers();
   }
 

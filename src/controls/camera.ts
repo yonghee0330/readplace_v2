@@ -40,12 +40,13 @@ export function applyPreset(cam: THREE.PerspectiveCamera, preset: CamPreset): TH
 
 
 const DEG = Math.PI / 180;
-const MIN_PITCH = 15 * DEG, MAX_PITCH = 70 * DEG;
-export const MIN_DIST = 1.5, MAX_DIST = 7;
+const MIN_PITCH = 15 * DEG, MAX_PITCH = 78 * DEG;
+/** 멀리 당기면 서점 전체를 조망한다. 가까울 때만 벽 안으로 붙인다. */
+export const MIN_DIST = 1.5, MAX_DIST = 14;
 
 /**
- * 3인칭 오빗 카메라. 아바타를 부드럽게 따라가고(댐핑), 드래그로 돌리고, 휠·핀치로 1.5~7m 줌,
- * 상하 각도 15°~70°. 방(벽·천장) 밖으로 나가려 하면 카메라를 안쪽으로 당긴다.
+ * 3인칭 오빗 카메라. 아바타를 부드럽게 따라가고(댐핑), 드래그로 돌리고, 휠·핀치로 1.5~14m 줌,
+ * 상하 각도 15°~78°. 가까이에서는 벽 밖으로 못 나가고, 멀리 당기면 방 밖으로 나가 전체를 본다.
  */
 export class FollowCamera {
   yaw: number;
@@ -104,8 +105,16 @@ export class FollowCamera {
       Math.sin(this.shown.pitch),
       Math.cos(this.shown.yaw) * Math.cos(this.shown.pitch),
     );
-    const d = Math.min(this.shown.dist, roomExit(this.target, dir) - 0.18);
+    // 줌이 멀수록 벽·천장 여유를 넓혀 서점 전체가 한눈에 들어오게 한다
+    const zoomT = THREE.MathUtils.clamp((this.shown.dist - MIN_DIST) / (MAX_DIST - MIN_DIST), 0, 1);
+    const slack = zoomT * zoomT * 5.2;
+    const d = Math.min(this.shown.dist, roomExit(this.target, dir, slack) - 0.18);
     const orbitPos = this.target.clone().addScaledVector(dir, Math.max(0.4, d));
+    // 가까이에서는 기존 시야를 유지하고, 멀리 당길수록 시야를 넓혀 구석까지 담는다
+    const nearFov = this.cam.aspect < 0.8 ? 62 : 55;
+    const wide = Math.max(0, (zoomT - 0.3) / 0.7);
+    this.cam.fov = nearFov + wide * wide * 14;
+    this.cam.updateProjectionMatrix();
     // 읽기 모드 구도와 섞기(약 0.8초)
     if (this.focusPose) this.lastFocus = this.focusPose;
     this.focusBlend += ((this.focusPose ? 1 : 0) - this.focusBlend) * k(5.5);
@@ -125,15 +134,15 @@ export class FollowCamera {
   }
 }
 
-/** 방 안의 점 p에서 dir 방향으로 벽·천장·바닥에 닿기까지의 거리(방 = 축 정렬 상자). */
-function roomExit(p: THREE.Vector3, dir: THREE.Vector3): number {
+/** 점 p에서 dir 방향으로 카메라 경계(방 + slack)에 닿기까지의 거리. */
+function roomExit(p: THREE.Vector3, dir: THREE.Vector3, slack = 0): number {
   let t = Infinity;
   const axis = (pos: number, d: number, lo: number, hi: number) => {
     if (d > 1e-6) t = Math.min(t, (hi - pos) / d);
     else if (d < -1e-6) t = Math.min(t, (lo - pos) / d);
   };
-  axis(p.x, dir.x, ROOM.x0, ROOM.x1);
-  axis(p.y, dir.y, 0.05, ROOM.h - 0.12);
-  axis(p.z, dir.z, ROOM.z0, ROOM.z1);
+  axis(p.x, dir.x, ROOM.x0 - slack, ROOM.x1 + slack);
+  axis(p.y, dir.y, 0.05, ROOM.h - 0.12 + slack * 0.85);
+  axis(p.z, dir.z, ROOM.z0 - slack, ROOM.z1 + slack);
   return t;
 }

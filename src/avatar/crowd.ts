@@ -13,6 +13,10 @@ export class Actor {
   readonly avatar: Avatar;
   nameplate: Nameplate | null = null;
   nickname: string;
+  /** 이름표 점 색(옷 색) */
+  accent: string;
+  /** 읽기 중이면 이름표에 보이는 책 제목 */
+  bookTitle: string | null = null;
   seatId: string | null = null;
   /** 읽기 모드에서 내 이름표·아이콘 숨기기 */
   hideLabel = false;
@@ -22,6 +26,7 @@ export class Actor {
 
   constructor(readonly id: string, readonly kind: ActorKind, nickname: string, look: { color: string; hair: HairStyle }) {
     this.nickname = nickname;
+    this.accent = look.color;
     this.avatar = new Avatar(look);
     this.avatar.root.userData.actorId = id;
   }
@@ -33,16 +38,32 @@ export class Actor {
   setState(state: AvatarState, seatId: string | null): void {
     this.seatId = seatId;
     this.avatar.anim.setState(state, seatId !== null);
+    if (state !== 'read') this.bookTitle = null;
+    this.refreshNameplate();
+  }
+
+  setBookTitle(title: string | null): void {
+    const next = title?.trim() || null;
+    if (this.bookTitle === next) return;
+    this.bookTitle = next;
+    this.refreshNameplate();
+  }
+
+  private refreshNameplate(): void {
+    const sub = this.avatar.state === 'read' && this.bookTitle ? this.bookTitle : '';
+    this.nameplate?.set(this.nickname, this.accent, sub);
   }
 
   /** 다른 방문객: 받은 상태를 기록해 둔다. */
   pushRemote(s: PlayerState, now: number): void {
     this.snapshots.push({ at: now, x: s.position[0], y: s.position[1], z: s.position[2], ry: s.rotationY });
     if (this.snapshots.length > 30) this.snapshots.shift();
+    this.nickname = s.nickname;
+    this.accent = s.color;
+    this.bookTitle = s.state === 'read' ? (s.book?.title ?? null) : null;
     this.setState(s.state, s.seatId);
     this.avatar.setLook({ color: s.color, hair: s.hair });
-    this.nickname = s.nickname;
-    this.nameplate?.set(s.nickname, s.color);
+    this.refreshNameplate();
   }
 
   /** 100ms 늦게 재생해 두 기록 사이를 보간한다. */
@@ -189,7 +210,8 @@ export class Crowd {
         a.nameplate.update(_v.set(p.x, top + 0.06, p.z), camera);
       }
       if (a.avatar.state === 'read' && !a.hideLabel && ni < MAX) {
-        const lift = a.nameplate ? 0.17 * a.nameplate.mesh.scale.x : 0.06;
+        // 책 제목이 있으면 이름표가 두 줄이라 아이콘을 조금 더 올린다
+        const lift = a.nameplate ? (a.bookTitle ? 0.24 : 0.17) * a.nameplate.mesh.scale.x : 0.06;
         const sc = a.nameplate ? a.nameplate.mesh.scale.x : 1;
         _m.compose(_v.set(p.x, top + 0.06 + lift, p.z), camera.quaternion, _s.set(sc, sc, sc));
         this.icons.setMatrixAt(ni++, _m);

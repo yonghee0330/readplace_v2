@@ -70,14 +70,29 @@ export function seatApproach(s: Seat, dist = 0.5): { x: number; z: number } {
   return { x: s.x + Math.sin(s.ry) * dist * s.approach, z: s.z + Math.cos(s.ry) * dist * s.approach };
 }
 
-/** 처음 들어왔을 때 서는 자리(계산대 앞, 서점 안쪽을 바라봄). 여러 명이 겹치지 않게 몇 군데로 나눈다. */
+/** 처음 들어왔을 때 서는 자리(계산대 앞, 서점 안쪽을 바라봄). 한 입장에서 20명이 겹치지 않게 통로에 나눈다. */
 export const SPAWN = { x: 1.15, z: 1.05, ry: -2.6 } as const;
 export const SPAWNS = [
   SPAWN,
-  { x: 1.6, z: 1.3, ry: -2.3 },
-  { x: 2.05, z: 0.85, ry: -2.0 },
-  { x: 0.45, z: 1.35, ry: -2.9 },
-  { x: 1.95, z: -0.35, ry: -1.8 },
+  { x: 1.13, z: 1.63, ry: -2.6 },
+  { x: 1.63, z: 1.38, ry: -2.6 },
+  { x: 0.63, z: 1.38, ry: -2.6 },
+  { x: 1.63, z: 0.63, ry: -2.6 },
+  { x: 0.38, z: 0.88, ry: -2.6 },
+  { x: 1.38, z: 0.13, ry: -2.6 },
+  { x: 2.13, z: 1.13, ry: -2.6 },
+  { x: 1.38, z: 2.13, ry: -2.6 },
+  { x: 1.88, z: 1.88, ry: -2.6 },
+  { x: 0.38, z: 1.88, ry: -2.6 },
+  { x: 2.13, z: 0.38, ry: -2.6 },
+  { x: -0.13, z: 1.13, ry: -2.6 },
+  { x: 0.88, z: 2.38, ry: -2.6 },
+  { x: 1.88, z: -0.13, ry: -2.6 },
+  { x: 2.63, z: 0.63, ry: -2.6 },
+  { x: -0.38, z: 1.63, ry: -2.6 },
+  { x: 1.63, z: 2.63, ry: -2.6 },
+  { x: 2.13, z: 2.38, ry: -2.6 },
+  { x: -0.13, z: 2.13, ry: -2.6 },
 ] as const;
 
 export interface Collider { x0: number; x1: number; z0: number; z1: number; h: number; seatable: boolean; seats?: string[] }

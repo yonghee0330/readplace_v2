@@ -1,7 +1,7 @@
 // e2e: 같은 방에 탭 2개 → 서로의 아바타·이름표·눈인사 알림·접속자 수 확인. Local(BroadcastChannel)과 ws 두 모드.
 // 읽기 모드(키 3 → 타이머 → 함께 읽는 중 N명 → Esc)도 탭 2개로 확인한다.
 // 모든 페이지의 콘솔 에러가 0개인지도 함께 확인한다.
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 interface Debug {
   __BBOOKS_READY?: boolean;
@@ -25,6 +25,37 @@ function watchErrors(page: Page, errors: string[]): void {
 async function open(page: Page, query: string): Promise<void> {
   await page.goto(`/?autostart=1&quality=low&npc=0&${query}`);
   await page.waitForFunction(() => (window as unknown as Debug).__BBOOKS_READY === true, null, { timeout: 180_000 });
+}
+
+/** 표지 조회 네트워크 없이 바로 확정되도록 샘플 책을 미리 넣는다. */
+async function seedReadingBook(ctx: BrowserContext): Promise<void> {
+  await ctx.addInitScript(() => {
+    localStorage.setItem(
+      'bbooks.book',
+      JSON.stringify({
+        title: '데미안',
+        author: '헤르만 헤세',
+        publisher: '민음사',
+        coverUrl: 'https://covers.openlibrary.org/b/id/10521265-L.jpg',
+      }),
+    );
+  });
+}
+
+/** 책 정보 시트가 열리면 저장된(또는 입력한) 책으로 확정한다. */
+async function confirmBook(page: Page): Promise<void> {
+  const sheet = page.locator('#book-sheet');
+  await expect(sheet).toBeVisible();
+  const title = page.locator('#book-title');
+  if (!(await title.inputValue()).trim()) {
+    await title.fill('데미안');
+    await page.locator('#book-author').fill('헤르만 헤세');
+    await page.locator('#book-publisher').fill('민음사');
+  }
+  await page.getByRole('button', { name: '이 책으로 읽기' }).click();
+  await expect(sheet).toBeHidden({ timeout: 45_000 });
+  await expect(page.locator('.book-card')).toBeVisible();
+  await expect(page.locator('.book-card-title')).toHaveText(/./);
 }
 
 const me = (p: Page) => p.evaluate(() => (window as unknown as Debug).__BBOOKS.me());
@@ -62,8 +93,9 @@ async function togetherFlow(a: Page, b: Page, query: string): Promise<void> {
   // 화면에 실제 토스트로도 뜬다(한 번은 DOM으로 확인)
   await expect(a.locator('.toast', { hasText: '눈인사를 건넸어요' })).toBeAttached();
 
-  // 책 펼치기: B의 상태가 A에게 "읽기"로 보인다
+  // 책 펼치기: 책 정보 확정 후 B의 상태가 A에게 "읽기"로 보인다
   await b.getByRole('button', { name: /책 펼치기/ }).click();
+  await confirmBook(b);
   await a.waitForFunction((id) => (window as unknown as Debug).__BBOOKS.peers().find((p) => p.id === id)?.state === 'read', meB.id);
 
   // 나가기: B를 닫으면 A의 접속자 수가 1로, 나갔다는 알림
@@ -76,6 +108,7 @@ test.describe('함께 있기', () => {
   test('Local 모드: 같은 브라우저 탭 2개가 서로를 본다', async ({ browser }) => {
     const errors: string[] = [];
     const ctx = await browser.newContext();
+    await seedReadingBook(ctx);
     const a = await ctx.newPage();
     const b = await ctx.newPage();
     watchErrors(a, errors);
@@ -90,6 +123,8 @@ test.describe('함께 있기', () => {
     // 다른 기기처럼 저장소를 나누기 위해 컨텍스트를 따로 연다(BroadcastChannel로는 서로 못 봄)
     const ctxA = await browser.newContext();
     const ctxB = await browser.newContext();
+    await seedReadingBook(ctxA);
+    await seedReadingBook(ctxB);
     const a = await ctxA.newPage();
     const b = await ctxB.newPage();
     watchErrors(a, errors);
@@ -105,6 +140,7 @@ test.describe('읽기 모드', () => {
   test('키 3으로 들어가 타이머가 오르고, 다른 탭과 함께 읽는 수가 맞고, Esc로 돌아온다', async ({ browser }) => {
     const errors: string[] = [];
     const ctx = await browser.newContext();
+    await seedReadingBook(ctx);
     const a = await ctx.newPage();
     const b = await ctx.newPage();
     watchErrors(a, errors);
@@ -117,13 +153,15 @@ test.describe('읽기 모드', () => {
     expect((await me(a)).state).toBe('sit');
     expect((await me(b)).state).toBe('stand');
 
-    // 진입: 키 3 → 집중 독서 화면, HUD 숨김, 상태 read
+    // 진입: 키 3 → 책 정보 확정 → 집중 독서 화면, HUD 숨김, 상태 read
     await a.keyboard.press('3');
+    await confirmBook(a);
     const focusA = a.locator('.focus');
     await expect(focusA).toBeVisible();
     await expect(a.locator('.hud')).toHaveClass(/is-hidden/);
     await expect.poll(async () => (await me(a)).state).toBe('read');
     await expect(a.locator('.focus-together')).toHaveText('함께 읽는 중 1명');
+    await expect(a.locator('.book-card.is-focus .book-card-title')).toHaveText('데미안');
 
     // 타이머가 오른다
     const clock = a.locator('.focus-clock');
@@ -133,6 +171,7 @@ test.describe('읽기 모드', () => {
 
     // 다른 탭도 읽기 모드로 → 양쪽에 "함께 읽는 중 2명"
     await b.keyboard.press('3');
+    await confirmBook(b);
     await expect(b.locator('.focus-together')).toHaveText('함께 읽는 중 2명');
     await expect(a.locator('.focus-together')).toHaveText('함께 읽는 중 2명');
     // A에게 B가 읽는 모습으로 보인다
@@ -163,6 +202,7 @@ test.describe('접근성·소리·PWA', () => {
     const errors: string[] = [];
     // 시스템 "동작 줄이기"를 켠 상태로 연다
     const ctx = await browser.newContext({ reducedMotion: 'reduce' });
+    await seedReadingBook(ctx);
     // 키보드 이동은 설정에서 켜는 기능이라 미리 켜 둔다(첫 안내도 이미 본 것으로)
     await ctx.addInitScript(() => {
       if (!localStorage.getItem('bbooks.settings')) localStorage.setItem('bbooks.settings', JSON.stringify({ keyboardMove: true, introDismissed: true }));
@@ -200,7 +240,9 @@ test.describe('접근성·소리·PWA', () => {
       expect(info.ring, `${info.name}에 포커스 링이 보인다`).toBe(true);
       stops.push(info.name);
     }
-    for (const want of ['서점에서 나가기', '방 선택', '서점 소리 켜기', '설정 열기', '눈인사 (단축키 1)']) expect(stops).toContain(want);
+    for (const want of ['서점에서 나가기', '서점 소리 켜기', '설정 열기', '눈인사 (단축키 1)']) expect(stops).toContain(want);
+    await expect(page.locator('.pill-room')).toHaveText('원미서가');
+    await expect(page.locator('.count-cap')).toHaveText('/20');
 
     // 설정 시트: 키보드로 열고 Esc로 닫으면 포커스가 버튼으로 돌아온다
     const settingsBtn = page.getByRole('button', { name: '설정 열기' });
@@ -259,6 +301,7 @@ test.describe('접근성·소리·PWA', () => {
     await page.keyboard.press('1');
     await toastSeen(page, '눈인사를 건넸어요');
     await page.keyboard.press('3');
+    await confirmBook(page);
     await expect(page.locator('.focus')).toBeVisible();
     await expect(page.getByRole('button', { name: /돌아가기/ })).toBeFocused();
     for (let i = 0; i < 3; i++) {

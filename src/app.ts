@@ -9,16 +9,19 @@ import { CAM_PRESETS, FollowCamera, applyPreset, createCamera } from './controls
 import { CanvasInput, isTyping } from './controls/input';
 import { Movement } from './controls/movement';
 import { Loop } from './core/loop';
-import type { Params, QualityLevel } from './core/params';
+import { ROOM_CAPACITY, apiBaseFromWs, type Params, type QualityLevel } from './core/params';
 import { detectQuality, profileFor, type QualityProfile } from './core/quality';
 import { Rng } from './core/rng';
 import { loadProfile, loadSettings, saveSettings, type Profile, type Settings } from './core/storage';
 import { LocalPresence } from './net/localPresence';
 import { randomNickname } from './net/nickname';
-import { newId, type ActionEvent, type Presence, type PlayerState } from './net/presence';
+import { newId, sanitizeSharedBook, type ActionEvent, type Presence, type PlayerState, type SharedBook } from './net/presence';
 import { WsPresence } from './net/wsPresence';
-import { FocusMode } from './reader/focus';
+import { loadBook, setCoverApiBase, type ReadingBook } from './reader/book';
+import { FocusMode, type FocusReader } from './reader/focus';
 import { buildBookstore, type Bookstore } from './scene/bookstore';
+import { BookCard } from './ui/bookCard';
+import { BookSheet } from './ui/bookSheet';
 import { SEATS, SPAWN, SPAWNS, colliders } from './scene/layout';
 import { buildPostFx, type PostFx } from './scene/postfx';
 import { Hud } from './ui/hud';
@@ -99,8 +102,13 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   const ui = document.getElementById('ui')!;
   const toasts = new Toasts(ui);
   const focus = new FocusMode(ui, () => setFocus(false));
+  const bookCard = new BookCard(ui);
+  const bookSheet = new BookSheet();
+  let currentBook: ReadingBook | null = loadBook();
+  // 카카오 책 표지는 REST 키를 서버에만 두고 `/api/kakao` 프록시로 통한다
+  setCoverApiBase(params.api || apiBaseFromWs(params.ws) || (import.meta.env.VITE_API_BASE as string | undefined) || '');
 
-  let presence: Presence = params.presence === 'ws' ? new WsPresence(params.ws) : new LocalPresence();
+  let presence: Presence = params.presence === 'ws' ? new WsPresence(params.ws) : new LocalPresence(params.cap);
   let instance = params.instance;
   let connected = false;
   let peers = new Map<string, PlayerState>();
@@ -119,12 +127,11 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     addEventListener('keydown', resume, true);
   }
 
-  const hud = new Hud(ui, instance, {
+  const hud = new Hud(ui, {
     exit: () => {
       sfx.play('tap');
       exitSheet.open();
     },
-    room: (n) => void switchRoom(n),
     sound: () => {
       settings.sound = !settings.sound;
       saveSettings(settings);
@@ -159,7 +166,8 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       sessionNick = p.nickname;
       me.avatar.setLook(p);
       me.nickname = p.nickname;
-      me.nameplate?.set(p.nickname, p.color);
+      me.accent = p.color;
+      me.setBookTitle(movement.reading ? (currentBook?.title ?? null) : null);
       pushState(true);
     },
     reducedMotion: (v) => {
@@ -187,18 +195,29 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   }
 
   // ---------- 상태 보내기 ----------
+  /** 읽기 중일 때만 책 메타를 실어 보낸다(표지는 https만). */
+  function sharedBook(): SharedBook | null {
+    if (!movement.reading || !currentBook?.title) return null;
+    return sanitizeSharedBook({
+      title: currentBook.title,
+      author: currentBook.author,
+      publisher: currentBook.publisher,
+      coverUrl: currentBook.coverUrl?.startsWith('https://') ? currentBook.coverUrl : null,
+    });
+  }
   function myState(): PlayerState {
     const p = me.root.position;
     return {
       id: myId, nickname: sessionNick, color: profile.color, hair: profile.hair,
       position: [round(p.x), round(p.y), round(p.z)], rotationY: round(me.root.rotation.y),
-      state: movement.state, seatId: movement.seatId, t: Date.now(),
+      state: movement.state, seatId: movement.seatId, book: sharedBook(), t: Date.now(),
     };
   }
   function pushState(force = false): void {
     const now = performance.now();
     if (!force && now - lastSentAt < 100) return;
     lastSentAt = now;
+    me.setBookTitle(movement.reading ? (currentBook?.title ?? null) : null);
     presence.sendState(myState());
     hud.setReading(movement.reading);
   }
@@ -231,7 +250,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       if (s.nickname === sessionNick && myId > s.id) {
         sessionNick = randomNickname();
         me.nickname = sessionNick;
-        me.nameplate?.set(sessionNick, profile.color);
+        me.setBookTitle(movement.reading ? (currentBook?.title ?? null) : null);
         pushState(true);
       }
     }
@@ -241,7 +260,21 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     for (const n of npcs) n.root.visible = params.npc && settings.npc && !peerSeats.has(n.seatId);
     const count = peers.size + 1;
     hud.setCount(count);
-    focus.setTogether([...peers.values()].filter((s) => s.state === 'read').length + (movement.reading ? 1 : 0));
+    const readers: FocusReader[] = [];
+    if (movement.reading) {
+      readers.push({
+        nickname: sessionNick,
+        color: profile.color,
+        book: sharedBook(),
+        self: true,
+      });
+    }
+    for (const s of peers.values()) {
+      if (s.state !== 'read') continue;
+      readers.push({ nickname: s.nickname, color: s.color, book: s.book });
+    }
+    focus.setTogether(readers.length);
+    focus.setReaders(readers);
   }
 
   function onAction(a: ActionEvent): void {
@@ -254,24 +287,10 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     }
   }
 
-  async function connect(): Promise<void> {
-    await presence.connect(params.room, instance, myState());
-    syncPeers();
-  }
-
-  async function switchRoom(n: number): Promise<void> {
-    if (n === instance) return;
-    presence.disconnect();
-    for (const a of crowd.list('peer')) crowd.remove(a.id);
-    peers.clear();
-    instance = n;
-    const u = new URL(location.href);
-    u.searchParams.set('room', params.room);
-    u.searchParams.set('instance', String(n));
-    history.replaceState(null, '', u);
-    hud.setRoom(n);
-    await connect();
-    toasts.show(`원미서가 ${n}에 들어왔어요`);
+  async function connect(): Promise<'ok' | 'full'> {
+    const result = await presence.connect(params.room, instance, myState());
+    if (result === 'ok') syncPeers();
+    return result;
   }
 
   // ---------- 액션 ----------
@@ -288,34 +307,82 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     hud.cooldown('nod', NOD_COOLDOWN);
   }
 
+  function applyBook(book: ReadingBook, focusMode: boolean): void {
+    currentBook = book;
+    bookCard.show(book, focusMode);
+    // 이름표 부제는 state===read일 때만 그려진다. 책 확정 직후·읽기 전환 전에 미리 넣어 둔다.
+    me.setBookTitle(book.title);
+  }
+
+  /** 캡처·테스트용: 시트 없이 저장된 책(또는 안내용 기본값)으로 바로 읽기 */
+  function bookForAuto(): ReadingBook {
+    return currentBook ?? loadBook() ?? {
+      title: '지금 읽는 책',
+      author: '',
+      publisher: '',
+      coverUrl: null,
+    };
+  }
+
+  function askBookThen(next: (book: ReadingBook) => void): void {
+    // 고정 시점·자동 읽기는 시트를 건너뛴다
+    if (params.autoread || params.cam) {
+      next(bookForAuto());
+      return;
+    }
+    bookSheet.open(next);
+  }
+
+  function enterFocusWith(book: ReadingBook): void {
+    applyBook(book, true);
+    sfx.play('page');
+    movement.setReading(true);
+    follow.setFocus(focusPose());
+    me.hideLabel = true;
+    focus.enter();
+    hud.setHidden(true);
+    pushState(true);
+    syncPeers();
+  }
+
   function toggleBook(): void {
     if (!connected) return;
     if (focus.active) {
       setFocus(false);
       return;
     }
-    movement.toggleReading();
-    if (movement.reading) sfx.play('page');
-    pushState(true);
+    if (movement.reading) {
+      movement.setReading(false);
+      bookCard.hide();
+      pushState(true);
+      return;
+    }
+    askBookThen((book) => {
+      applyBook(book, false);
+      movement.setReading(true);
+      sfx.play('page');
+      pushState(true);
+    });
   }
 
   function setFocus(on: boolean): void {
     if (on === focus.active) return;
     if (on) {
       if (!connected) return;
-      sfx.play('page');
-      movement.setReading(true);
-      follow.setFocus(focusPose());
-      me.hideLabel = true;
-      focus.enter();
-      hud.setHidden(true);
-    } else {
-      focus.exit();
-      movement.setReading(false);
-      follow.setFocus(null);
-      me.hideLabel = false;
-      hud.setHidden(false);
+      // 이미 책을 펼친 상태면 같은 책으로 바로 집중 모드
+      if (movement.reading && currentBook) {
+        enterFocusWith(currentBook);
+        return;
+      }
+      askBookThen((book) => enterFocusWith(book));
+      return;
     }
+    focus.exit();
+    movement.setReading(false);
+    follow.setFocus(null);
+    me.hideLabel = false;
+    hud.setHidden(false);
+    bookCard.hide();
     pushState(true);
     syncPeers();
   }
@@ -417,7 +484,19 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   // ---------- 연결 ----------
   await loading.begin('연결');
   wirePresence(presence);
-  await connect();
+  const admission = await connect();
+  if (admission === 'full') {
+    hud.root.hidden = true;
+    const full = document.getElementById('full')!;
+    const limit = params.presence === 'ws' ? ROOM_CAPACITY : params.cap;
+    document.getElementById('full-copy')!.innerHTML = `지금은 ${limit}명이 모두 모였어요.<br />누군가 나가면 다시 들어올 수 있어요.`;
+    full.hidden = false;
+    const back = document.getElementById('full-back')!;
+    back.addEventListener('click', () => location.assign(location.pathname));
+    await loading.finish(reducedMotion());
+    back.focus();
+    return;
+  }
   // 먼저 온 사람이 서 있는 자리와 겹치지 않는 시작 자리로
   if (!startSeat && peers.size) {
     const taken = [...peers.values()].map((p) => p.position);
@@ -457,7 +536,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   (window as unknown as { __BBOOKS: unknown }).__BBOOKS = {
     me: () => myState(),
     toasts: () => [...toasts.log],
-    peers: () => [...peers.values()].map((p) => ({ id: p.id, nickname: p.nickname, state: p.state, seatId: p.seatId })),
+    peers: () => [...peers.values()].map((p) => ({ id: p.id, nickname: p.nickname, state: p.state, seatId: p.seatId, book: p.book })),
     visiblePeerAvatars: () => crowd.list('peer').filter((a) => a.root.visible && a.root.parent).map((a) => ({ id: a.id, nickname: a.nickname, nameplate: !!a.nameplate?.mesh.visible })),
     npcCount: () => npcs.filter((n) => n.root.visible).length,
     sound: () => amb.status(),

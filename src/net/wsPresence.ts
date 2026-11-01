@@ -1,5 +1,6 @@
 // WsPresence: server/index.ts 중계 서버에 붙어 다른 기기와도 함께 있기(?presence=ws&ws=ws://...).
 // 끊기면 1·2·4·8·최대 15초 간격으로 다시 연결한다.
+import { ROOM_CAPACITY } from '../core/params';
 import {
   HEARTBEAT_MS, PeerTracker, STATE_INTERVAL_MS, isPlayerState,
   type ActionEvent, type Presence, type PlayerState,
@@ -11,7 +12,8 @@ type ServerMsg =
   | { type: 'welcome'; peers: PlayerState[] }
   | { type: 'state'; state: PlayerState }
   | { type: 'action'; action: ActionEvent }
-  | { type: 'leave'; id: string };
+  | { type: 'leave'; id: string }
+  | { type: 'full'; limit?: number };
 
 export class WsPresence extends PeerTracker implements Presence {
   private ws: WebSocket | null = null;
@@ -24,6 +26,8 @@ export class WsPresence extends PeerTracker implements Presence {
   private closedByUser = false;
   private lastSent = 0;
   private pending = 0;
+  private settle: ((r: 'ok' | 'full') => void) | null = null;
+  private settleTimer = 0;
 
   /** 탭을 닫을 때 서버의 하트비트 정리(최대 20초)를 기다리지 않고 바로 나갔다고 알린다 */
   private onHide = () => this.disconnect();
@@ -32,7 +36,7 @@ export class WsPresence extends PeerTracker implements Presence {
     super();
   }
 
-  connect(room: string, instance: number, me: PlayerState): Promise<void> {
+  connect(room: string, instance: number, me: PlayerState): Promise<'ok' | 'full'> {
     this.disconnect();
     this.closedByUser = false;
     this.room = room;
@@ -42,16 +46,21 @@ export class WsPresence extends PeerTracker implements Presence {
     this.attempt = 0;
     this.setStatus('connecting');
     addEventListener('pagehide', this.onHide);
-    return new Promise((resolve) => this.open(resolve));
+    return new Promise((resolve) => {
+      this.settle = resolve;
+      this.open();
+      // 서버가 응답하지 않으면 혼자 있는 것으로 들어간다(재연결은 계속)
+      this.settleTimer = window.setTimeout(() => this.done('ok'), 4000);
+    });
   }
 
-  private open(firstDone?: () => void): void {
+  private open(): void {
     let ws: WebSocket;
     try {
       ws = new WebSocket(this.url);
     } catch {
       this.scheduleRetry();
-      firstDone?.();
+      this.done('ok');
       return;
     }
     this.ws = ws;
@@ -60,11 +69,8 @@ export class WsPresence extends PeerTracker implements Presence {
       // 다시 연결할 때 받은 목록은 조용히 반영(이미 알던 사람들)
       this.quietUntil = Date.now() + 1500;
       this.send({ type: 'join', room: this.room, instance: this.instance, state: this.me });
-      this.setStatus('connected');
       clearInterval(this.heartbeat);
       this.heartbeat = window.setInterval(() => this.me && this.send({ type: 'state', state: { ...this.me, t: Date.now() } }), HEARTBEAT_MS);
-      firstDone?.();
-      firstDone = undefined;
     };
     ws.onmessage = (e) => {
       let m: ServerMsg;
@@ -81,8 +87,8 @@ export class WsPresence extends PeerTracker implements Presence {
       this.ws = null;
       if (this.closedByUser) return;
       this.scheduleRetry();
-      firstDone?.();
-      firstDone = undefined;
+      // 서버가 꺼져 있으면 혼자 들어가고, 붙으면 다시 만난다
+      this.done('ok');
     };
     // 오류는 onclose에서 함께 처리한다(콘솔 에러를 남기지 않게 기본 동작만).
     ws.onerror = () => {};
@@ -100,6 +106,8 @@ export class WsPresence extends PeerTracker implements Presence {
     removeEventListener('pagehide', this.onHide);
     this.closedByUser = true;
     clearTimeout(this.retry);
+    clearTimeout(this.settleTimer);
+    this.settle = null;
     clearInterval(this.heartbeat);
     clearTimeout(this.pending);
     this.pending = 0;
@@ -135,13 +143,43 @@ export class WsPresence extends PeerTracker implements Presence {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
   }
 
+  private done(r: 'ok' | 'full'): void {
+    clearTimeout(this.settleTimer);
+    const settle = this.settle;
+    if (!settle) return;
+    this.settle = null;
+    // 서버가 꺼져 재연결 중이면 '연결됨'으로 덮지 않는다
+    if (r === 'ok' && this.status !== 'reconnecting') this.setStatus('connected');
+    settle(r);
+  }
+
+  /** 정원이 차 거절되면 재연결하지 않고 입장을 멈춘다. */
+  private rejectFull(): void {
+    this.closedByUser = true;
+    clearTimeout(this.retry);
+    clearInterval(this.heartbeat);
+    this.done('full');
+    this.ws?.close();
+    this.ws = null;
+  }
+
   private handle(m: ServerMsg): void {
     if (!m || typeof m !== 'object') return;
-    if (m.type === 'welcome' && Array.isArray(m.peers)) {
+    if (m.type === 'full') {
+      this.rejectFull();
+    } else if (m.type === 'welcome' && Array.isArray(m.peers)) {
+      const peers = m.peers.filter(isPlayerState);
+      // 서버가 이미 정원을 채운 목록을 주면 들어가지 않는다
+      if (peers.length >= ROOM_CAPACITY) {
+        this.rejectFull();
+        return;
+      }
+      this.setStatus('connected');
       // 다시 연결: 서버 목록에 없는 피어는 조용히 지운다
-      const ids = new Set(m.peers.filter(isPlayerState).map((p) => p.id));
+      const ids = new Set(peers.map((p) => p.id));
       for (const id of [...this.peers.keys()]) if (!ids.has(id)) this.remove(id, true);
-      for (const p of m.peers) if (isPlayerState(p)) this.upsert(p, true);
+      for (const p of peers) this.upsert(p, true);
+      this.done('ok');
     } else if (m.type === 'state' && isPlayerState(m.state)) {
       this.upsert(m.state);
     } else if (m.type === 'action' && m.action?.type === 'nod' && typeof m.action.from === 'string') {

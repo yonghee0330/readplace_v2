@@ -1,6 +1,6 @@
-// HUD: 상단 좌측(나가기·방 선택), 상단 우측(접속자 수·소리·설정), 하단 액션 3개(눈인사·책 펼치기·읽기 모드),
+// HUD: 상단 좌측(나가기·서점 이름), 상단 우측(접속자 수·소리·설정), 하단 액션 3개(눈인사·책 펼치기·읽기 모드),
 // 연결 상태 필. 모든 버튼에 aria-label, 하단 액션은 연결 전 비활성 + "연결 중" 툴팁.
-import { roomLabel } from '../core/params';
+import { ROOM_CAPACITY, roomLabel } from '../core/params';
 
 const ICON = {
   back: '<path d="M15 5l-7 7 7 7" />',
@@ -18,7 +18,6 @@ export const icon = (name: keyof typeof ICON) =>
 
 export interface HudHandlers {
   exit(): void;
-  room(instance: number): void;
   sound(): void;
   settings(): void;
   nod(): void;
@@ -33,21 +32,17 @@ export class Hud {
   private actions: HTMLButtonElement[];
   private bookBtn: HTMLButtonElement;
   private pill: HTMLElement;
-  private roomSel: HTMLSelectElement;
 
-  constructor(parent: HTMLElement, instance: number, h: HudHandlers) {
+  constructor(parent: HTMLElement, h: HudHandlers) {
     this.root = document.createElement('div');
     this.root.className = 'hud';
     this.root.innerHTML = `
       <div class="hud-top hud-left">
         <button type="button" class="pill pill-icon" data-act="exit" aria-label="서점에서 나가기">${icon('back')}<span class="pill-text">나가기</span></button>
-        <label class="pill pill-select">
-          <span class="visually-hidden">방 선택</span>
-          <select data-act="room" aria-label="방 선택"></select>
-        </label>
+        <div class="pill pill-room" role="status">${roomLabel()}</div>
       </div>
       <div class="hud-top hud-right">
-        <div class="pill pill-count" role="status" aria-live="polite">${icon('people')}<span class="count-num">1</span></div>
+        <div class="pill pill-count" role="status" aria-live="polite">${icon('people')}<span class="count-num">1</span><span class="count-cap">/${ROOM_CAPACITY}</span></div>
         <button type="button" class="pill pill-icon" data-act="sound" aria-label="서점 소리 켜기" aria-pressed="false">${icon('soundOff')}</button>
         <button type="button" class="pill pill-icon" data-act="settings" aria-label="설정 열기" aria-haspopup="dialog">${icon('gear')}</button>
       </div>
@@ -64,17 +59,6 @@ export class Hud {
     this.bookBtn = q<HTMLButtonElement>('[data-act="book"]');
     this.pill = q('.hud-status');
     this.actions = [...this.root.querySelectorAll<HTMLButtonElement>('.action')];
-    this.roomSel = q<HTMLSelectElement>('select');
-    const rooms = [1, 2, 3, 4, 5, 6, 7, 8];
-    if (!rooms.includes(instance)) rooms.unshift(instance);
-    for (const n of rooms) {
-      const o = document.createElement('option');
-      o.value = String(n);
-      o.textContent = roomLabel(n);
-      this.roomSel.appendChild(o);
-    }
-    this.roomSel.value = String(instance);
-    this.roomSel.addEventListener('change', () => h.room(Number(this.roomSel.value)));
 
     q('[data-act="exit"]').addEventListener('click', () => h.exit());
     this.soundBtn.addEventListener('click', () => h.sound());
@@ -86,12 +70,13 @@ export class Hud {
     q('[data-act="nod"]').addEventListener('click', guard(h.nod));
     this.bookBtn.addEventListener('click', guard(h.book));
     q('[data-act="focus"]').addEventListener('click', guard(h.focus));
+    this.setCount(1);
     this.setConnected(false);
   }
 
   setCount(n: number): void {
     this.count.textContent = String(n);
-    this.count.parentElement!.setAttribute('aria-label', `지금 함께 있는 사람 ${n}명`);
+    this.count.parentElement!.setAttribute('aria-label', `지금 함께 있는 사람 ${n}명, 최대 ${ROOM_CAPACITY}명`);
   }
 
   setSound(on: boolean): void {
@@ -115,10 +100,6 @@ export class Hud {
       else b.title = '연결 중';
     }
     this.pill.hidden = !reconnecting;
-  }
-
-  setRoom(instance: number): void {
-    this.roomSel.value = String(instance);
   }
 
   /** 읽기 모드에서는 HUD를 옅게 숨긴다. */
