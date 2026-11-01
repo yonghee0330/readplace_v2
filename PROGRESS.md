@@ -3,7 +3,7 @@
 세션 간 인수인계 문서. 단계마다 "한 일 / 확인 방법 / 남은 일"을 적는다.
 기준: SPEC-v3.md 13장. 계획 상세는 PLAN.md.
 
-현재 상태: **세션 2 완료 — 단계 1~5 통과, 단계 6(읽기 모드) 대부분 완료. 다음은 세션 3(단계 6 마무리·7·8)** (저장소 yonghee0330/readplace_v2, 브랜치 session-2-avatar-hud-presence)
+현재 상태: **세션 3 진행 중 — 단계 1~6 통과. 단계 7·8 작업 중** (저장소 yonghee0330/readplace_v2, 브랜치 session-3-finish. PR #1·#2는 main에 병합, GitHub Pages 배포 중)
 
 ---
 
@@ -77,8 +77,13 @@
 - [x] "함께 읽는 중 N명", 이번 독서 타이머, 오늘 읽은 시간
 - [x] localStorage 누적·오늘 시간(날짜 바뀌면 초기화, 10초마다 저장)
 - [x] Esc·돌아가기 → 원래 시점, presence 상태 read ↔ stand/sit
-- [ ] e2e: 읽기 모드 진입 → 타이머 → 돌아가기, 다른 탭에서 "함께 읽는 중 2명"
-- 통과 조건: 읽기 모드 진입 → 타이머 동작 → 돌아가기, 다른 탭에서 읽는 모습 보임
+- [x] e2e: 읽기 모드 진입 → 타이머 → 돌아가기, 다른 탭에서 "함께 읽는 중 2명"
+- 통과 조건: 읽기 모드 진입 → 타이머 동작 → 돌아가기, 다른 탭에서 읽는 모습 보임 → **통과**
+
+### 단계 6 결과 (세션 3)
+- 한 일: `tests/e2e.spec.ts`에 "읽기 모드" 테스트 추가 — A(소파에 앉은 채)·B(선 채) 탭 2개, A가 키 3 → 집중 화면·HUD 숨김·상태 read·"함께 읽는 중 1명" → 타이머가 오름 → B도 키 3 → 양쪽 "함께 읽는 중 2명", A에게 B가 read로 보임 → A는 Esc로 나와 sit 복귀·오늘 읽은 시간 저장 확인, B는 "돌아가기" 버튼으로 stand 복귀. 콘솔 에러 0 확인.
+- 고친 버그: `app.ts`에서 `wired = true`가 소리 버튼 핸들러 안에 잘못 들어가 있어, 소리 버튼을 누르기 전까지 이동·앉기 상태 변화가 즉시 전송되지 않던 문제.
+- 확인 방법: `npx playwright test -g "읽기 모드"` → 1 passed(약 2분, Mac 로컬).
 
 ## 단계 7 — 소리, PWA, 접근성, 성능 튜닝
 - [ ] Web Audio 합성(비, 공기음, 패드, 넘김 소리), 1.5초 페이드
@@ -100,4 +105,6 @@
 - 세션 1: 폴더 준비, PLAN.md 작성. 환경 확인 결과 — npm 열림, Playwright 1.63 + 크로미움 설치됨, ko.wikisource.org·gongu.copyright.or.kr 차단, GitHub 저장소 미연결.
 - 세션 1: 단계 1·2 완료, 커밋·푸시.
 - 세션 2: 단계 3~5 완료 + 단계 6 대부분, 브랜치 `session-2-avatar-hud-presence`에 커밋·푸시, 초안 PR.
+- PR #1(세션 2)·PR #2(GitHub Pages 자동 배포) main에 병합. https://yonghee0330.github.io/readplace_v2/
+- 세션 3(Claude Code 데스크톱, Mac): `session-3-finish` 브랜치. Playwright 크로미움(headless shell 1243) 설치.
 - 결정(운영자): 실제 책 본문 없음 → 9장 삭제, 3-9는 집중 독서 화면. 실내 그림자 광원은 SpotLight. 기본 구조는 산사와 같게.

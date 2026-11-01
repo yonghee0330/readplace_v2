@@ -1,4 +1,5 @@
 // e2e: 같은 방에 탭 2개 → 서로의 아바타·이름표·눈인사 알림·접속자 수 확인. Local(BroadcastChannel)과 ws 두 모드.
+// 읽기 모드(키 3 → 타이머 → 함께 읽는 중 N명 → Esc)도 탭 2개로 확인한다.
 // 모든 페이지의 콘솔 에러가 0개인지도 함께 확인한다.
 import { expect, test, type Page } from '@playwright/test';
 
@@ -94,6 +95,63 @@ test.describe('함께 있기', () => {
     await togetherFlow(a, b, `presence=ws&ws=ws://localhost:8787&room=wonmi&instance=${100 + Math.floor(Math.random() * 800)}`);
     await ctxA.close();
     await ctxB.close();
+    expect(errors).toEqual([]);
+  });
+});
+
+test.describe('읽기 모드', () => {
+  test('키 3으로 들어가 타이머가 오르고, 다른 탭과 함께 읽는 수가 맞고, Esc로 돌아온다', async ({ browser }) => {
+    const errors: string[] = [];
+    const ctx = await browser.newContext();
+    const a = await ctx.newPage();
+    const b = await ctx.newPage();
+    watchErrors(a, errors);
+    watchErrors(b, errors);
+    const room = `room=wonmi&instance=${100 + Math.floor(Math.random() * 800)}`;
+    // A는 소파에 앉은 채로, B는 서서 시작한다(돌아올 때 sit/stand가 각각 복귀하는지 본다)
+    await open(a, `${room}&seat=sofa-2`);
+    await open(b, room);
+    await expect(a.locator('.count-num')).toHaveText('2');
+    expect((await me(a)).state).toBe('sit');
+    expect((await me(b)).state).toBe('stand');
+
+    // 진입: 키 3 → 집중 독서 화면, HUD 숨김, 상태 read
+    await a.keyboard.press('3');
+    const focusA = a.locator('.focus');
+    await expect(focusA).toBeVisible();
+    await expect(a.locator('.hud')).toHaveClass(/is-hidden/);
+    await expect.poll(async () => (await me(a)).state).toBe('read');
+    await expect(a.locator('.focus-together')).toHaveText('함께 읽는 중 1명');
+
+    // 타이머가 오른다
+    const clock = a.locator('.focus-clock');
+    const first = await clock.textContent();
+    await expect.poll(async () => await clock.textContent(), { timeout: 15_000 }).not.toBe(first);
+    await expect(clock).toHaveText(/^00:0\d:\d\d$/);
+
+    // 다른 탭도 읽기 모드로 → 양쪽에 "함께 읽는 중 2명"
+    await b.keyboard.press('3');
+    await expect(b.locator('.focus-together')).toHaveText('함께 읽는 중 2명');
+    await expect(a.locator('.focus-together')).toHaveText('함께 읽는 중 2명');
+    // A에게 B가 읽는 모습으로 보인다
+    const idB = (await me(b)).id;
+    await a.waitForFunction((id) => (window as unknown as Debug).__BBOOKS.peers().find((p) => p.id === id)?.state === 'read', idB);
+
+    // Esc로 돌아가기 → A는 다시 앉은 자세, HUD 복귀, B의 수는 1명
+    await a.keyboard.press('Escape');
+    await expect(focusA).toBeHidden();
+    await expect(a.locator('.hud')).not.toHaveClass(/is-hidden/);
+    await expect.poll(async () => (await me(a)).state).toBe('sit');
+    await expect(b.locator('.focus-together')).toHaveText('함께 읽는 중 1명');
+    // 오늘 읽은 시간이 저장됐다
+    const saved = await a.evaluate(() => JSON.parse(localStorage.getItem('bbooks.reading') ?? 'null'));
+    expect(saved?.todaySec ?? 0).toBeGreaterThan(0);
+
+    // B는 "돌아가기" 버튼으로 → 서 있는 자세로 복귀
+    await b.getByRole('button', { name: /돌아가기/ }).click();
+    await expect.poll(async () => (await me(b)).state).toBe('stand');
+
+    await ctx.close();
     expect(errors).toEqual([]);
   });
 });

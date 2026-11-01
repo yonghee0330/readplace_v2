@@ -104,7 +104,6 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       settings.sound = !settings.sound;
       saveSettings(settings);
       hud.setSound(settings.sound);
-  wired = true;
     },
     settings: () => settingsSheet.open(),
     nod: () => nod(),
@@ -112,6 +111,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     focus: () => setFocus(!focus.active),
   });
   hud.setSound(settings.sound);
+  wired = true;
 
   const exitSheet = new Sheet('서점을 나갈까요?', 'exit-sheet');
   exitSheet.body.innerHTML = `<p class="sheet-text">나가면 첫 화면으로 돌아가요. 언제든 다시 들어올 수 있어요.</p>
