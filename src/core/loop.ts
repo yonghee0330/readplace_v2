@@ -52,16 +52,19 @@ export class Loop {
 
   private stats(dt: number): void {
     const info = this.renderer.info.render;
+    const main = (window as unknown as { __BBOOKS_MAIN?: { calls: number; triangles: number } }).__BBOOKS_MAIN;
     (window as unknown as { __BBOOKS_STATS: unknown }).__BBOOKS_STATS = {
       calls: info.calls,
       triangles: info.triangles,
+      mainCalls: main?.calls,
+      mainTriangles: main?.triangles,
     };
     if (!this.fpsEl) return;
     this.frames++;
     this.fpsT += dt;
     if (this.fpsT >= 0.5) {
       const fps = Math.round(this.frames / this.fpsT);
-      this.fpsEl.textContent = `${fps} fps · ${info.calls} calls · ${(info.triangles / 1000).toFixed(0)}k tris`;
+      this.fpsEl.textContent = `${fps} fps · 메인 ${main?.calls ?? '-'}콜 / 전체 ${info.calls}콜 · ${(info.triangles / 1000).toFixed(0)}k tris`;
       this.frames = 0;
       this.fpsT = 0;
     }

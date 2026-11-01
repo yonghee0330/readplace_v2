@@ -52,37 +52,53 @@ export const FLOOR_PLANTS = [
   { x: 3.6, z: 0.62, scale: 0.9 },
 ] as const;
 
-export interface Seat { id: string; x: number; z: number; ry: number; y: number }
-/** 앉을 수 있는 자리. ry는 앉은 사람이 바라보는 방향. y는 엉덩이 높이. */
+export interface Seat { id: string; x: number; z: number; ry: number; y: number; approach: 1 | -1 }
+/** 앉을 수 있는 자리. ry는 앉은 사람이 바라보는 방향. y는 엉덩이 높이.
+ *  approach: 1이면 앞쪽(바라보는 쪽)에서, -1이면 뒤쪽에서 다가와 앉는다(창을 보는 의자). */
 export const SEATS: Seat[] = [
-  { id: 'chair-1', x: CHAIRS[0].x, z: CHAIRS[0].z + 0.02, ry: Math.PI, y: 0.46 },
-  { id: 'chair-2', x: CHAIRS[1].x, z: CHAIRS[1].z + 0.02, ry: Math.PI, y: 0.46 },
-  { id: 'sofa-1', x: SOFA.x + 0.12, z: SOFA.z - 0.6, ry: Math.PI / 2, y: 0.44 },
-  { id: 'sofa-2', x: SOFA.x + 0.12, z: SOFA.z, ry: Math.PI / 2, y: 0.44 },
-  { id: 'sofa-3', x: SOFA.x + 0.12, z: SOFA.z + 0.6, ry: Math.PI / 2, y: 0.44 },
-  { id: 'bench-1', x: BENCH.x - 0.32, z: BENCH.z + 0.02, ry: 0, y: 0.47 },
-  { id: 'bench-2', x: BENCH.x + 0.32, z: BENCH.z + 0.02, ry: 0, y: 0.47 },
+  { id: 'chair-1', x: CHAIRS[0].x, z: CHAIRS[0].z + 0.02, ry: Math.PI, y: 0.46, approach: -1 },
+  { id: 'chair-2', x: CHAIRS[1].x, z: CHAIRS[1].z + 0.02, ry: Math.PI, y: 0.46, approach: -1 },
+  { id: 'sofa-1', x: SOFA.x + 0.12, z: SOFA.z - 0.6, ry: Math.PI / 2, y: 0.44, approach: 1 },
+  { id: 'sofa-2', x: SOFA.x + 0.12, z: SOFA.z, ry: Math.PI / 2, y: 0.44, approach: 1 },
+  { id: 'sofa-3', x: SOFA.x + 0.12, z: SOFA.z + 0.6, ry: Math.PI / 2, y: 0.44, approach: 1 },
+  { id: 'bench-1', x: BENCH.x - 0.32, z: BENCH.z + 0.02, ry: 0, y: 0.47, approach: 1 },
+  { id: 'bench-2', x: BENCH.x + 0.32, z: BENCH.z + 0.02, ry: 0, y: 0.47, approach: 1 },
 ];
 
-export interface Collider { x0: number; x1: number; z0: number; z1: number; seatable?: boolean }
+/** 앉으러 갈 때 먼저 걸어갈 지점 */
+export function seatApproach(s: Seat, dist = 0.5): { x: number; z: number } {
+  return { x: s.x + Math.sin(s.ry) * dist * s.approach, z: s.z + Math.cos(s.ry) * dist * s.approach };
+}
 
-/** 경로 탐색용 바닥 장애물(축 정렬 박스). */
+/** 처음 들어왔을 때 서는 자리(계산대 앞, 서점 안쪽을 바라봄). 여러 명이 겹치지 않게 몇 군데로 나눈다. */
+export const SPAWN = { x: 1.15, z: 1.05, ry: -2.6 } as const;
+export const SPAWNS = [
+  SPAWN,
+  { x: 1.6, z: 1.3, ry: -2.3 },
+  { x: 2.05, z: 0.85, ry: -2.0 },
+  { x: 0.45, z: 1.35, ry: -2.9 },
+  { x: 1.95, z: -0.35, ry: -1.8 },
+] as const;
+
+export interface Collider { x0: number; x1: number; z0: number; z1: number; h: number; seatable: boolean; seats?: string[] }
+
+/** 경로 탐색·클릭 판정용 장애물(축 정렬 박스). h는 클릭 판정 높이, seats는 그 가구에 딸린 자리. */
 export function colliders(): Collider[] {
   const list: Collider[] = [];
-  const rect = (cx: number, cz: number, w: number, d: number, ry: number, seatable = false) => {
+  const rect = (cx: number, cz: number, w: number, d: number, ry: number, h: number, seats?: string[]) => {
     const rot = Math.abs(Math.sin(ry)) > 0.5;
     const hw = (rot ? d : w) / 2, hd = (rot ? w : d) / 2;
-    list.push({ x0: cx - hw, x1: cx + hw, z0: cz - hd, z1: cz + hd, seatable });
+    list.push({ x0: cx - hw, x1: cx + hw, z0: cz - hd, z1: cz + hd, h, seatable: !!seats, seats });
   };
-  for (const s of SHELVES) rect(s.x, s.z, s.w, SHELF.d, s.ry);
-  rect(ISLAND.x, ISLAND.z, ISLAND.w, ISLAND.d, 0);
-  rect(READING_TABLE.x, READING_TABLE.z, READING_TABLE.w, READING_TABLE.d, 0);
-  for (const c of CHAIRS) rect(c.x, c.z, 0.44, 0.44, 0, true);
-  rect(SOFA.x, SOFA.z, SOFA.w, SOFA.d, SOFA.ry, true);
-  rect(COUNTER.x, COUNTER.z, COUNTER.w, COUNTER.d, COUNTER.ry);
-  rect(BENCH.x, BENCH.z, BENCH.w, BENCH.d, 0, true);
-  rect(COFFEE_TABLE.x, COFFEE_TABLE.z, COFFEE_TABLE.w, COFFEE_TABLE.d, COFFEE_TABLE.ry);
-  for (const l of FLOOR_LAMPS) rect(l.x, l.z, 0.34, 0.34, 0);
-  for (const p of FLOOR_PLANTS) rect(p.x, p.z, 0.45 * p.scale, 0.45 * p.scale, 0);
+  for (const s of SHELVES) rect(s.x, s.z, s.w, SHELF.d, s.ry, SHELF.h);
+  rect(ISLAND.x, ISLAND.z, ISLAND.w, ISLAND.d, 0, ISLAND.h);
+  rect(READING_TABLE.x, READING_TABLE.z, READING_TABLE.w, READING_TABLE.d, 0, READING_TABLE.h);
+  CHAIRS.forEach((c, i) => rect(c.x, c.z, 0.44, 0.44, 0, 0.84, [`chair-${i + 1}`]));
+  rect(SOFA.x, SOFA.z, SOFA.w, SOFA.d, SOFA.ry, 0.85, ['sofa-1', 'sofa-2', 'sofa-3']);
+  rect(COUNTER.x, COUNTER.z, COUNTER.w, COUNTER.d, COUNTER.ry, COUNTER.h);
+  rect(BENCH.x, BENCH.z, BENCH.w, BENCH.d, 0, BENCH.h + 0.06, ['bench-1', 'bench-2']);
+  rect(COFFEE_TABLE.x, COFFEE_TABLE.z, COFFEE_TABLE.w, COFFEE_TABLE.d, COFFEE_TABLE.ry, COFFEE_TABLE.h);
+  for (const l of FLOOR_LAMPS) rect(l.x, l.z, 0.34, 0.34, 0, 1.5);
+  for (const p of FLOOR_PLANTS) rect(p.x, p.z, 0.45 * p.scale, 0.45 * p.scale, 0, 1.0 * p.scale);
   return list;
 }

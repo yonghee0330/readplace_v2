@@ -15,6 +15,8 @@ export interface Params {
   ws: string;
   autoread: boolean;
   autostart: boolean;
+  /** 캡처·테스트용: 이 자리에 앉은 채로 시작(예: sofa-2) */
+  seat: string | null;
 }
 
 export const DEFAULT_SEED = 86;
@@ -42,6 +44,7 @@ export function readParams(search = location.search): Params {
     autoread,
     // 캡처·테스트용: 시작 화면을 건너뛰고 바로 들어간다.
     autostart: q.get('autostart') === '1' || cam !== null || autoread,
+    seat: q.get('seat'),
   };
 }
 
