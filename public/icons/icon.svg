@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- 비북스 아이콘: 짙은 녹색 바탕, 따뜻한 전구 빛, 펼친 책, 빗줄기. 가장자리 여백을 둬 마스커블로도 쓴다. -->
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="34%" r="52%">
+      <stop offset="0" stop-color="#ffcf8a" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ffcf8a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7f1e5"/>
+      <stop offset="1" stop-color="#e6d8bf"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="#24251f"/>
+  <rect width="512" height="512" fill="url(#glow)"/>
+  <g stroke="#efe6d6" stroke-opacity="0.22" stroke-width="5" stroke-linecap="round">
+    <path d="M118 96l-14 34M168 70l-14 34M378 78l-14 34M424 120l-14 34M96 196l-12 30M436 214l-12 30"/>
+  </g>
+  <circle cx="256" cy="150" r="22" fill="#ffcf8a"/>
+  <path d="M256 104v24" stroke="#c08a4e" stroke-width="6" stroke-linecap="round"/>
+  <path d="M256 236c-36-26-84-34-132-26v176c48-8 96 0 132 26 36-26 84-34 132-26V210c-48-8-96 0-132 26z" fill="url(#page)"/>
+  <path d="M256 236v176" stroke="#c08a4e" stroke-width="6" stroke-linecap="round"/>
+  <g fill="none" stroke="#c08a4e" stroke-opacity="0.55" stroke-width="5" stroke-linecap="round">
+    <path d="M152 254c26-3 52 1 76 12M152 288c26-3 52 1 76 12M152 322c26-3 52 1 76 12"/>
+    <path d="M284 266c24-11 50-15 76-12M284 300c24-11 50-15 76-12M284 334c24-11 50-15 76-12"/>
+  </g>
+</svg>

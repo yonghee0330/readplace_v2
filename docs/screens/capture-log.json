@@ -1,22 +1,58 @@
 {
-  "at": "2026-11-01T12:38:37.272Z",
+  "at": "2026-11-01T14:12:09.143Z",
   "results": [
+    {
+      "file": "overview.png",
+      "stats": {
+        "calls": 163,
+        "triangles": 412534,
+        "mainCalls": 75,
+        "mainTriangles": 206544
+      }
+    },
+    {
+      "file": "overview-mobile.png",
+      "stats": {
+        "calls": 126,
+        "triangles": 363974,
+        "mainCalls": 56,
+        "mainTriangles": 182024
+      }
+    },
     {
       "file": "with-visitors.png",
       "stats": {
-        "calls": 168,
-        "triangles": 423250,
-        "mainCalls": 78,
-        "mainTriangles": 211904
+        "calls": 170,
+        "triangles": 423254,
+        "mainCalls": 79,
+        "mainTriangles": 211906
       }
     },
     {
       "file": "with-visitors-mobile.png",
       "stats": {
-        "calls": 143,
-        "triangles": 381262,
-        "mainCalls": 65,
-        "mainTriangles": 190670
+        "calls": 149,
+        "triangles": 377790,
+        "mainCalls": 68,
+        "mainTriangles": 188934
+      }
+    },
+    {
+      "file": "reader.png",
+      "stats": {
+        "calls": 99,
+        "triangles": 363592,
+        "mainCalls": 42,
+        "mainTriangles": 182032
+      }
+    },
+    {
+      "file": "reader-mobile.png",
+      "stats": {
+        "calls": 103,
+        "triangles": 372184,
+        "mainCalls": 44,
+        "mainTriangles": 186328
       }
     }
   ],

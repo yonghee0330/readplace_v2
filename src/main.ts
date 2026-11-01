@@ -5,6 +5,7 @@ import './style.css';
 
 import { startApp } from './app';
 import { readParams, roomLabel } from './core/params';
+import { registerServiceWorker } from './pwa/register';
 import { LoadingScreen } from './ui/loading';
 
 declare global {
@@ -12,6 +13,8 @@ declare global {
     __BBOOKS_READY?: boolean;
   }
 }
+
+registerServiceWorker();
 
 const params = readParams();
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;

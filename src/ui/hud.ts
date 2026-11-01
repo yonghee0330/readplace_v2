@@ -124,6 +124,8 @@ export class Hud {
   /** 읽기 모드에서는 HUD를 옅게 숨긴다. */
   setHidden(hidden: boolean): void {
     this.root.classList.toggle('is-hidden', hidden);
+    // 숨긴 동안에는 Tab으로도 닿지 않게 한다
+    this.root.inert = hidden;
   }
 
   cooldown(act: 'nod', ms: number): void {

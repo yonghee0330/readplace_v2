@@ -10,8 +10,9 @@
 | 항목 | 상태 |
 |---|---|
 | 저장소 | https://github.com/yonghee0330/readplace_v2 |
-| `main` 브랜치 | 단계 1·2(서점 장면)까지 |
-| `session-2-avatar-hud-presence` 브랜치 | 단계 3~5 + 읽기 모드. **초안 PR #1** (충돌 없음, 병합 가능) |
+| `main` 브랜치 | 단계 1~5 + 읽기 모드. PR #1(세션 2)·PR #2(GitHub Pages 자동 배포) **병합 완료** |
+| 배포 | https://yonghee0330.github.io/readplace_v2/ — `main`에 올라가면 자동 재배포 |
+| `session-3-finish` 브랜치 | 세션 3(단계 6 마무리·7·8) 작업 브랜치 |
 | 통과한 단계 | 1, 2, 3, 4, 5 (단계 6은 e2e 하나만 남음) |
 | 남은 단계 | 6 마무리, 7(소리·PWA·접근성·성능), 8(e2e 전체·최종 캡처·README 완성) |
 | 마지막 검증 | `npm run typecheck`·`npm run build` 통과, `npm run test:e2e` 2개 통과(Local·ws), `npm run capture` 콘솔 에러 0 |
@@ -33,13 +34,9 @@ Mac 기준(폴더는 `~/Documents` 아래). Windows는 아래 "환경 차이" �
 cd ~/Documents && git clone https://github.com/yonghee0330/readplace_v2.git
 ```
 
-2) PR #1을 먼저 병합할지 정한다(추천: GitHub에서 PR #1을 확인하고 `main`에 병합). 병합했다면:
+2) `main`을 최신으로 받는다(PR #1·#2는 이미 병합됨):
 ```bash
 cd ~/Documents/readplace_v2 && git checkout main && git pull
-```
-병합 전이라면 브랜치에서 이어간다:
-```bash
-cd ~/Documents/readplace_v2 && git checkout session-2-avatar-hud-presence
 ```
 
 3) 패키지 설치(Node 20 이상, 클라우드에서는 Node 22로 확인)
@@ -68,7 +65,7 @@ npm run dev
 HANDOFF.md, CLAUDE.md, SPEC-v3.md(맨 위 v3.1 변경 포함), PROGRESS.md를 읽고 이어서 진행해.
 실제 책 본문은 다루지 않는다(SPEC v3.1). 세션 3 원래 프롬프트의 "책 데이터" 부분은 무시한다.
 
-작업 브랜치: main에서 session-3-finish 브랜치를 새로 만들어 진행하고, 끝나면 푸시 후 초안 PR.
+작업 브랜치: main을 최신으로 받은 뒤 session-3-finish 브랜치를 새로 만들어 진행하고, 끝나면 푸시 후 초안 PR.
 
 단계 6 마무리:
 - tests/e2e.spec.ts에 읽기 모드 테스트 추가: 진입(키 3) → 타이머가 오름 → 다른 탭에 "함께 읽는 중 2명" → Esc로 돌아가기 → 상태가 sit/stand로 복귀.
@@ -151,5 +148,6 @@ HANDOFF.md, CLAUDE.md, SPEC-v3.md(맨 위 v3.1 변경 포함), PROGRESS.md를 �
 
 ## 8. 열려 있는 것
 
-- PR #1(초안): https://github.com/yonghee0330/readplace_v2/pull/1 — 운영자가 확인 후 병합
+- PR #1(세션 2)·PR #2(GitHub Pages 자동 배포): `main`에 병합 완료. https://yonghee0330.github.io/readplace_v2/ 에 배포됨
+- 세션 3 작업은 `session-3-finish` 브랜치 → 초안 PR
 - 클라우드 세션에 걸어 둔 PR 점검 예약 1건(2026-11-01 13:40 UTC)은 변화가 없으면 아무것도 하지 않는다. 데스크톱 작업과 충돌하지 않는다.

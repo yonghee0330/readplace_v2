@@ -39,6 +39,11 @@ export class Movement {
     return this.seat ? 'sit' : 'stand';
   }
 
+  /** 앉아 있거나 앉으러 미끄러져 들어가는 중인 자리 */
+  get seatId(): string | null {
+    return this.seat?.id ?? (this.phase.kind === 'glide' && this.phase.then === 'sit' ? this.phase.seat?.id ?? null : null);
+  }
+
   get moving(): boolean {
     return this.phase.kind !== 'idle' || this.keyInput.lengthSq() > 0.01;
   }
@@ -137,7 +142,7 @@ export class Movement {
   }
 
   private sync(): void {
-    this.me.setState(this.state, this.seat?.id ?? (this.phase.kind === 'glide' && this.phase.then === 'sit' ? this.phase.seat?.id ?? null : null));
+    this.me.setState(this.state, this.seatId);
     this.onChange();
   }
 

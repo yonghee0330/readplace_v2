@@ -82,3 +82,7 @@ export class Sheet {
 export function anySheetOpen(): boolean {
   return openSheet !== null;
 }
+
+export function closeOpenSheet(): void {
+  openSheet?.close();
+}

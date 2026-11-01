@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "capture": "vite build && tsx scripts/capture.ts",
     "server": "tsx server/index.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "perf": "vite build && tsx scripts/perf.ts",
+    "icons": "tsx scripts/icons.ts"
   },
   "dependencies": {
     "@fontsource/noto-serif-kr": "5.3.1",
