@@ -86,11 +86,29 @@
 - 확인 방법: `npx playwright test -g "읽기 모드"` → 1 passed(약 2분, Mac 로컬).
 
 ## 단계 7 — 소리, PWA, 접근성, 성능 튜닝
-- [ ] Web Audio 합성(비, 공기음, 패드, 넘김 소리), 1.5초 페이드
-- [ ] manifest, 아이콘, 서비스워커(빌드만)
-- [ ] aria-label, 포커스 링, 키보드(WASD, Tab, Esc, 1/2/3), 모션 줄이기
-- [ ] 성능 예산 측정 기록
-- 통과 조건: 키보드만으로 주요 흐름, 성능 예산 내
+- [x] Web Audio 합성(비, 공기음, 패드, 넘김 소리), 1.5초 페이드
+- [x] manifest, 아이콘, 서비스워커(빌드만)
+- [x] aria-label, 포커스 링, 키보드(WASD, Tab, Esc, 1/2/3), 모션 줄이기
+- [x] 성능 예산 측정 기록
+- 통과 조건: 키보드만으로 주요 흐름, 성능 예산 내 → **통과**
+
+### 단계 7 결과 (세션 3)
+- 소리(`src/audio/ambience.ts`, `sfx.ts`): 빗소리(화이트 노이즈 → 밴드패스 1.1~1.8kHz + 로우패스, 2.5초마다 진폭·대역 랜덤 변조, 낮은 웅웅거림, 0.25~1.65초 간격 물방울 = 짧은 사인 + 지수 감쇠 + 좌우 위치), 실내 공기음(핑크 노이즈 → 로우패스 260Hz), 패드(음마다 사인 + ±디튠 삼각파 2개, 로우패스 900Hz + 느린 LFO, Fmaj9→Em7→Dm9→Cmaj7 4마디 19.2초 루프, 1.5초 앞서 예약). 효과음: 페이지 넘김(노이즈 2번 + 하이패스 700→5200Hz 스윕) — 책 펼치기·읽기 모드, 눈인사 종소리(보낼 때·받을 때), 나가기·설정 버튼 똑. 기본 꺼짐, 켜고 끌 때 1.5초 페이드, 꺼진 뒤 AudioContext suspend. AudioContext는 소리 버튼을 누를 때(또는 지난번에 켜 두었으면 첫 클릭·키 입력 때) 처음 만든다.
+- PWA: `public/manifest.webmanifest`(상대 경로 start_url·scope), `public/icons/icon.svg` + 192·512 PNG(`npm run icons` = Playwright로 SVG→PNG, 새 패키지 없음), `vite.config.ts`의 `bbooks-pwa` 플러그인이 빌드 때만 `dist/sw.js`를 만든다(템플릿 `src/pwa/sw.template.js`에 html·js·css·manifest·아이콘 목록과 버전 해시를 채움). 등록은 `src/pwa/register.ts`(PROD에서만, `./sw.js`, scope `./`). 등록 직후 페이지가 이미 받은 같은 출처 파일(글꼴 등)도 넘겨 캐시. 페이지 이동은 네트워크 우선 → 오프라인이면 캐시한 index.html, 나머지는 캐시 우선.
+  - 하위 경로 확인: dist를 `/readplace_v2/` 아래에 두고 띄워 scope `http://localhost:4999/readplace_v2/`, 캐시 9개, 오프라인 새로고침 시 시작 화면 정상·콘솔 에러 0.
+- 접근성: HUD를 숨긴 읽기 모드에서는 `inert`라 Tab으로 닿지 않음, Esc는 포커스가 어디 있든 열린 시트부터 닫음, 밝은 바탕(시작 화면·시트)에서는 포커스 링을 짙은 꿀색으로, 방 선택 필은 `:focus-within` 링, 설정의 "모션 줄이기"도 `html.reduce-motion`으로 CSS 전환을 끔(이전엔 시스템 설정만 반영). 캔버스 `role="img"` + 장면 설명 aria-label은 기존.
+- 높음 품질 창유리 빗방울 셰이더(`src/scene/windowRain.ts`): 유리 2mm 안쪽 판 하나(드로우콜 1)에 맺힌 물방울 2겹 + 흘러내리는 물줄기. 오버레이 레이어(AO 제외). 모션 줄이기면 물줄기가 멈춘다. 단계 2부터 남아 있던 항목 해결.
+- 성능(`npm run perf` → `docs/perf.json`, `npm run perf -- --gpu` → `docs/perf-gpu.json`, 1440×900, seed 86, NPC 포함):
+
+| 품질 | 시점 | 메인 패스 콜 / 삼각형 | 프레임 전체 콜 / 삼각형 | 텍스처 최대 | fps(Mac GPU) |
+|---|---|---|---|---|---|
+| 낮음 | 아바타 / 전체 | 69 / 21.0만 · 82 / 21.5만 | 70 / 21.0만 · 83 / 21.5만 | 1024 | 60 / 60 |
+| 보통 | 아바타 / 전체 | 70 / 21.0만 · 83 / 21.4만 | 153 / 41.8만 · 179 / 42.6만 | 1024 | 60 / 60 |
+| 높음 | 아바타 / 전체 | 70 / 21.0만 · 83 / 21.5만 | 152 / 41.8만 · 178 / 42.9만 | 1024 | 54 / 60 |
+
+  메인 패스는 예산(150콜·60만) 안. 프레임 전체는 AO가 깊이·법선을 얻으려고 장면을 한 번 더 그려 150을 조금 넘는다(README 남은 이슈에 기록). 헤드리스 SwiftShader에서는 10~15fps(참고).
+- e2e 추가: "접근성·소리·PWA" — 동작 줄이기 켠 상태로 Tab→Enter로 입장, Tab 정지점마다 이름·포커스 링 확인, 설정 시트 Enter/Esc + 포커스 복귀, 소리 Enter → AudioContext running·게인 0.7 이상 → 다시 Enter → 0, W로 걷기, 1 눈인사, 3 읽기 모드(HUD에 Tab이 닿지 않음), Esc 복귀, manifest 아이콘·서비스워커 ready.
+- 확인 방법: `npm run typecheck && npm run build` 통과, `npx playwright test -g "키보드만으로"` 통과.
 
 ## 단계 8 — e2e, 최종 캡처, README
 - [ ] npm run test:e2e 전체 통과 + 콘솔 에러 0

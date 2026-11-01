@@ -19,11 +19,14 @@ import { buildShelves } from './props/shelf';
 import { buildRug, buildSofa } from './props/sofa';
 import { buildWallDecor } from './props/wallDecor';
 import { buildWindows } from './props/windows';
+import { buildWindowRain, type WindowRain } from './windowRain';
 
 export interface Bookstore {
   root: THREE.Group;
   lighting: Lighting;
   exterior: Exterior;
+  /** 창유리 빗방울(높음 품질) */
+  windowRain: WindowRain;
   /** 클릭 이동·앉기 판정용 바닥 메시 */
   floor: THREE.Object3D;
   stats: { books: number; planks: number };
@@ -54,6 +57,9 @@ export async function buildBookstore(
   glass.material = mats.glass;
   glass.renderOrder = 2;
   root.add(glass);
+  const windowRain = buildWindowRain(glass.geometry);
+  windowRain.set(q.windowRainShader, true);
+  root.add(windowRain.mesh);
 
   await loading.begin('서가');
   const comps = buildShelves(bucket, rng);
@@ -106,5 +112,5 @@ export async function buildBookstore(
 
   scene.add(root);
   renderer.shadowMap.needsUpdate = true;
-  return { root, lighting, exterior, floor, stats: { books: books.items.length, planks } };
+  return { root, lighting, exterior, windowRain, floor, stats: { books: books.items.length, planks } };
 }

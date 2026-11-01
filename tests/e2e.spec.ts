@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test';
 interface Debug {
   __BBOOKS_READY?: boolean;
   __BBOOKS: {
-    me(): { id: string; nickname: string; state: string; seatId: string | null };
+    me(): { id: string; nickname: string; state: string; seatId: string | null; position: number[] };
     peers(): { id: string; nickname: string; state: string; seatId: string | null }[];
     visiblePeerAvatars(): { id: string; nickname: string; nameplate: boolean }[];
     toasts(): string[];
@@ -150,6 +150,107 @@ test.describe('읽기 모드', () => {
     // B는 "돌아가기" 버튼으로 → 서 있는 자세로 복귀
     await b.getByRole('button', { name: /돌아가기/ }).click();
     await expect.poll(async () => (await me(b)).state).toBe('stand');
+
+    await ctx.close();
+    expect(errors).toEqual([]);
+  });
+});
+
+test.describe('접근성·소리·PWA', () => {
+  test('키보드만으로 들어가 둘러보고, 소리를 켜고, 읽기 모드를 오간다', async ({ browser }) => {
+    const errors: string[] = [];
+    // 시스템 "동작 줄이기"를 켠 상태로 연다
+    const ctx = await browser.newContext({ reducedMotion: 'reduce' });
+    // 키보드 이동은 설정에서 켜는 기능이라 미리 켜 둔다(첫 안내도 이미 본 것으로)
+    await ctx.addInitScript(() => {
+      if (!localStorage.getItem('bbooks.settings')) localStorage.setItem('bbooks.settings', JSON.stringify({ keyboardMove: true, introDismissed: true }));
+    });
+    const page = await ctx.newPage();
+    watchErrors(page, errors);
+    await page.goto(`/?quality=low&npc=0&room=wonmi&instance=${100 + Math.floor(Math.random() * 800)}`);
+
+    // 캔버스 설명
+    const canvas = page.locator('#scene');
+    await expect(canvas).toHaveAttribute('role', 'img');
+    await expect(canvas).toHaveAttribute('aria-label', /서점/);
+
+    // 시작 화면: Tab으로 "들어가기"에 가서 Enter
+    await page.keyboard.press('Tab');
+    await expect(page.locator('#start-enter')).toBeFocused();
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => (window as unknown as Debug).__BBOOKS_READY === true, null, { timeout: 180_000 });
+    await expect(page.locator('html')).toHaveClass(/reduce-motion/);
+
+    // Tab 순회: 모든 정지점이 이름(aria-label 또는 글자)을 갖고, 포커스 링이 보인다
+    const stops: string[] = [];
+    for (let i = 0; i < 8; i++) {
+      await page.keyboard.press('Tab');
+      const info = await page.evaluate(() => {
+        const el = document.activeElement as HTMLElement | null;
+        if (!el || el === document.body) return null;
+        const name = el.getAttribute('aria-label') || el.textContent?.trim() || '';
+        const target = el.closest('.pill-select') ?? el;
+        const ring = getComputedStyle(target).outlineStyle !== 'none' && parseFloat(getComputedStyle(target).outlineWidth) > 0;
+        return { name, ring };
+      });
+      if (!info) continue;
+      expect(info.name, 'Tab 정지점에 이름이 있다').not.toBe('');
+      expect(info.ring, `${info.name}에 포커스 링이 보인다`).toBe(true);
+      stops.push(info.name);
+    }
+    for (const want of ['서점에서 나가기', '방 선택', '서점 소리 켜기', '설정 열기', '눈인사 (단축키 1)']) expect(stops).toContain(want);
+
+    // 설정 시트: 키보드로 열고 Esc로 닫으면 포커스가 버튼으로 돌아온다
+    const settingsBtn = page.getByRole('button', { name: '설정 열기' });
+    await settingsBtn.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#settings')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#settings')).toBeHidden();
+    await expect(settingsBtn).toBeFocused();
+
+    // 소리: 키보드로 켜면 AudioContext가 돌고 1.5초 동안 커진다, 끄면 다시 0으로
+    const soundBtn = page.getByRole('button', { name: '서점 소리 켜기' });
+    await soundBtn.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('button', { name: '서점 소리 끄기' })).toHaveAttribute('aria-pressed', 'true');
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __BBOOKS: { sound(): { state: string } } }).__BBOOKS.sound().state)).toBe('running');
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __BBOOKS: { sound(): { gain: number } } }).__BBOOKS.sound().gain)).toBeGreaterThan(0.7);
+    await page.keyboard.press('Enter');
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __BBOOKS: { sound(): { gain: number } } }).__BBOOKS.sound().gain)).toBeLessThan(0.01);
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+
+    // WASD로 걷기
+    const before = await me(page);
+    await page.keyboard.down('w');
+    await expect.poll(async () => {
+      const p = (await me(page)).position;
+      return Math.hypot(p[0] - before.position[0], p[2] - before.position[2]);
+    }, { timeout: 30_000 }).toBeGreaterThan(0.05);
+    await page.keyboard.up('w');
+
+    // 1: 눈인사, 3: 읽기 모드(HUD는 Tab으로도 닿지 않음), Esc: 돌아가기
+    await page.keyboard.press('1');
+    await toastSeen(page, '눈인사를 건넸어요');
+    await page.keyboard.press('3');
+    await expect(page.locator('.focus')).toBeVisible();
+    await expect(page.getByRole('button', { name: /돌아가기/ })).toBeFocused();
+    for (let i = 0; i < 3; i++) {
+      await page.keyboard.press('Tab');
+      expect(await page.evaluate(() => !!document.activeElement?.closest('.hud'))).toBe(false);
+    }
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.focus')).toBeHidden();
+    await expect.poll(async () => (await me(page)).state).toBe('stand');
+
+    // PWA: manifest와 서비스워커(빌드 결과물에서만 등록)
+    const manifest = await page.evaluate(async () => {
+      const href = document.querySelector<HTMLLinkElement>('link[rel="manifest"]')!.href;
+      return (await fetch(href)).json();
+    });
+    expect(manifest.icons.map((i: { sizes: string }) => i.sizes)).toEqual(expect.arrayContaining(['192x192', '512x512']));
+    const scope = await page.evaluate(async () => (await navigator.serviceWorker.ready).scope);
+    expect(scope).toBe('http://localhost:4173/');
 
     await ctx.close();
     expect(errors).toEqual([]);

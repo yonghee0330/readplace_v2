@@ -1,0 +1,73 @@
+{
+  "at": "2026-11-01T13:32:31.655Z",
+  "renderer": "GPU(headed)",
+  "viewport": "1440x900",
+  "rows": [
+    {
+      "level": "low",
+      "view": "아바타 시점",
+      "calls": 70,
+      "triangles": 209509,
+      "mainCalls": 69,
+      "mainTriangles": 209508,
+      "maxTexture": 1024,
+      "hud": "60 fps · 메인 69콜 / 전체 70콜 · 210k tris",
+      "errors": []
+    },
+    {
+      "level": "low",
+      "view": "전체 시점",
+      "calls": 83,
+      "triangles": 214533,
+      "mainCalls": 82,
+      "mainTriangles": 214532,
+      "maxTexture": 1024,
+      "hud": "60 fps · 메인 82콜 / 전체 83콜 · 215k tris",
+      "errors": []
+    },
+    {
+      "level": "medium",
+      "view": "아바타 시점",
+      "calls": 153,
+      "triangles": 418458,
+      "mainCalls": 70,
+      "mainTriangles": 209508,
+      "maxTexture": 1024,
+      "hud": "60 fps · 메인 70콜 / 전체 153콜 · 418k tris",
+      "errors": []
+    },
+    {
+      "level": "medium",
+      "view": "전체 시점",
+      "calls": 179,
+      "triangles": 426450,
+      "mainCalls": 83,
+      "mainTriangles": 213504,
+      "maxTexture": 1024,
+      "hud": "60 fps · 메인 83콜 / 전체 179콜 · 426k tris",
+      "errors": []
+    },
+    {
+      "level": "high",
+      "view": "아바타 시점",
+      "calls": 152,
+      "triangles": 418458,
+      "mainCalls": 70,
+      "mainTriangles": 209508,
+      "maxTexture": 1024,
+      "hud": "54 fps · 메인 70콜 / 전체 152콜 · 418k tris",
+      "errors": []
+    },
+    {
+      "level": "high",
+      "view": "전체 시점",
+      "calls": 178,
+      "triangles": 428506,
+      "mainCalls": 83,
+      "mainTriangles": 214532,
+      "maxTexture": 1024,
+      "hud": "60 fps · 메인 83콜 / 전체 178콜 · 429k tris",
+      "errors": []
+    }
+  ]
+}

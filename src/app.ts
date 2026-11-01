@@ -1,5 +1,7 @@
 // 앱 조립: 장면 + 아바타 + 이동·카메라 + HUD + 함께 있기(presence) + 읽기 모드.
 import * as THREE from 'three';
+import { Ambience } from './audio/ambience';
+import { Sfx } from './audio/sfx';
 import { Crowd, type Actor } from './avatar/crowd';
 import { OVERLAY_LAYER } from './avatar/nameplate';
 import { placeAtSeat, setNpcsVisible, spawnNpcs } from './avatar/npc';
@@ -22,7 +24,7 @@ import { buildPostFx, type PostFx } from './scene/postfx';
 import { Hud } from './ui/hud';
 import type { LoadingScreen } from './ui/loading';
 import { SettingsSheet } from './ui/settings';
-import { Sheet, anySheetOpen } from './ui/sheet';
+import { Sheet, anySheetOpen, closeOpenSheet } from './ui/sheet';
 import { Toasts } from './ui/toast';
 
 const NOD_COOLDOWN = 3000;
@@ -32,6 +34,8 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   if (systemReducedMotion) settings.reducedMotion = settings.reducedMotion || systemReducedMotion;
   const profile: Profile = loadProfile();
   const reducedMotion = () => settings.reducedMotion;
+  const applyMotionClass = () => document.documentElement.classList.toggle('reduce-motion', settings.reducedMotion);
+  applyMotionClass();
 
   // ---------- 렌더러 ----------
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -58,7 +62,11 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   const store: Bookstore = await buildBookstore(renderer, scene, q, rng, loading);
   let fx: PostFx = buildPostFx(renderer, scene, camera, q);
   const rain = () => (reducedMotion() ? 0 : q.rainParticles);
-  store.exterior.setRain(rain());
+  const applyRain = () => {
+    store.exterior.setRain(rain());
+    store.windowRain.set(q.windowRainShader, !reducedMotion());
+  };
+  applyRain();
 
   // ---------- 아바타 ----------
   const crowd = new Crowd();
@@ -97,15 +105,36 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   let connected = false;
   let peers = new Map<string, PlayerState>();
 
+  // ---------- 소리 ----------
+  // AudioContext는 사용자가 처음 누른 뒤에만 만든다. 지난번에 켜 두었으면 첫 클릭·키 입력에서 다시 켠다.
+  const amb = new Ambience();
+  const sfx = new Sfx(amb);
+  if (settings.sound) {
+    const resume = () => {
+      removeEventListener('pointerdown', resume, true);
+      removeEventListener('keydown', resume, true);
+      if (settings.sound) amb.setEnabled(true);
+    };
+    addEventListener('pointerdown', resume, true);
+    addEventListener('keydown', resume, true);
+  }
+
   const hud = new Hud(ui, instance, {
-    exit: () => exitSheet.open(),
+    exit: () => {
+      sfx.play('tap');
+      exitSheet.open();
+    },
     room: (n) => void switchRoom(n),
     sound: () => {
       settings.sound = !settings.sound;
       saveSettings(settings);
       hud.setSound(settings.sound);
+      amb.setEnabled(settings.sound);
     },
-    settings: () => settingsSheet.open(),
+    settings: () => {
+      sfx.play('tap');
+      settingsSheet.open();
+    },
     nod: () => nod(),
     book: () => toggleBook(),
     focus: () => setFocus(!focus.active),
@@ -134,8 +163,9 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       pushState(true);
     },
     reducedMotion: (v) => {
+      applyMotionClass();
       follow.reducedMotion = v;
-      store.exterior.setRain(rain());
+      applyRain();
     },
     npc: (v) => setNpcsVisible(npcs, params.npc && v),
     keyboardMove: () => {},
@@ -220,6 +250,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     else if (a.type === 'nod') {
       toasts.show(`${a.nickname}님이 눈인사했어요`);
       crowd.get(a.from)?.avatar.anim.bow();
+      sfx.play('nod');
     }
   }
 
@@ -251,6 +282,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     if (now - lastNod < NOD_COOLDOWN) return;
     lastNod = now;
     me.avatar.anim.bow();
+    sfx.play('nod');
     presence.sendAction({ type: 'nod', from: myId, nickname: sessionNick, t: Date.now() });
     toasts.show('눈인사를 건넸어요');
     hud.cooldown('nod', NOD_COOLDOWN);
@@ -263,6 +295,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       return;
     }
     movement.toggleReading();
+    if (movement.reading) sfx.play('page');
     pushState(true);
   }
 
@@ -270,6 +303,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     if (on === focus.active) return;
     if (on) {
       if (!connected) return;
+      sfx.play('page');
       movement.setReading(true);
       follow.setFocus(focusPose());
       me.hideLabel = true;
@@ -346,7 +380,9 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   addEventListener('keydown', (e) => {
     if (isTyping(e) || e.altKey || e.ctrlKey || e.metaKey) return;
     if (e.key === 'Escape') {
-      if (focus.active && !anySheetOpen()) setFocus(false);
+      // 시트가 열려 있으면 시트를 먼저 닫는다(포커스가 시트 밖에 있어도)
+      if (anySheetOpen()) closeOpenSheet();
+      else if (focus.active) setFocus(false);
       return;
     }
     if (anySheetOpen()) return;
@@ -361,7 +397,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     renderer.setPixelRatio(q.pixelRatio);
     renderer.setSize(innerWidth, innerHeight, false);
     store.lighting.applyQuality(q);
-    store.exterior.setRain(rain());
+    applyRain();
     fx.dispose();
     fx = buildPostFx(renderer, scene, camera, q);
     fx.setSize(innerWidth, innerHeight);
@@ -396,6 +432,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   const loop = new Loop(() => fx.render(), renderer, params.debug);
   loop.add((dt, t) => {
     store.exterior.update(dt);
+    store.windowRain.update(dt);
     if (settings.keyboardMove && !anySheetOpen() && !focus.active) {
       const ax = input.moveAxis();
       movement.keyInput.set(ax.x, ax.y);
@@ -423,6 +460,21 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     peers: () => [...peers.values()].map((p) => ({ id: p.id, nickname: p.nickname, state: p.state, seatId: p.seatId })),
     visiblePeerAvatars: () => crowd.list('peer').filter((a) => a.root.visible && a.root.parent).map((a) => ({ id: a.id, nickname: a.nickname, nameplate: !!a.nameplate?.mesh.visible })),
     npcCount: () => npcs.filter((n) => n.root.visible).length,
+    sound: () => amb.status(),
+    /** 장면이 쓰는 텍스처 중 가장 큰 변의 길이(성능 예산: 1024px 이하) */
+    maxTextureSize: () => {
+      let max = 0;
+      scene.traverse((o) => {
+        const mats = (o as THREE.Mesh).material;
+        for (const m of Array.isArray(mats) ? mats : mats ? [mats] : []) {
+          for (const v of Object.values(m)) {
+            const img = v instanceof THREE.Texture ? (v.image as { width?: number; height?: number } | null) : null;
+            if (img?.width) max = Math.max(max, img.width, img.height ?? 0);
+          }
+        }
+      });
+      return max;
+    },
     walkTo: (x: number, z: number) => movement.walkTo({ x, z }),
     sit: (id: string) => {
       const s = SEATS.find((x) => x.id === id);
