@@ -10,6 +10,8 @@ interface Debug {
     peers(): { id: string; nickname: string; state: string; seatId: string | null }[];
     visiblePeerAvatars(): { id: string; nickname: string; nameplate: boolean }[];
     toasts(): string[];
+    project(x: number, y: number, z: number): { x: number; y: number };
+    seats(): { id: string; x: number; z: number; y: number }[];
   };
 }
 
@@ -157,7 +159,7 @@ test.describe('읽기 모드', () => {
 });
 
 test.describe('접근성·소리·PWA', () => {
-  test('키보드만으로 들어가 둘러보고, 소리를 켜고, 읽기 모드를 오간다', async ({ browser }) => {
+  test('키보드로 들어가 둘러보고, 소리를 켜고, 걷고·앉고, 읽기 모드를 오간다', async ({ browser }) => {
     const errors: string[] = [];
     // 시스템 "동작 줄이기"를 켠 상태로 연다
     const ctx = await browser.newContext({ reducedMotion: 'reduce' });
@@ -220,6 +222,16 @@ test.describe('접근성·소리·PWA', () => {
     await expect.poll(() => page.evaluate(() => (window as unknown as { __BBOOKS: { sound(): { gain: number } } }).__BBOOKS.sound().gain)).toBeLessThan(0.01);
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 
+    // 바닥 클릭 → 그 자리로 걸어간다(시작 자리에서 보이는 빈 바닥, 드래그와 구분되는 짧은 클릭)
+    const target = { tx: 1.95, tz: -0.35 };
+    const spot = await page.evaluate(([x, z]) => (window as unknown as Debug).__BBOOKS.project(x, 0, z), [target.tx, target.tz]);
+    expect(await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.id, [spot.x, spot.y])).toBe('scene');
+    await page.mouse.click(spot.x, spot.y);
+    await expect.poll(async () => {
+      const p = (await me(page)).position;
+      return Math.hypot(p[0] - target.tx, p[2] - target.tz);
+    }, { timeout: 60_000 }).toBeLessThan(0.3);
+
     // WASD로 걷기
     const before = await me(page);
     await page.keyboard.down('w');
@@ -228,6 +240,20 @@ test.describe('접근성·소리·PWA', () => {
       return Math.hypot(p[0] - before.position[0], p[2] - before.position[2]);
     }, { timeout: 30_000 }).toBeGreaterThan(0.05);
     await page.keyboard.up('w');
+
+    // 의자·벤치 클릭 → 가장 가까운 빈 자리로 걸어가 앉는다(지금 화면에 보이는 자리 중 하나)
+    const seat = await page.evaluate(() => {
+      const b = (window as unknown as Debug).__BBOOKS;
+      for (const st of b.seats()) {
+        const q = b.project(st.x, st.y + 0.1, st.z);
+        if (q.x > 40 && q.y > 80 && q.x < innerWidth - 40 && q.y < innerHeight - 120 && document.elementFromPoint(q.x, q.y)?.id === 'scene') return { id: st.id, ...q };
+      }
+      return null;
+    });
+    expect(seat, '화면에 보이는 앉을 자리가 있다').not.toBeNull();
+    await page.mouse.click(seat!.x, seat!.y);
+    await expect.poll(async () => (await me(page)).state, { timeout: 90_000 }).toBe('sit');
+    expect((await me(page)).seatId).not.toBeNull();
 
     // 1: 눈인사, 3: 읽기 모드(HUD는 Tab으로도 닿지 않음), Esc: 돌아가기
     await page.keyboard.press('1');
@@ -241,7 +267,7 @@ test.describe('접근성·소리·PWA', () => {
     }
     await page.keyboard.press('Escape');
     await expect(page.locator('.focus')).toBeHidden();
-    await expect.poll(async () => (await me(page)).state).toBe('stand');
+    await expect.poll(async () => (await me(page)).state).toBe('sit');
 
     // PWA: manifest와 서비스워커(빌드 결과물에서만 등록)
     const manifest = await page.evaluate(async () => {

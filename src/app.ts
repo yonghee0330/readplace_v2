@@ -192,7 +192,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     return {
       id: myId, nickname: sessionNick, color: profile.color, hair: profile.hair,
       position: [round(p.x), round(p.y), round(p.z)], rotationY: round(me.root.rotation.y),
-      state: movement.state, seatId: movement.seat?.id ?? null, t: Date.now(),
+      state: movement.state, seatId: movement.seatId, t: Date.now(),
     };
   }
   function pushState(force = false): void {
@@ -486,6 +486,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       return { x: ((v.x + 1) / 2) * innerWidth, y: ((1 - v.y) / 2) * innerHeight };
     },
     camPresets: CAM_PRESETS,
+    seats: () => SEATS.map((s) => ({ id: s.id, x: s.x, z: s.z, y: s.y })),
     placeAtSeat: (id: string) => {
       const s = SEATS.find((x) => x.id === id);
       if (s) {
