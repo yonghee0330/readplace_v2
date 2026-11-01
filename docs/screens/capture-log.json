@@ -1,18 +1,22 @@
 {
-  "at": "2026-10-31T05:15:12.792Z",
+  "at": "2026-11-01T12:38:37.272Z",
   "results": [
     {
-      "file": "overview.png",
+      "file": "with-visitors.png",
       "stats": {
-        "calls": 113,
-        "triangles": 378170
+        "calls": 168,
+        "triangles": 423250,
+        "mainCalls": 78,
+        "mainTriangles": 211904
       }
     },
     {
-      "file": "overview-mobile.png",
+      "file": "with-visitors-mobile.png",
       "stats": {
-        "calls": 92,
-        "triangles": 343122
+        "calls": 143,
+        "triangles": 381262,
+        "mainCalls": 65,
+        "mainTriangles": 190670
       }
     }
   ],

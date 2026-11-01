@@ -17,12 +17,14 @@ interface Shot {
   query: string;
   /** 같은 방에 먼저 열어 둘 탭 수(함께 있기 캡처용) */
   companions?: number;
+  companionQuery?: string;
 }
 
 const SHOTS: Shot[] = [
   { name: 'overview', query: '?cam=overview&seed=1&npc=1&quality=medium' },
-  { name: 'with-visitors', query: '?cam=avatar&seed=1&npc=1&quality=medium&room=wonmi&instance=86', companions: 1 },
-  { name: 'reader', query: '?autoread=1&seed=1&npc=1&quality=medium' },
+  // 동행 탭은 창가 독서 테이블 의자에 앉혀 두고, 캡처하는 탭은 아바타 시점
+  { name: 'with-visitors', query: '?cam=avatar&seed=1&npc=1&quality=medium&room=wonmi&instance=86', companions: 1, companionQuery: '?autostart=1&seed=1&npc=1&quality=low&room=wonmi&instance=86&seat=chair-2' },
+  { name: 'reader', query: '?autoread=1&seed=1&npc=1&quality=medium&seat=sofa-2' },
 ];
 
 async function waitReady(page: Page): Promise<void> {
@@ -38,7 +40,7 @@ async function capture(browser: Browser, base: string, shot: Shot, vpName: keyof
   const companions: Page[] = [];
   for (let i = 0; i < (shot.companions ?? 0); i++) {
     const p = await ctx.newPage();
-    await p.goto(`${base}/${shot.query.replace('cam=avatar', 'cam=overview')}`);
+    await p.goto(`${base}/${shot.companionQuery ?? shot.query}`);
     await waitReady(p);
     companions.push(p);
   }
@@ -49,6 +51,13 @@ async function capture(browser: Browser, base: string, shot: Shot, vpName: keyof
   page.on('pageerror', (e) => errors.push(`[${shot.name}/${vpName}] ${e.message}`));
   await page.goto(`${base}/${shot.query}`);
   await waitReady(page);
+  // 함께 있기 캡처: 동행 탭의 아바타가 실제로 보일 때까지 기다린다
+  if (companions.length) {
+    await page.waitForFunction(() => (window as unknown as { __BBOOKS: { visiblePeerAvatars(): unknown[] } }).__BBOOKS.visiblePeerAvatars().length > 0, null, { timeout: 120_000 });
+    await page.evaluate(() => (window as unknown as { __BBOOKS_LOOP?: { start(): void } }).__BBOOKS_LOOP?.start());
+    await page.waitForTimeout(2500);
+    await page.evaluate(() => (window as unknown as { __BBOOKS_LOOP?: { stop(): void } }).__BBOOKS_LOOP?.stop());
+  }
   const file = vpName === 'desktop' ? `${shot.name}.png` : `${shot.name}-mobile.png`;
   await page.screenshot({ path: resolve(OUT, file), timeout: 120_000 });
   const stats = await page.evaluate(() => (window as unknown as { __BBOOKS_STATS?: unknown }).__BBOOKS_STATS);
