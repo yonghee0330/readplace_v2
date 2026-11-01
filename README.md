@@ -86,6 +86,10 @@ docs/screens/  스크린샷과 시각 품질 판정(REVIEW.md)
 assets/models/ 외부 glb 교체용(비어 있음)
 ```
 
+## 배포(GitHub Pages)
+
+`main`에 올라오면 `.github/workflows/deploy.yml`이 빌드해서 https://yonghee0330.github.io/readplace_v2/ 에 배포합니다. 처음 한 번은 저장소 Settings → Pages → Source를 **GitHub Actions**로 바꿔야 합니다. 정적 호스팅이라 Local 모드(같은 브라우저 탭끼리)로 동작하고, 다른 기기끼리 만나는 ws 모드는 중계 서버를 따로 띄워야 합니다.
+
 ## 외부 모델(glb)로 바꾸기
 
 `assets/models/{이름}.glb`를 넣고 다시 빌드하면, 해당 소품은 절차 모델 대신 glb를 씁니다. 지금 지원하는 이름은 `island`, `reading-table`, `counter`, `sofa`입니다. 모델 원점은 바닥 중앙, 정면은 +z 기준입니다. 어떤 파일이 있는지는 빌드할 때 확인하므로, 없는 파일을 요청해 404가 나지는 않습니다.
