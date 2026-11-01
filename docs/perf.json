@@ -1,39 +1,39 @@
 {
-  "at": "2026-11-01T13:31:21.844Z",
+  "at": "2026-11-01T14:03:48.322Z",
   "renderer": "SwiftShader(headless)",
   "viewport": "1440x900",
   "rows": [
     {
       "level": "low",
       "view": "아바타 시점",
-      "calls": 70,
-      "triangles": 209509,
-      "mainCalls": 69,
-      "mainTriangles": 209508,
+      "calls": 71,
+      "triangles": 208483,
+      "mainCalls": 70,
+      "mainTriangles": 208482,
       "maxTexture": 1024,
-      "hud": "10 fps · 메인 69콜 / 전체 70콜 · 210k tris",
+      "hud": "10 fps · 메인 70콜 / 전체 71콜 · 208k tris",
       "errors": []
     },
     {
       "level": "low",
       "view": "전체 시점",
       "calls": 83,
-      "triangles": 214533,
+      "triangles": 213505,
       "mainCalls": 82,
-      "mainTriangles": 214532,
+      "mainTriangles": 213504,
       "maxTexture": 1024,
-      "hud": "10 fps · 메인 82콜 / 전체 83콜 · 215k tris",
+      "hud": "10 fps · 메인 82콜 / 전체 83콜 · 214k tris",
       "errors": []
     },
     {
       "level": "medium",
       "view": "아바타 시점",
-      "calls": 153,
-      "triangles": 416402,
-      "mainCalls": 70,
-      "mainTriangles": 208480,
+      "calls": 155,
+      "triangles": 418462,
+      "mainCalls": 71,
+      "mainTriangles": 209510,
       "maxTexture": 1024,
-      "hud": "13 fps · 메인 70콜 / 전체 153콜 · 416k tris",
+      "hud": "15 fps · 메인 71콜 / 전체 155콜 · 418k tris",
       "errors": []
     },
     {
@@ -50,23 +50,23 @@
     {
       "level": "high",
       "view": "아바타 시점",
-      "calls": 152,
-      "triangles": 418458,
-      "mainCalls": 70,
-      "mainTriangles": 209508,
+      "calls": 155,
+      "triangles": 416412,
+      "mainCalls": 72,
+      "mainTriangles": 208488,
       "maxTexture": 1024,
-      "hud": "15 fps · 메인 70콜 / 전체 152콜 · 418k tris",
+      "hud": "15 fps · 메인 72콜 / 전체 155콜 · 416k tris",
       "errors": []
     },
     {
       "level": "high",
       "view": "전체 시점",
-      "calls": 178,
-      "triangles": 426450,
-      "mainCalls": 83,
-      "mainTriangles": 213504,
+      "calls": 179,
+      "triangles": 428512,
+      "mainCalls": 84,
+      "mainTriangles": 214538,
       "maxTexture": 1024,
-      "hud": "15 fps · 메인 83콜 / 전체 178콜 · 426k tris",
+      "hud": "15 fps · 메인 84콜 / 전체 179콜 · 429k tris",
       "errors": []
     }
   ]

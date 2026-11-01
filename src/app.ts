@@ -89,7 +89,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
 
   const follow = new FollowCamera(camera, SPAWN.ry + Math.PI);
   follow.reducedMotion = reducedMotion();
-  const fitLook = () => (follow.lookHeight = camera.aspect < 0.8 ? 1.05 : 0.62);
+  const fitLook = () => (follow.lookHeight = camera.aspect < 0.8 ? 1.25 : 0.9);
   fitLook();
   follow.follow(me.root.position, true);
   const fixedCam = params.cam && params.cam !== 'avatar' ? params.cam : null;

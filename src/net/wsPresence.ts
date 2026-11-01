@@ -25,6 +25,9 @@ export class WsPresence extends PeerTracker implements Presence {
   private lastSent = 0;
   private pending = 0;
 
+  /** 탭을 닫을 때 서버의 하트비트 정리(최대 20초)를 기다리지 않고 바로 나갔다고 알린다 */
+  private onHide = () => this.disconnect();
+
   constructor(private url: string) {
     super();
   }
@@ -38,6 +41,7 @@ export class WsPresence extends PeerTracker implements Presence {
     this.selfId = me.id;
     this.attempt = 0;
     this.setStatus('connecting');
+    addEventListener('pagehide', this.onHide);
     return new Promise((resolve) => this.open(resolve));
   }
 
@@ -93,6 +97,7 @@ export class WsPresence extends PeerTracker implements Presence {
   }
 
   disconnect(): void {
+    removeEventListener('pagehide', this.onHide);
     this.closedByUser = true;
     clearTimeout(this.retry);
     clearInterval(this.heartbeat);

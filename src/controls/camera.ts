@@ -49,11 +49,11 @@ export const MIN_DIST = 1.5, MAX_DIST = 7;
  */
 export class FollowCamera {
   yaw: number;
-  pitch = 27 * DEG;
+  pitch = 22 * DEG;
   distance = 3.3;
   readonly target = new THREE.Vector3();
   private goal = new THREE.Vector3();
-  private shown = { yaw: 0, pitch: 27 * DEG, dist: 3.3 };
+  private shown = { yaw: 0, pitch: 22 * DEG, dist: 3.3 };
   reducedMotion = false;
 
   constructor(private cam: THREE.PerspectiveCamera, yaw: number) {
