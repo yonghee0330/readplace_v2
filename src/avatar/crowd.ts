@@ -1,8 +1,10 @@
 // 장면 속 모든 아바타(나, 다른 방문객, NPC)를 관리한다.
-// 이름표·책 아이콘 빌보드, 발밑 그림자(InstancedMesh 1콜), 다른 방문객의 위치 보간(100ms 지연).
+// 이름표·책 배지·책 아이콘 빌보드, 발밑 그림자(InstancedMesh 1콜), 다른 방문객의 위치 보간(100ms 지연).
 import * as THREE from 'three';
-import type { AvatarState, HairStyle, PlayerState } from '../net/presence';
+import type { AvatarState, HairStyle, PlayerState, SharedBook } from '../net/presence';
 import { Avatar } from './avatar';
+import { blurbForTitle } from './bestsellers';
+import { BookBadge } from './bookBadge';
 import { Nameplate, OVERLAY_LAYER, bookIconTexture } from './nameplate';
 
 export type ActorKind = 'me' | 'peer' | 'npc';
@@ -12,11 +14,17 @@ interface Snapshot { at: number; x: number; y: number; z: number; ry: number }
 export class Actor {
   readonly avatar: Avatar;
   nameplate: Nameplate | null = null;
+  /** 다른 사람·NPC 전용. 읽는 책 제목을 머리 위에 띄우고 클릭할 수 있다. */
+  bookBadge: BookBadge | null = null;
   nickname: string;
   /** 이름표 점 색(옷 색) */
   accent: string;
-  /** 읽기 중이면 이름표에 보이는 책 제목 */
+  /** 읽기 중이면 이름표(나) 또는 배지(타인)에 보이는 책 제목 */
   bookTitle: string | null = null;
+  /** 지금 읽는 책 메타(표지·저자 등). 읽기 중이 아니면 null */
+  book: SharedBook | null = null;
+  /** 로컬 소개문(NPC 베스트셀러 등). 네트워크로는 보내지 않는다. */
+  bookBlurb: string | null = null;
   seatId: string | null = null;
   /** 읽기 모드에서 내 이름표·아이콘 숨기기 */
   hideLabel = false;
@@ -38,20 +46,35 @@ export class Actor {
   setState(state: AvatarState, seatId: string | null): void {
     this.seatId = seatId;
     this.avatar.anim.setState(state, seatId !== null);
-    if (state !== 'read') this.bookTitle = null;
-    this.refreshNameplate();
+    if (state !== 'read') {
+      this.bookTitle = null;
+      this.book = null;
+      this.bookBlurb = null;
+    }
+    this.refreshLabels();
   }
 
   setBookTitle(title: string | null): void {
-    const next = title?.trim() || null;
-    if (this.bookTitle === next) return;
-    this.bookTitle = next;
-    this.refreshNameplate();
+    this.setReadingBook(title ? { title, author: '', publisher: '', coverUrl: null } : null, this.bookBlurb);
   }
 
-  private refreshNameplate(): void {
-    const sub = this.avatar.state === 'read' && this.bookTitle ? this.bookTitle : '';
+  /** 읽는 책 메타·소개를 갱신한다. */
+  setReadingBook(book: SharedBook | null, blurb: string | null = null): void {
+    this.book = book?.title ? book : null;
+    this.bookTitle = this.book?.title ?? null;
+    this.bookBlurb = blurb?.trim() || null;
+    this.refreshLabels();
+  }
+
+  private refreshLabels(): void {
+    const reading = this.avatar.state === 'read' && !!this.bookTitle;
+    // 나는 이름표 부제로, 타인·NPC는 클릭용 배지로 책을 보여 준다
+    const sub = this.kind === 'me' && reading ? this.bookTitle! : '';
     this.nameplate?.set(this.nickname, this.accent, sub);
+    if (this.bookBadge) {
+      const show = this.kind !== 'me' && reading && !this.hideLabel;
+      this.bookBadge.set(this.id, show ? this.bookTitle : null);
+    }
   }
 
   /** 다른 방문객: 받은 상태를 기록해 둔다. */
@@ -60,10 +83,13 @@ export class Actor {
     if (this.snapshots.length > 30) this.snapshots.shift();
     this.nickname = s.nickname;
     this.accent = s.color;
-    this.bookTitle = s.state === 'read' ? (s.book?.title ?? null) : null;
     this.setState(s.state, s.seatId);
     this.avatar.setLook({ color: s.color, hair: s.hair });
-    this.refreshNameplate();
+    if (s.state === 'read' && s.book?.title) {
+      this.setReadingBook(s.book, blurbForTitle(s.book.title));
+    } else {
+      this.setReadingBook(null, null);
+    }
   }
 
   /** 100ms 늦게 재생해 두 기록 사이를 보간한다. */
@@ -154,6 +180,10 @@ export class Crowd {
       a.nameplate = new Nameplate(nickname, look.color);
       this.overlay.add(a.nameplate.mesh);
     }
+    if (kind === 'peer' || kind === 'npc') {
+      a.bookBadge = new BookBadge();
+      this.overlay.add(a.bookBadge.mesh);
+    }
     this.group.add(a.root);
     this.actors.set(id, a);
     return a;
@@ -167,7 +197,20 @@ export class Crowd {
       a.nameplate.mesh.removeFromParent();
       a.nameplate.dispose();
     }
+    if (a.bookBadge) {
+      a.bookBadge.mesh.removeFromParent();
+      a.bookBadge.dispose();
+    }
     this.actors.delete(id);
+  }
+
+  /** 클릭 레이캐스트용 책 배지 메시 */
+  bookBadgeMeshes(): THREE.Object3D[] {
+    const out: THREE.Object3D[] = [];
+    for (const a of this.actors.values()) {
+      if (a.bookBadge?.mesh.visible && a.root.visible) out.push(a.bookBadge.mesh);
+    }
+    return out;
   }
 
   get(id: string): Actor | undefined {
@@ -194,6 +237,7 @@ export class Crowd {
       a.avatar.update(dt, t);
       if (!a.root.visible) {
         if (a.nameplate) a.nameplate.mesh.visible = false;
+        if (a.bookBadge) a.bookBadge.mesh.visible = false;
         continue;
       }
       const p = a.root.position;
@@ -209,8 +253,17 @@ export class Crowd {
         a.nameplate.mesh.visible = !a.hideLabel;
         a.nameplate.update(_v.set(p.x, top + 0.06, p.z), camera);
       }
-      if (a.avatar.state === 'read' && !a.hideLabel && ni < MAX) {
-        // 책 제목이 있으면 이름표가 두 줄이라 아이콘을 조금 더 올린다
+      const badgeOn = !!a.bookBadge && a.kind !== 'me' && a.avatar.state === 'read' && !!a.bookTitle && !a.hideLabel;
+      if (a.bookBadge) {
+        if (!badgeOn) a.bookBadge.mesh.visible = false;
+        else {
+          a.bookBadge.set(a.id, a.bookTitle);
+          const nameH = a.nameplate ? 0.14 * a.nameplate.mesh.scale.x : 0.08;
+          a.bookBadge.update(_v.set(p.x, top + 0.06 + nameH, p.z), camera);
+        }
+      }
+      // 나는 작은 책 아이콘, 타인·NPC는 배지가 대신하므로 아이콘은 나에게만
+      if (a.kind === 'me' && a.avatar.state === 'read' && !a.hideLabel && ni < MAX) {
         const lift = a.nameplate ? (a.bookTitle ? 0.24 : 0.17) * a.nameplate.mesh.scale.x : 0.06;
         const sc = a.nameplate ? a.nameplate.mesh.scale.x : 1;
         _m.compose(_v.set(p.x, top + 0.06 + lift, p.z), camera.quaternion, _s.set(sc, sc, sc));

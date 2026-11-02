@@ -7,6 +7,8 @@ export interface KakaoBookHit {
   author: string;
   publisher: string;
   coverUrl: string;
+  /** 카카오 책 소개 요약(본문 아님) */
+  blurb: string | null;
   link: string | null;
 }
 
@@ -95,22 +97,27 @@ export async function searchKakaoBooks(
           authors?: string[];
           publisher?: string;
           thumbnail?: string;
+          contents?: string;
           url?: string;
         }[];
       };
       const ranked = (data.documents ?? [])
         .map((doc) => {
           const cover = httpsUrl(doc.thumbnail);
-          if (!cover) return null;
+          const blurbRaw = stripHtml(doc.contents ?? '');
+          const blurb = blurbRaw ? blurbRaw.slice(0, 280) : null;
+          // 표지 또는 소개 중 하나라도 있으면 채택(머리 위 책 미리보기용)
+          if (!cover && !blurb) return null;
           return {
             hit: {
               title: stripHtml(doc.title ?? title),
               author: (doc.authors ?? []).map(stripHtml).filter(Boolean).join(', ') || author,
               publisher: stripHtml(doc.publisher ?? publisher),
-              coverUrl: enlargeThumbnail(cover),
+              coverUrl: cover ? enlargeThumbnail(cover) : '',
+              blurb,
               link: httpsUrl(doc.url),
             } satisfies KakaoBookHit,
-            score: scoreDoc(doc, title, author, publisher),
+            score: scoreDoc(doc, title, author, publisher) + (cover ? 0 : -1),
           };
         })
         .filter((x): x is { hit: KakaoBookHit; score: number } => !!x)

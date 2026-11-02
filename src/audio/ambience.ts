@@ -1,9 +1,11 @@
 // 서점 소리(SPEC 3-10): 외부 음원 없이 Web Audio로 직접 합성한다.
-// 창밖 빗소리·실내 공기음은 작게, 본 줄기는 책 읽기 좋은 잔잔한 패드·멜로디.
+// 날씨(비·눈·맑음)에 따라 창밖 레이어만 바뀌고, 본 줄기는 잔잔한 패드·멜로디.
 // 기본 꺼짐, 켜고 끌 때 1.5초 페이드. AudioContext는 사용자가 처음 누른 뒤에만 만든다.
+import type { WeatherKind } from '../weather/bucheon';
 
 const FADE = 1.5;
 const LEVEL = 0.8;
+const WEATHER_FADE = 1.2;
 /** 패드 한 마디 길이(초). 4마디 ≈ 22초 루프 */
 const BAR = 5.5;
 /**
@@ -30,11 +32,15 @@ export class Ambience {
   /** 효과음 버스(소리를 켠 상태에서만 들린다) */
   sfxBus: GainNode | null = null;
   private weatherBus: GainNode | null = null;
+  private rainGain: GainNode | null = null;
+  private snowGain: GainNode | null = null;
+  private clearGain: GainNode | null = null;
   private musicBus: GainNode | null = null;
   private padTimer = 0;
   private nextBar = 0;
   private bar = 0;
   private suspendTimer = 0;
+  private weather: WeatherKind = 'rain';
   enabled = false;
 
   /** 사용자 동작(클릭·키) 안에서만 부른다. 처음이면 AudioContext와 소리 그래프를 만든다. */
@@ -54,17 +60,46 @@ export class Ambience {
     this.sfxBus = ctx.createGain();
     this.sfxBus.gain.value = 0.9;
     this.sfxBus.connect(this.master);
-    // 날씨(비·공기음)는 작게, 음악은 또렷하게
+    // 날씨 버스는 작게, 음악은 또렷하게
     this.weatherBus = ctx.createGain();
     this.weatherBus.gain.value = 0.32;
     this.weatherBus.connect(this.master);
+    this.rainGain = ctx.createGain();
+    this.snowGain = ctx.createGain();
+    this.clearGain = ctx.createGain();
+    this.rainGain.connect(this.weatherBus);
+    this.snowGain.connect(this.weatherBus);
+    this.clearGain.connect(this.weatherBus);
+    this.rainGain.gain.value = this.weather === 'rain' ? 1 : 0;
+    this.snowGain.gain.value = this.weather === 'snow' ? 1 : 0;
+    this.clearGain.gain.value = this.weather === 'clear' ? 1 : 0;
     this.musicBus = ctx.createGain();
     this.musicBus.gain.value = 1;
     this.musicBus.connect(this.master);
-    this.buildRain(ctx, this.weatherBus);
-    this.buildAir(ctx, this.weatherBus);
+    this.buildRain(ctx, this.rainGain);
+    this.buildSnow(ctx, this.snowGain);
+    this.buildClear(ctx, this.clearGain);
     this.buildPad(ctx, this.musicBus);
     return ctx;
+  }
+
+  /** 부천 날씨에 맞춰 창밖 소리만 바꾼다(비 / 눈 / 맑음·새소리). */
+  setWeather(kind: WeatherKind): void {
+    this.weather = kind;
+    if (!this.ctx || !this.rainGain || !this.snowGain || !this.clearGain) return;
+    const now = this.ctx.currentTime;
+    const targets: Record<WeatherKind, [GainNode, number]> = {
+      rain: [this.rainGain, 1],
+      snow: [this.snowGain, 1],
+      clear: [this.clearGain, 1],
+    };
+    for (const k of ['rain', 'snow', 'clear'] as WeatherKind[]) {
+      const g = k === 'rain' ? this.rainGain : k === 'snow' ? this.snowGain : this.clearGain;
+      const to = targets[kind][0] === g ? 1 : 0;
+      g.gain.cancelScheduledValues(now);
+      g.gain.setValueAtTime(g.gain.value, now);
+      g.gain.linearRampToValueAtTime(to, now + WEATHER_FADE);
+    }
   }
 
   /** 소리를 켜거나 끈다. 켤 때는 반드시 사용자 동작 안에서 불러야 한다. */
@@ -93,8 +128,13 @@ export class Ambience {
   }
 
   /** 테스트·디버그용 상태 */
-  status(): { enabled: boolean; state: string; gain: number } {
-    return { enabled: this.enabled, state: this.ctx?.state ?? 'none', gain: this.master?.gain.value ?? 0 };
+  status(): { enabled: boolean; state: string; gain: number; weather: WeatherKind } {
+    return {
+      enabled: this.enabled,
+      state: this.ctx?.state ?? 'none',
+      gain: this.master?.gain.value ?? 0,
+      weather: this.weather,
+    };
   }
 
   // ---------- 빗소리(창밖, 작게) ----------
@@ -116,19 +156,29 @@ export class Ambience {
     const rumble = ctx.createGain();
     rumble.gain.value = 0.035;
     noise.connect(rumbleLp).connect(rumble).connect(out);
+    // 실내 공기음도 비 레이어에 살짝
+    const air = loopSource(ctx, pinkNoise(ctx, 4));
+    const airLp = ctx.createBiquadFilter();
+    airLp.type = 'lowpass';
+    airLp.frequency.value = 240;
+    const airG = ctx.createGain();
+    airG.gain.value = 0.05;
+    air.connect(airLp).connect(airG).connect(out);
     noise.start();
+    air.start();
 
     const sway = () => {
+      if (!this.enabled || this.weather !== 'rain') return;
       const t = ctx.currentTime;
       body.gain.cancelScheduledValues(t);
       body.gain.setValueAtTime(body.gain.value, t);
       body.gain.linearRampToValueAtTime(0.04 + Math.random() * 0.045, t + 2.5);
       band.frequency.setTargetAtTime(1100 + Math.random() * 700, t, 1.5);
     };
-    window.setInterval(() => this.enabled && sway(), 2500);
+    window.setInterval(sway, 2500);
 
     const drop = () => {
-      if (this.enabled) {
+      if (this.enabled && this.weather === 'rain') {
         const t = ctx.currentTime + 0.02;
         const o = ctx.createOscillator();
         const g = ctx.createGain();
@@ -150,16 +200,85 @@ export class Ambience {
     drop();
   }
 
-  // ---------- 실내 공기음 ----------
-  private buildAir(ctx: AudioContext, out: AudioNode): void {
-    const src = loopSource(ctx, pinkNoise(ctx, 4));
+  // ---------- 눈 오는 날: 부드러운 바람·얇은 화이트노이즈 ----------
+  private buildSnow(ctx: AudioContext, out: AudioNode): void {
+    const noise = loopSource(ctx, whiteNoise(ctx, 4));
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.value = 900;
+    band.Q.value = 0.35;
+    const low = ctx.createBiquadFilter();
+    low.type = 'lowpass';
+    low.frequency.value = 2200;
+    const body = ctx.createGain();
+    body.gain.value = 0.045;
+    noise.connect(band).connect(low).connect(body).connect(out);
+    const wind = loopSource(ctx, pinkNoise(ctx, 5));
+    const windLp = ctx.createBiquadFilter();
+    windLp.type = 'lowpass';
+    windLp.frequency.value = 180;
+    const windG = ctx.createGain();
+    windG.gain.value = 0.055;
+    wind.connect(windLp).connect(windG).connect(out);
+    noise.start();
+    wind.start();
+    window.setInterval(() => {
+      if (!this.enabled || this.weather !== 'snow') return;
+      const t = ctx.currentTime;
+      body.gain.setTargetAtTime(0.03 + Math.random() * 0.03, t, 1.2);
+      windG.gain.setTargetAtTime(0.04 + Math.random() * 0.03, t, 1.8);
+    }, 3200);
+  }
+
+  // ---------- 맑은 날: 화이트노이즈 + 가끔 새소리 ----------
+  private buildClear(ctx: AudioContext, out: AudioNode): void {
+    const hush = loopSource(ctx, whiteNoise(ctx, 3));
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 400;
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = 240;
+    lp.frequency.value = 3200;
     const g = ctx.createGain();
-    g.gain.value = 0.05;
-    src.connect(lp).connect(g).connect(out);
-    src.start();
+    g.gain.value = 0.028;
+    hush.connect(hp).connect(lp).connect(g).connect(out);
+    const air = loopSource(ctx, pinkNoise(ctx, 4));
+    const airLp = ctx.createBiquadFilter();
+    airLp.type = 'lowpass';
+    airLp.frequency.value = 280;
+    const airG = ctx.createGain();
+    airG.gain.value = 0.035;
+    air.connect(airLp).connect(airG).connect(out);
+    hush.start();
+    air.start();
+
+    const chirp = () => {
+      if (this.enabled && this.weather === 'clear') {
+        const t = ctx.currentTime + 0.02;
+        const pan = ctx.createStereoPanner();
+        pan.pan.value = Math.random() * 1.4 - 0.7;
+        const notes = 2 + Math.floor(Math.random() * 3);
+        let f0 = 1800 + Math.random() * 1400;
+        for (let i = 0; i < notes; i++) {
+          const o = ctx.createOscillator();
+          const eg = ctx.createGain();
+          const start = t + i * (0.07 + Math.random() * 0.05);
+          const f = f0 * (0.92 + Math.random() * 0.2);
+          o.type = 'sine';
+          o.frequency.setValueAtTime(f, start);
+          o.frequency.exponentialRampToValueAtTime(f * (1.15 + Math.random() * 0.2), start + 0.06);
+          eg.gain.setValueAtTime(0.0001, start);
+          eg.gain.exponentialRampToValueAtTime(0.018 + Math.random() * 0.012, start + 0.012);
+          eg.gain.exponentialRampToValueAtTime(0.0001, start + 0.09);
+          o.connect(eg).connect(pan).connect(out);
+          o.start(start);
+          o.stop(start + 0.12);
+          f0 = f;
+        }
+      }
+      window.setTimeout(chirp, 2800 + Math.random() * 6500);
+    };
+    window.setTimeout(chirp, 1500 + Math.random() * 2000);
   }
 
   // ---------- 잔잔한 서점 음악(패드 + 느린 멜로디) ----------

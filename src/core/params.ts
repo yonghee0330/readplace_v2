@@ -21,6 +21,8 @@ export interface Params {
   cap: number;
   /** 카카오 표지 프록시 등 HTTP API origin. 없으면 ws 주소에서 추론하거나 같은 출처 */
   api: string;
+  /** 캡처·테스트용 날씨 고정. 없으면 부천 실시간 */
+  weather: 'rain' | 'snow' | 'clear' | null;
 }
 
 export const DEFAULT_SEED = 86;
@@ -42,6 +44,8 @@ export function readParams(search = location.search): Params {
   const instance = Math.min(999, Math.max(1, Math.round(num('instance', 86))));
   const cap = Math.min(ROOM_CAPACITY, Math.max(1, Math.round(num('cap', ROOM_CAPACITY))));
   const autoread = q.has('autoread') && q.get('autoread') !== '0';
+  const weatherRaw = q.get('weather');
+  const weather = weatherRaw === 'rain' || weatherRaw === 'snow' || weatherRaw === 'clear' ? weatherRaw : null;
   return {
     seed: Math.floor(num('seed', DEFAULT_SEED)),
     quality: quality === 'low' || quality === 'medium' || quality === 'high' ? quality : null,
@@ -58,6 +62,7 @@ export function readParams(search = location.search): Params {
     seat: q.get('seat'),
     cap,
     api: (q.get('api') || '').replace(/\/$/, ''),
+    weather,
   };
 }
 

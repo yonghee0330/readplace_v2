@@ -1,5 +1,5 @@
 // NPC 독자: 로컬 연출. 자리에 앉아 최근 베스트셀러를 읽고, 가끔 페이지를 넘긴다.
-// 접속자 수·알림에서 빠진다. 이름표에 닉네임·책 제목을 보여 진짜 독자처럼 보이게 한다.
+// 접속자 수·알림에서 빠진다. 머리 위 책 배지를 누르면 표지·소개를 볼 수 있다.
 import { Rng } from '../core/rng';
 import { HAIR_STYLES, OUTFIT_COLORS } from '../core/storage';
 import { randomNickname } from '../net/nickname';
@@ -40,7 +40,10 @@ export function spawnNpcs(crowd: Crowd, rng: Rng): Actor[] {
     const a = crowd.add(`npc-${i}`, 'npc', nick, { color: r.pick(OUTFIT_COLORS), hair: r.pick(HAIR_STYLES) }, true);
     placeAtSeat(a, seat);
     a.setState('read', seat.id);
-    a.setBookTitle(book.title);
+    a.setReadingBook(
+      { title: book.title, author: book.author, publisher: book.publisher, coverUrl: null },
+      book.blurb,
+    );
     return a;
   });
 }

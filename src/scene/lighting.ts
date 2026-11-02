@@ -1,7 +1,9 @@
 // 조명: 창 방향 키라이트(그림자), 실내 전구, 반구광, 바닥의 창빛 패치, 약한 환경 반사.
+// 부천 날씨(비·눈·맑음)에 따라 창빛 색·세기를 살짝 바꾼다.
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { QualityProfile } from '../core/quality';
+import type { WeatherKind } from '../weather/bucheon';
 import { BACK_OPENINGS, ROOM } from './layout';
 import type { LampAnchor } from './props/lamps';
 import { windowLightTexture } from './textures';
@@ -12,6 +14,7 @@ export const KEY_DIR = new THREE.Vector3(0.32, -0.78, 1).normalize();
 export interface Lighting {
   group: THREE.Group;
   applyQuality(q: QualityProfile): void;
+  setWeather(kind: WeatherKind): void;
 }
 
 export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene, lamps: LampAnchor[], q: QualityProfile): Lighting {
@@ -92,7 +95,39 @@ export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
   scene.environmentIntensity = 0.18;
   pmrem.dispose();
 
+  let lastQ = q;
+  let weather: WeatherKind = 'rain';
+
+  const tintForWeather = () => {
+    if (weather === 'clear') {
+      key.color.setHex(0xfff2d8);
+      hemi.color.setHex(0xfff6e8);
+      hemi.groundColor.setHex(0x5a4030);
+      patchMat.color.setHex(0xffe8c4);
+    } else if (weather === 'snow') {
+      key.color.setHex(0xe8eef5);
+      hemi.color.setHex(0xe8eef4);
+      hemi.groundColor.setHex(0x4a4550);
+      patchMat.color.setHex(0xdde6f0);
+    } else {
+      key.color.setHex(0xe9edf0);
+      hemi.color.setHex(0xf2e1c4);
+      hemi.groundColor.setHex(0x4f3622);
+      patchMat.color.setHex(0xdde6ee);
+    }
+  };
+
+  const applyWeatherBoost = () => {
+    if (weather === 'clear') {
+      key.intensity *= 1.35;
+      patchMat.opacity = Math.min(0.4, patchMat.opacity * 1.5);
+    } else if (weather === 'snow') {
+      key.intensity *= 1.1;
+    }
+  };
+
   const applyQuality = (qq: QualityProfile) => {
+    lastQ = qq;
     renderer.shadowMap.enabled = qq.shadows;
     key.castShadow = qq.shadows;
     if (qq.shadows) key.shadow.mapSize.set(qq.shadowMapSize, qq.shadowMapSize);
@@ -102,6 +137,8 @@ export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
     key.intensity = qq.shadows ? 1.25 : 0.35;
     patchMat.opacity = qq.shadows ? 0.1 : 0.32;
     hemi.intensity = qq.shadows ? 0.65 : 0.85;
+    tintForWeather();
+    applyWeatherBoost();
     key.shadow.map?.dispose();
     key.shadow.map = null;
     spot.shadow.map?.dispose();
@@ -109,5 +146,11 @@ export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
     renderer.shadowMap.needsUpdate = true;
   };
   applyQuality(q);
-  return { group, applyQuality };
+
+  const setWeather = (kind: WeatherKind) => {
+    weather = kind;
+    applyQuality(lastQ);
+  };
+
+  return { group, applyQuality, setWeather };
 }

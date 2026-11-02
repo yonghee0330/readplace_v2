@@ -32,6 +32,7 @@ export class Hud {
   private actions: HTMLButtonElement[];
   private bookBtn: HTMLButtonElement;
   private pill: HTMLElement;
+  private weatherEl: HTMLElement;
 
   constructor(parent: HTMLElement, h: HudHandlers) {
     this.root = document.createElement('div');
@@ -40,6 +41,7 @@ export class Hud {
       <div class="hud-top hud-left">
         <button type="button" class="pill pill-icon" data-act="exit" aria-label="서점에서 나가기">${icon('back')}<span class="pill-text">나가기</span></button>
         <div class="pill pill-room" role="status">${roomLabel()}</div>
+        <div class="pill pill-weather" role="status" data-weather hidden>부천</div>
       </div>
       <div class="hud-top hud-right">
         <div class="pill pill-count" role="status" aria-live="polite">${icon('people')}<span class="count-num">1</span><span class="count-cap">/${ROOM_CAPACITY}</span></div>
@@ -58,6 +60,7 @@ export class Hud {
     this.soundBtn = q<HTMLButtonElement>('[data-act="sound"]');
     this.bookBtn = q<HTMLButtonElement>('[data-act="book"]');
     this.pill = q('.hud-status');
+    this.weatherEl = q('[data-weather]');
     this.actions = [...this.root.querySelectorAll<HTMLButtonElement>('.action')];
 
     q('[data-act="exit"]').addEventListener('click', () => h.exit());
@@ -77,6 +80,12 @@ export class Hud {
   setCount(n: number): void {
     this.count.textContent = String(n);
     this.count.parentElement!.setAttribute('aria-label', `지금 함께 있는 사람 ${n}명, 최대 ${ROOM_CAPACITY}명`);
+  }
+
+  setWeather(label: string): void {
+    this.weatherEl.hidden = !label;
+    this.weatherEl.textContent = label;
+    this.weatherEl.setAttribute('aria-label', label ? `지금 날씨 ${label}` : '');
   }
 
   setSound(on: boolean): void {

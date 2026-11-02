@@ -21,6 +21,7 @@ import { loadBook, setCoverApiBase, type ReadingBook } from './reader/book';
 import { FocusMode, type FocusReader } from './reader/focus';
 import { buildBookstore, type Bookstore } from './scene/bookstore';
 import { BookCard } from './ui/bookCard';
+import { BookPeekSheet } from './ui/bookPeek';
 import { BookSheet } from './ui/bookSheet';
 import { SEATS, SPAWN, SPAWNS, colliders } from './scene/layout';
 import { buildPostFx, type PostFx } from './scene/postfx';
@@ -29,6 +30,7 @@ import type { LoadingScreen } from './ui/loading';
 import { SettingsSheet } from './ui/settings';
 import { Sheet, anySheetOpen, closeOpenSheet } from './ui/sheet';
 import { Toasts } from './ui/toast';
+import { fetchBucheonWeather, weatherAria, type WeatherInfo } from './weather/bucheon';
 
 const NOD_COOLDOWN = 3000;
 
@@ -64,12 +66,10 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
 
   const store: Bookstore = await buildBookstore(renderer, scene, q, rng, loading);
   let fx: PostFx = buildPostFx(renderer, scene, camera, q);
-  const rain = () => (reducedMotion() ? 0 : q.rainParticles);
-  const applyRain = () => {
-    store.exterior.setRain(rain());
-    store.windowRain.set(q.windowRainShader, !reducedMotion());
-  };
-  applyRain();
+
+  // 부천 실시간 날씨(실패 시 비). ?weather= 으로 고정 가능.
+  let weather: WeatherInfo = await fetchBucheonWeather(params.weather);
+  const particles = () => (reducedMotion() ? 0 : q.rainParticles);
 
   // ---------- 아바타 ----------
   const crowd = new Crowd();
@@ -104,6 +104,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   const focus = new FocusMode(ui, () => setFocus(false));
   const bookCard = new BookCard(ui);
   const bookSheet = new BookSheet();
+  const bookPeek = new BookPeekSheet();
   let currentBook: ReadingBook | null = loadBook();
   // 카카오 책 표지는 REST 키를 서버에만 두고 `/api/kakao` 프록시로 통한다
   setCoverApiBase(params.api || apiBaseFromWs(params.ws) || (import.meta.env.VITE_API_BASE as string | undefined) || '');
@@ -149,6 +150,17 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   hud.setSound(settings.sound);
   wired = true;
 
+  const applyWeather = () => {
+    const kind = weather.kind;
+    store.exterior.setWeather(kind, particles());
+    store.windowRain.set(kind === 'rain' && q.windowRainShader, !reducedMotion());
+    store.lighting.setWeather(kind);
+    amb.setWeather(kind);
+    hud.setWeather(weather.label);
+    document.getElementById('scene')?.setAttribute('aria-label', weatherAria(kind));
+  };
+  applyWeather();
+
   const exitSheet = new Sheet('서점을 나갈까요?', 'exit-sheet');
   exitSheet.body.innerHTML = `<p class="sheet-text">나가면 첫 화면으로 돌아가요. 언제든 다시 들어올 수 있어요.</p>
     <div class="sheet-actions"><button type="button" class="btn" data-act="stay">계속 머물기</button>
@@ -167,13 +179,12 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       me.avatar.setLook(p);
       me.nickname = p.nickname;
       me.accent = p.color;
-      me.setBookTitle(movement.reading ? (currentBook?.title ?? null) : null);
       pushState(true);
     },
     reducedMotion: (v) => {
       applyMotionClass();
       follow.reducedMotion = v;
-      applyRain();
+      applyWeather();
     },
     npc: (v) => setNpcsVisible(npcs, params.npc && v),
     keyboardMove: () => {},
@@ -217,7 +228,15 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     const now = performance.now();
     if (!force && now - lastSentAt < 100) return;
     lastSentAt = now;
-    me.setBookTitle(movement.reading ? (currentBook?.title ?? null) : null);
+    if (!movement.reading) me.setReadingBook(null);
+    else if (currentBook) {
+      me.setReadingBook({
+        title: currentBook.title,
+        author: currentBook.author,
+        publisher: currentBook.publisher,
+        coverUrl: currentBook.coverUrl?.startsWith('https://') ? currentBook.coverUrl : null,
+      });
+    }
     presence.sendState(myState());
     hud.setReading(movement.reading);
   }
@@ -250,7 +269,6 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       if (s.nickname === sessionNick && myId > s.id) {
         sessionNick = randomNickname();
         me.nickname = sessionNick;
-        me.setBookTitle(movement.reading ? (currentBook?.title ?? null) : null);
         pushState(true);
       }
     }
@@ -311,7 +329,12 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     currentBook = book;
     bookCard.show(book, focusMode);
     // 이름표 부제는 state===read일 때만 그려진다. 책 확정 직후·읽기 전환 전에 미리 넣어 둔다.
-    me.setBookTitle(book.title);
+    me.setReadingBook({
+      title: book.title,
+      author: book.author,
+      publisher: book.publisher,
+      coverUrl: book.coverUrl?.startsWith('https://') ? book.coverUrl : null,
+    });
   }
 
   /** 캡처·테스트용: 시트 없이 저장된 책(또는 안내용 기본값)으로 바로 읽기 */
@@ -416,9 +439,23 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   scene.add(ring.mesh);
 
   function clickAt(clientX: number, clientY: number): void {
-    if (focus.active) return;
+    if (focus.active || anySheetOpen()) return;
     const ndc = new THREE.Vector2((clientX / innerWidth) * 2 - 1, -(clientY / innerHeight) * 2 + 1);
     ray.setFromCamera(ndc, camera);
+    // 머리 위 책 배지(다른 사람·NPC)를 먼저 본다
+    const badgeHit = ray.intersectObjects(crowd.bookBadgeMeshes(), false)[0];
+    if (badgeHit) {
+      const id = String(badgeHit.object.userData.actorId ?? '');
+      const actor = crowd.get(id);
+      if (actor?.book?.title) {
+        bookPeek.open({
+          nickname: actor.nickname || '독자',
+          book: actor.book,
+          blurb: actor.bookBlurb,
+        });
+        return;
+      }
+    }
     const hits = ray.intersectObjects([...hitGroup.children, store.floor], false);
     const hit = hits[0];
     if (!hit) return;
@@ -464,7 +501,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     renderer.setPixelRatio(q.pixelRatio);
     renderer.setSize(innerWidth, innerHeight, false);
     store.lighting.applyQuality(q);
-    applyRain();
+    applyWeather();
     fx.dispose();
     fx = buildPostFx(renderer, scene, camera, q);
     fx.setSize(innerWidth, innerHeight);
@@ -540,6 +577,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     visiblePeerAvatars: () => crowd.list('peer').filter((a) => a.root.visible && a.root.parent).map((a) => ({ id: a.id, nickname: a.nickname, nameplate: !!a.nameplate?.mesh.visible })),
     npcCount: () => npcs.filter((n) => n.root.visible).length,
     sound: () => amb.status(),
+    weather: () => weather,
     /** 장면이 쓰는 텍스처 중 가장 큰 변의 길이(성능 예산: 1024px 이하) */
     maxTextureSize: () => {
       let max = 0;
