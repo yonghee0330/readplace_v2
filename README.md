@@ -83,6 +83,8 @@ npm run server
 | `cap=20` | 입장 상한(1~20, 기본 20). 테스트용 |
 | `presence=ws&ws=ws://…` | 중계 서버로 연결(기본은 같은 브라우저 탭끼리). 표지 프록시 origin도 여기서 추론 |
 | `api=http://localhost:8787` | 카카오 표지 프록시 origin을 직접 지정 |
+| `presence=supabase` | Supabase Realtime 함께 있기(env에 URL·키 필요). 미지정이면 env 있으면 자동 |
+| `presence=local` / `ws` | 탭 간 BroadcastChannel / 로컬 ws 서버 |
 | `npc=0` | NPC 독자 숨기기 |
 | `autoread=1` | 바로 읽기 모드 |
 | `weather=rain\|snow\|clear` | 부천 실시간 날씨 대신 연출 고정(캡처·테스트용) |
@@ -96,7 +98,7 @@ npm run server
 - 글꼴: `@fontsource/noto-serif-kr`(제목), `pretendard`(본문). 로컬 번들이라 오프라인에서도 보입니다.
 - 실시간: `ws`(중계 서버). 개발용: `@playwright/test`(캡처·테스트·성능 측정·아이콘 PNG 생성), `tsx`(스크립트·서버 실행), `@types/three`, `@types/node`, `@types/ws`(타입 검사).
 - 소리는 Web Audio, PWA는 직접 쓴 서비스워커 + 작은 Vite 플러그인(`vite.config.ts`의 `bbooks-pwa`)으로 만들어 패키지를 더하지 않았습니다.
-- SPEC에 없는 패키지는 추가하지 않았습니다. `page-flip`도 v3.1에서 책 본문을 빼면서 쓰지 않습니다.
+- SPEC에 없는 패키지는 꼭 필요할 때만 추가합니다. `@supabase/supabase-js`는 Pages에서도 다른 기기 함께 있기·카카오 표지 프록시를 위해 넣었습니다. `page-flip`은 v3.1에서 책 본문을 빼면서 쓰지 않습니다.
 
 ## 구조
 
@@ -139,12 +141,47 @@ SPEC v3.1에 따라 이 서비스는 **실제 책 본문을 다루지 않습니�
 
 `assets/models/{이름}.glb`를 넣고 다시 빌드하면, 해당 소품은 절차 모델 대신 glb를 씁니다. 지금 지원하는 이름은 `island`, `reading-table`, `counter`, `sofa`입니다. 모델 원점은 바닥 중앙, 정면은 +z 기준입니다. 어떤 파일이 있는지는 빌드할 때 확인하므로, 없는 파일을 요청해 404가 나지는 않습니다.
 
-## 실시간 백엔드 바꾸기(Supabase Realtime·Cloudflare Durable Objects)
+## Supabase 연동(함께 있기 + 카카오 표지)
 
-`src/net/presence.ts`의 `Presence` 인터페이스(connect·disconnect·sendState·sendAction·onPeers·onAction·onStatus)만 새로 구현하면 됩니다. 피어 목록·들어옴/나감 알림은 `PeerTracker`를 상속하면 그대로 씁니다. `src/app.ts`에서 `?presence=` 값에 따라 구현을 고르는 한 줄만 추가하세요.
+GitHub Pages는 정적 호스팅이라, **다른 기기와 만나기**와 **카카오 표지(키 숨김)** 는 Supabase를 쓰면 됩니다. 패키지: `@supabase/supabase-js`(Realtime Presence·Broadcast·Edge Function 호출).
 
-- Supabase Realtime: 채널 이름을 `channelName(room, instance)`로, `presence.track(state)` + `broadcast`(눈인사) 사용
-- Durable Objects: 방·인스턴스마다 객체 하나, `server/index.ts`의 메시지 형식(join·state·action·leave / welcome·state·action·leave)을 그대로 옮기면 클라이언트는 `WsPresence`를 그대로 씀
+### 1) 프로젝트·환경 변수
+
+1. [Supabase](https://supabase.com)에서 프로젝트 생성
+2. Project Settings → API에서 **Project URL**과 **publishable**(또는 anon) 키 복사
+3. 로컬 `.env`(커밋 금지):
+
+```bash
+VITE_SUPABASE_URL=https://xxxx.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+# 또는 VITE_SUPABASE_ANON_KEY=eyJ...
+```
+
+4. GitHub 저장소 Secrets에도 같은 이름으로 넣으면 Pages 빌드에 들어갑니다(`deploy.yml`).
+
+URL에 `presence=`가 없고 위 env가 있으면 자동으로 **supabase** 모드입니다. 강제로 쓰려면 `?presence=supabase`, 끄려면 `?presence=local`.
+
+### 2) 카카오 Edge Function
+
+```bash
+# CLI: https://supabase.com/docs/guides/cli
+npx supabase login
+npx supabase link --project-ref YOUR_REF
+npx supabase secrets set KAKAO_REST_API_KEY=카카오REST키
+npx supabase functions deploy kakao-search
+```
+
+함수 코드는 `supabase/functions/kakao-search`. 브라우저는 `VITE_SUPABASE_URL/functions/v1/kakao-search`로 호출합니다.
+
+### 3) Realtime
+
+대시보드에서 Realtime이 켜져 있으면 됩니다(기본 on). 채널 이름: `bbooks:{room}:{instance}`(공간 이동 시 `room-seminar`처럼 방마다 분리). 명단은 Presence, 위치·눈인사는 Broadcast입니다.
+
+## 실시간 백엔드 바꾸기(다른 구현)
+
+`src/net/presence.ts`의 `Presence` 인터페이스만 새로 구현하면 됩니다. 지금은 `local` · `ws` · `supabase` 세 가지입니다.
+
+- Durable Objects: 방·인스턴스마다 객체 하나, `server/index.ts` 메시지 형식을 옮기면 클라이언트는 `WsPresence`를 그대로 씀
 
 ## 성능
 

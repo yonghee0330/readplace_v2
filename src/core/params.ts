@@ -11,7 +11,7 @@ export interface Params {
   npc: boolean;
   room: string;
   instance: number;
-  presence: 'local' | 'ws';
+  presence: 'local' | 'ws' | 'supabase';
   ws: string;
   autoread: boolean;
   autostart: boolean;
@@ -46,6 +46,11 @@ export function readParams(search = location.search): Params {
   const autoread = q.has('autoread') && q.get('autoread') !== '0';
   const weatherRaw = q.get('weather');
   const weather = weatherRaw === 'rain' || weatherRaw === 'snow' || weatherRaw === 'clear' ? weatherRaw : null;
+  const presenceRaw = q.get('presence');
+  const presence: Params['presence'] =
+    presenceRaw === 'ws' || presenceRaw === 'supabase' || presenceRaw === 'local'
+      ? presenceRaw
+      : 'local';
   return {
     seed: Math.floor(num('seed', DEFAULT_SEED)),
     quality: quality === 'low' || quality === 'medium' || quality === 'high' ? quality : null,
@@ -54,7 +59,7 @@ export function readParams(search = location.search): Params {
     npc: q.get('npc') !== '0',
     room: q.get('room') || 'wonmi',
     instance,
-    presence: q.get('presence') === 'ws' ? 'ws' : 'local',
+    presence,
     ws: q.get('ws') || 'ws://localhost:8787',
     autoread,
     // 캡처·테스트용: 시작 화면을 건너뛰고 바로 들어간다.
@@ -64,6 +69,18 @@ export function readParams(search = location.search): Params {
     api: (q.get('api') || '').replace(/\/$/, ''),
     weather,
   };
+}
+
+/** URL에 `presence=`가 없고 Supabase env가 있으면 supabase 모드. */
+export function resolvePresence(
+  raw: Params['presence'],
+  search = location.search,
+  hasSupabase: boolean,
+): Params['presence'] {
+  const q = new URLSearchParams(search);
+  if (q.has('presence')) return raw;
+  if (hasSupabase) return 'supabase';
+  return raw;
 }
 
 /** ws URL에서 표지 프록시 HTTP origin을 뽑는다. */

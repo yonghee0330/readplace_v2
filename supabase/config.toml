@@ -1,0 +1,12 @@
+# Supabase 로컬·원격 공통 최소 설정. `supabase link` 후 프로젝트 ref가 채워진다.
+project_id = "readplace-v2"
+
+[api]
+enabled = true
+
+[realtime]
+enabled = true
+
+[functions.kakao-search]
+# 브라우저에서 anon/publishable 키로 호출 (로그인 불필요)
+verify_jwt = false

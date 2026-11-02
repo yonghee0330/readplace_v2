@@ -1,4 +1,5 @@
-// 카카오 책 검색 클라이언트. REST 키는 서버에만 두고 `/api/kakao/search` 프록시를 친다.
+// 카카오 책 검색 클라이언트. REST 키는 서버/Edge에만 두고 프록시를 친다.
+import { supabaseConfig } from '../net/supabaseClient';
 
 export interface KakaoBookItem {
   title: string;
@@ -25,10 +26,25 @@ export function getKakaoApiBase(): string {
 }
 
 function endpoints(): string[] {
-  const path = '/api/kakao/search';
-  const list = [path];
-  if (apiBase) list.unshift(`${apiBase}${path}`);
+  const list: string[] = ['/api/kakao/search'];
+  if (apiBase) {
+    if (apiBase.includes('/functions/v1')) {
+      list.unshift(apiBase.endsWith('kakao-search') ? apiBase : `${apiBase}/kakao-search`);
+    } else {
+      list.unshift(`${apiBase}/api/kakao/search`);
+    }
+  }
   return [...new Set(list)];
+}
+
+function authHeaders(url: string): HeadersInit | undefined {
+  if (!url.includes('/functions/v1/')) return undefined;
+  const cfg = supabaseConfig();
+  if (!cfg) return undefined;
+  return {
+    Authorization: `Bearer ${cfg.key}`,
+    apikey: cfg.key,
+  };
 }
 
 /** 제목으로 카카오 책 1건을 찾는다. 프록시가 없으면 ok:false. */
@@ -44,7 +60,7 @@ export async function fetchKakaoBook(
   let last: KakaoClientResult = { ok: false, error: 'upstream', message: '카카오 프록시에 연결하지 못했어요.' };
   for (const base of endpoints()) {
     try {
-      const res = await fetch(`${base}?${q}`, { signal });
+      const res = await fetch(`${base}?${q}`, { signal, headers: authHeaders(base) });
       const data = (await res.json().catch(() => null)) as {
         ok?: boolean;
         item?: KakaoBookItem | null;

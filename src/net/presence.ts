@@ -1,5 +1,5 @@
-// 실시간 함께 있기 인터페이스. 구현은 LocalPresence(BroadcastChannel)와 WsPresence(중계 서버).
-// Supabase Realtime·Cloudflare Durable Objects로 바꿀 때도 이 인터페이스만 새로 구현하면 된다.
+// 실시간 함께 있기 인터페이스.
+// 구현: LocalPresence(BroadcastChannel), WsPresence(중계 서버), SupabasePresence(Realtime).
 
 export type AvatarState = 'stand' | 'walk' | 'sit' | 'read';
 export type HairStyle = 'bangs' | 'bob' | 'short';

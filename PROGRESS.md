@@ -35,6 +35,11 @@
 - 확인 방법: `npm run typecheck && npm run build`. `npm run server` 후 `/health`의 `kakaoKey: true`, 책 펼치기 표지. preview에서 포털 이름·공간 메뉴·확인 입장.
 - SPEC과 달라진 점: 단일 연속 공간 → 허브+서브룸 포털 구조(운영자 요청).
 
+### 운영자 수정 (2026-11-02) — Supabase Realtime·카카오 Edge
+- 한 일: `@supabase/supabase-js` + `SupabasePresence`(Presence 명단 + Broadcast 위치/눈인사). env 있으면 기본 supabase 모드. `supabase/functions/kakao-search` Edge Function 스캐폴드. Pages 빌드에 `VITE_SUPABASE_*` Secrets 주입.
+- 확인 방법: `.env`에 URL·키 → `?presence=supabase`로 탭/기기 2개. Edge 배포 후 책 펼치기 표지. `npm run typecheck && npm run build`.
+- 새 패키지: `@supabase/supabase-js` 2.118.0 — Pages에서 다른 기기 함께 있기·표지 프록시용.
+
 ---
 
 ## 단계 1 — 스캐폴딩, 시드 난수, 품질 설정, 로딩 화면, 빈 장면

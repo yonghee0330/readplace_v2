@@ -9,13 +9,15 @@ import { CAM_PRESETS, FollowCamera, applyPreset, createCamera } from './controls
 import { CanvasInput, isTyping } from './controls/input';
 import { Movement } from './controls/movement';
 import { Loop } from './core/loop';
-import { ROOM_CAPACITY, apiBaseFromWs, type Params, type QualityLevel } from './core/params';
+import { ROOM_CAPACITY, apiBaseFromWs, resolvePresence, type Params, type QualityLevel } from './core/params';
 import { detectQuality, profileFor, type QualityProfile } from './core/quality';
 import { Rng } from './core/rng';
 import { loadProfile, loadSettings, saveSettings, type Profile, type Settings } from './core/storage';
 import { LocalPresence } from './net/localPresence';
 import { randomNickname } from './net/nickname';
 import { newId, sanitizeSharedBook, type ActionEvent, type Presence, type PlayerState, type SharedBook } from './net/presence';
+import { hasSupabaseConfig, supabaseKakaoApiBase } from './net/supabaseClient';
+import { SupabasePresence } from './net/supabasePresence';
 import { WsPresence } from './net/wsPresence';
 import { loadBook, setCoverApiBase, type ReadingBook } from './reader/book';
 import { FocusMode, type FocusReader } from './reader/focus';
@@ -112,10 +114,20 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   const bookSheet = new BookSheet();
   const bookPeek = new BookPeekSheet();
   let currentBook: ReadingBook | null = loadBook();
-  // 카카오 책 표지는 REST 키를 서버에만 두고 `/api/kakao` 프록시로 통한다
-  setCoverApiBase(params.api || apiBaseFromWs(params.ws) || (import.meta.env.VITE_API_BASE as string | undefined) || '');
+  // 카카오 표지: 명시 api → Supabase Edge → 로컬 ws 서버 → Vite 프록시
+  const presenceMode = resolvePresence(params.presence, location.search, hasSupabaseConfig());
+  setCoverApiBase(
+    params.api
+    || (presenceMode === 'supabase' ? supabaseKakaoApiBase() : '')
+    || apiBaseFromWs(params.ws)
+    || (import.meta.env.VITE_API_BASE as string | undefined)
+    || '',
+  );
 
-  let presence: Presence = params.presence === 'ws' ? new WsPresence(params.ws) : new LocalPresence(params.cap);
+  let presence: Presence =
+    presenceMode === 'ws' ? new WsPresence(params.ws)
+      : presenceMode === 'supabase' ? new SupabasePresence(params.cap)
+        : new LocalPresence(params.cap);
   let instance = params.instance;
   let connected = false;
   let peers = new Map<string, PlayerState>();
@@ -679,7 +691,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   if (admission === 'full') {
     hud.root.hidden = true;
     const full = document.getElementById('full')!;
-    const limit = params.presence === 'ws' ? ROOM_CAPACITY : params.cap;
+    const limit = presenceMode === 'local' ? params.cap : ROOM_CAPACITY;
     document.getElementById('full-copy')!.innerHTML = `지금은 ${limit}명이 모두 모였어요.<br />누군가 나가면 다시 들어올 수 있어요.`;
     full.hidden = false;
     const back = document.getElementById('full-back')!;
@@ -785,7 +797,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
   await loading.finish(reducedMotion());
   window.__BBOOKS_READY = true;
-  console.info(`[bbooks] 품질 ${q.level}, 책 ${store.stats.books}권, NPC ${npcs.length}명, ${params.presence} 모드`);
+  console.info(`[bbooks] 품질 ${q.level}, 책 ${store.stats.books}권, NPC ${npcs.length}명, ${presenceMode} 모드`);
 }
 
 const round = (v: number) => Math.round(v * 1000) / 1000;
