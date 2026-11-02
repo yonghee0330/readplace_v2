@@ -72,8 +72,9 @@ export class Actor {
     const sub = this.kind === 'me' && reading ? this.bookTitle! : '';
     this.nameplate?.set(this.nickname, this.accent, sub);
     if (this.bookBadge) {
-      const show = this.kind !== 'me' && reading && !this.hideLabel;
+      const show = this.kind !== 'me' && reading;
       this.bookBadge.set(this.id, show ? this.bookTitle : null);
+      if (this.hideLabel) this.bookBadge.root.visible = false;
     }
   }
 
@@ -182,7 +183,7 @@ export class Crowd {
     }
     if (kind === 'peer' || kind === 'npc') {
       a.bookBadge = new BookBadge();
-      this.overlay.add(a.bookBadge.mesh);
+      this.overlay.add(a.bookBadge.root);
     }
     this.group.add(a.root);
     this.actors.set(id, a);
@@ -198,19 +199,28 @@ export class Crowd {
       a.nameplate.dispose();
     }
     if (a.bookBadge) {
-      a.bookBadge.mesh.removeFromParent();
+      a.bookBadge.root.removeFromParent();
       a.bookBadge.dispose();
     }
     this.actors.delete(id);
   }
 
-  /** 클릭 레이캐스트용 책 배지 메시 */
-  bookBadgeMeshes(): THREE.Object3D[] {
-    const out: THREE.Object3D[] = [];
+  /**
+   * 화면 좌표로 머리 위 책 배지를 고른다(레이캐스트 없음).
+   * 여러 개면 포인터에 더 가까운 것.
+   */
+  pickBookBadge(clientX: number, clientY: number, camera: THREE.Camera, rect: DOMRectReadOnly): Actor | null {
+    let best: Actor | null = null;
+    let bestDist = Infinity;
     for (const a of this.actors.values()) {
-      if (a.bookBadge?.mesh.visible && a.root.visible) out.push(a.bookBadge.mesh);
+      if (!a.root.visible || !a.bookBadge?.root.visible) continue;
+      const d = a.bookBadge.hitDistance(clientX, clientY, camera, rect);
+      if (d !== null && d < bestDist) {
+        bestDist = d;
+        best = a;
+      }
     }
-    return out;
+    return best;
   }
 
   get(id: string): Actor | undefined {
@@ -237,7 +247,7 @@ export class Crowd {
       a.avatar.update(dt, t);
       if (!a.root.visible) {
         if (a.nameplate) a.nameplate.mesh.visible = false;
-        if (a.bookBadge) a.bookBadge.mesh.visible = false;
+        if (a.bookBadge) a.bookBadge.root.visible = false;
         continue;
       }
       const p = a.root.position;
@@ -255,7 +265,7 @@ export class Crowd {
       }
       const badgeOn = !!a.bookBadge && a.kind !== 'me' && a.avatar.state === 'read' && !!a.bookTitle && !a.hideLabel;
       if (a.bookBadge) {
-        if (!badgeOn) a.bookBadge.mesh.visible = false;
+        if (!badgeOn) a.bookBadge.root.visible = false;
         else {
           a.bookBadge.set(a.id, a.bookTitle);
           const nameH = a.nameplate ? 0.14 * a.nameplate.mesh.scale.x : 0.08;

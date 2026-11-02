@@ -42,39 +42,44 @@ export function buildWindows(bucket: MergeBucket, rng: Rng): { windows: WindowIn
     windows.push({ cx: o.cx, w: o.w, y0: o.y0, y1: o.y1, sillTop: o.y0 + 0.005, sillZ });
   }
 
-  // 출입문
-  const door = BACK_OPENINGS.find((o) => o.kind === 'door')!;
-  const dx0 = door.cx - door.w / 2, dx1 = door.cx + door.w / 2;
-  const frameW = 0.07;
-  const frame = (g: THREE.BufferGeometry, grain: 'x' | 'y', m: THREE.Matrix4) => {
-    projectUV(g, grain, { offset: [r.float(), r.float()] });
-    bucket.add('walnut', g, m);
-  };
-  frame(bevelBox(frameW, door.y1 + frameW, 0.05, 0.008), 'y', trs(dx0 - frameW / 2 + 0.01, (door.y1 + frameW) / 2, ROOM.z0 + 0.02));
-  frame(bevelBox(frameW, door.y1 + frameW, 0.05, 0.008), 'y', trs(dx1 + frameW / 2 - 0.01, (door.y1 + frameW) / 2, ROOM.z0 + 0.02));
-  frame(bevelBox(door.w + 2 * frameW - 0.02, frameW, 0.05, 0.008), 'x', trs(door.cx, door.y1 + frameW / 2, ROOM.z0 + 0.02));
-  // 문짝: 아래 두 판 패널 + 위 유리 창
-  const dz = ROOM.z0 - 0.06, dw = door.w - 0.02, dh = door.y1 - 0.01, st = 0.1;
-  frame(bevelBox(st, dh, 0.045, 0.006), 'y', trs(dx0 + 0.01 + st / 2, dh / 2, dz));
-  frame(bevelBox(st, dh, 0.045, 0.006), 'y', trs(dx1 - 0.01 - st / 2, dh / 2, dz));
-  for (const y of [0.08, 0.92, 1.3, dh - 0.06]) {
-    frame(bevelBox(dw - 2 * st, y === 0.08 ? 0.16 : 0.1, 0.045, 0.006), 'x', trs(door.cx, y, dz));
+  // 출입문(허브=앞벽, 서브룸=뒤벽)
+  const door = BACK_OPENINGS.find((o) => o.kind === 'door');
+  if (door) {
+    const hasWindows = BACK_OPENINGS.some((o) => o.kind === 'window');
+    const doorZ = hasWindows ? ROOM.z1 - 0.02 : ROOM.z0 + 0.02;
+    const leafZ = hasWindows ? ROOM.z1 + 0.06 : ROOM.z0 - 0.06;
+    const dx0 = door.cx - door.w / 2, dx1 = door.cx + door.w / 2;
+    const frameW = 0.07;
+    const frame = (g: THREE.BufferGeometry, grain: 'x' | 'y', m: THREE.Matrix4) => {
+      projectUV(g, grain, { offset: [r.float(), r.float()] });
+      bucket.add('walnut', g, m);
+    };
+    frame(bevelBox(frameW, door.y1 + frameW, 0.05, 0.008), 'y', trs(dx0 - frameW / 2 + 0.01, (door.y1 + frameW) / 2, doorZ));
+    frame(bevelBox(frameW, door.y1 + frameW, 0.05, 0.008), 'y', trs(dx1 + frameW / 2 - 0.01, (door.y1 + frameW) / 2, doorZ));
+    frame(bevelBox(door.w + 2 * frameW - 0.02, frameW, 0.05, 0.008), 'x', trs(door.cx, door.y1 + frameW / 2, doorZ));
+    const dw = door.w - 0.02, dh = door.y1 - 0.01, st = 0.1;
+    frame(bevelBox(st, dh, 0.045, 0.006), 'y', trs(dx0 + 0.01 + st / 2, dh / 2, leafZ));
+    frame(bevelBox(st, dh, 0.045, 0.006), 'y', trs(dx1 - 0.01 - st / 2, dh / 2, leafZ));
+    for (const y of [0.08, 0.92, 1.3, dh - 0.06]) {
+      frame(bevelBox(dw - 2 * st, y === 0.08 ? 0.16 : 0.1, 0.045, 0.006), 'x', trs(door.cx, y, leafZ));
+    }
+    const panel = bevelBox(dw - 2 * st, 0.68, 0.025, 0.012, 2);
+    projectUV(panel, 'y', { offset: [r.float(), r.float()] });
+    bucket.add('walnut', panel, trs(door.cx, 0.53, leafZ + (hasWindows ? 0.004 : -0.004)), 0xc9b8a6);
+    if (dh > 1.5) {
+      const dg = new THREE.PlaneGeometry(dw - 2 * st, Math.max(0.2, dh - 0.06 - 1.3 - 0.1));
+      dg.translate(door.cx, (1.35 + dh - 0.11) / 2, leafZ);
+      glassGeoms.push(dg);
+    }
+    const knob = new THREE.SphereGeometry(0.03, 12, 8);
+    const kz = leafZ + (hasWindows ? -0.05 : 0.05);
+    bucket.add('brass', knob, trs(dx0 + 0.13, 1.0, kz));
+    const rose = new THREE.CylinderGeometry(0.035, 0.035, 0.012, 16);
+    rose.rotateX(Math.PI / 2);
+    bucket.add('brass', rose, trs(dx0 + 0.13, 1.0, leafZ + (hasWindows ? -0.027 : 0.027)));
   }
-  // 아래 판 패널(살짝 들어감)
-  const panel = bevelBox(dw - 2 * st, 0.68, 0.025, 0.012, 2);
-  projectUV(panel, 'y', { offset: [r.float(), r.float()] });
-  bucket.add('walnut', panel, trs(door.cx, 0.53, dz - 0.004), 0xc9b8a6);
-  const dg = new THREE.PlaneGeometry(dw - 2 * st, dh - 0.06 - 1.3 - 0.1);
-  dg.translate(door.cx, (1.35 + dh - 0.11) / 2, dz);
-  glassGeoms.push(dg);
-  // 손잡이
-  const knob = new THREE.SphereGeometry(0.03, 12, 8);
-  bucket.add('brass', knob, trs(dx0 + 0.13, 1.0, dz + 0.05));
-  const rose = new THREE.CylinderGeometry(0.035, 0.035, 0.012, 16);
-  rose.rotateX(Math.PI / 2);
-  bucket.add('brass', rose, trs(dx0 + 0.13, 1.0, dz + 0.027));
 
-  const merged = new THREE.Mesh(mergeSimple(glassGeoms));
+  const merged = new THREE.Mesh(glassGeoms.length ? mergeSimple(glassGeoms) : new THREE.BufferGeometry());
   merged.name = 'glass';
   return { windows, glass: merged };
 }

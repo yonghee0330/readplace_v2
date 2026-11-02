@@ -18,14 +18,14 @@ export function buildExterior(rng: Rng, rainCount: number): Exterior {
   group.name = 'exterior';
 
   const skyMat = new THREE.MeshBasicMaterial({ map: skyTexture(), color: new THREE.Color(1.5, 1.5, 1.5), fog: false });
-  const sky = new THREE.Mesh(new THREE.PlaneGeometry(60, 26), skyMat);
-  sky.position.set(0, 8, -22);
+  const sky = new THREE.Mesh(new THREE.PlaneGeometry(80, 32), skyMat);
+  sky.position.set(0, 9, -26);
   group.add(sky);
 
   const layers = [
-    { z: -18, color: '#a3a9ad', lit: 0.05, tall: 0.31, w: 44, h: 16, k: 1.0 },
-    { z: -13, color: '#747a7b', lit: 0.1, tall: 0.34, w: 32, h: 12, k: 0.95 },
-    { z: -8.5, color: '#454842', lit: 0.16, tall: 0.38, w: 22, h: 8.5, k: 0.9 },
+    { z: -22, color: '#a3a9ad', lit: 0.05, tall: 0.31, w: 56, h: 18, k: 1.0 },
+    { z: -16, color: '#747a7b', lit: 0.1, tall: 0.34, w: 42, h: 13, k: 0.95 },
+    { z: -10.5, color: '#454842', lit: 0.16, tall: 0.38, w: 30, h: 9, k: 0.9 },
   ];
   for (const l of layers) {
     const m = new THREE.Mesh(
@@ -36,7 +36,7 @@ export function buildExterior(rng: Rng, rainCount: number): Exterior {
     group.add(m);
   }
 
-  for (const [x, z, s] of [[-3.9, -6.8, 3.6], [3.9, -7.4, 4.2], [-0.2, -12, 3.6]] as const) {
+  for (const [x, z, s] of [[-5.5, -8.2, 3.8], [5.2, -8.8, 4.4], [-0.2, -14, 3.8]] as const) {
     const tree = new THREE.Mesh(
       new THREE.PlaneGeometry(s, s),
       new THREE.MeshBasicMaterial({ map: treeTexture(r.fork(`tree-${x}`), '#3f483e'), transparent: true, depthWrite: false }),

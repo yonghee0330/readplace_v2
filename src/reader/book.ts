@@ -1,5 +1,6 @@
 // 지금 읽는 책 메타데이터(제목·저자·출판사)와 표지 URL.
 // 본문은 다루지 않는다. 표지: 카카오 책(서버 프록시) → Google Books → Open Library → 제목 카드.
+import { fetchKakaoBook, setKakaoApiBase } from './kakaoApi';
 
 export interface ReadingBook {
   title: string;
@@ -47,19 +48,8 @@ function httpsUrl(u: string | undefined | null): string | null {
   return s.startsWith('https://') ? s : null;
 }
 
-/** 표지 프록시 서버 origin. 비어 있으면 같은 출처 `/api/kakao/...`(Vite 프록시)만 시도. */
-let apiBase = '';
-
-export function setCoverApiBase(base: string): void {
-  apiBase = base.replace(/\/$/, '');
-}
-
-function kakaoEndpoints(): string[] {
-  const path = '/api/kakao/search';
-  const list = [path];
-  if (apiBase) list.unshift(`${apiBase}${path}`);
-  return [...new Set(list)];
-}
+/** @deprecated setKakaoApiBase와 동일 */
+export const setCoverApiBase = setKakaoApiBase;
 
 /**
  * 제목·저자·출판사로 온라인 서점에서 표지를 찾는다.
@@ -73,37 +63,13 @@ export async function lookupCover(
 ): Promise<string | null> {
   const t = title.trim();
   if (!t) return null;
-  const fromKakao = await searchKakao(t, author, publisher, signal);
-  if (fromKakao) return fromKakao;
+  const kakao = await fetchKakaoBook(t, author, publisher, signal);
+  if (kakao.ok && kakao.item?.coverUrl?.startsWith('http')) return kakao.item.coverUrl;
   const fromGoogle = await searchGoogleBooks(t, author, publisher, signal);
   if (fromGoogle) return fromGoogle;
   const fromOl = await searchOpenLibrary(t, author, publisher, signal);
   if (fromOl) return fromOl;
   return drawCoverCard(t, author, publisher);
-}
-
-/** 카카오 책 검색 — REST 키는 서버에만 두고 프록시로 호출한다. */
-async function searchKakao(
-  title: string,
-  author: string,
-  publisher: string,
-  signal?: AbortSignal,
-): Promise<string | null> {
-  const q = new URLSearchParams({ title, author, publisher });
-  for (const base of kakaoEndpoints()) {
-    try {
-      const res = await fetch(`${base}?${q}`, { signal });
-      if (!res.ok) continue;
-      const data = (await res.json()) as {
-        ok?: boolean;
-        item?: { coverUrl?: string } | null;
-      };
-      if (data.ok && data.item?.coverUrl?.startsWith('http')) return data.item.coverUrl;
-    } catch {
-      /* 프록시 미기동 등은 다음 서점으로 */
-    }
-  }
-  return null;
 }
 
 async function searchGoogleBooks(

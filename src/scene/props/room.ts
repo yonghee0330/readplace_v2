@@ -61,14 +61,17 @@ interface WallDef { matrix: THREE.Matrix4; length: number; holes: { x0: number; 
 
 function wallDefs(): WallDef[] {
   const H = ROOM.h;
+  const hole = (o: { cx: number; w: number; y0: number; y1: number }) => ({
+    x0: o.cx - o.w / 2, x1: o.cx + o.w / 2, y0: o.y0, y1: o.y1,
+  });
+  // 창이 있으면(허브) 문은 앞벽, 창이 없으면(서브룸) 문은 뒤벽
+  const hasWindows = BACK_OPENINGS.some((o) => o.kind === 'window');
+  const doors = BACK_OPENINGS.filter((o) => o.kind === 'door').map(hole);
+  const windows = BACK_OPENINGS.filter((o) => o.kind === 'window').map(hole);
   return [
-    // 뒤 벽(창 2 + 문), +z를 바라봄. 로컬 x = 월드 x
-    { matrix: trs(0, 0, ROOM.z0), length: ROOM.w, holes: BACK_OPENINGS.map((o) => ({ x0: o.cx - o.w / 2, x1: o.cx + o.w / 2, y0: o.y0, y1: o.y1 })) },
-    // 앞 벽, -z를 바라봄
-    { matrix: trs(0, 0, ROOM.z1, 0, Math.PI), length: ROOM.w, holes: [] },
-    // 왼쪽 벽, +x를 바라봄. 로컬 x = 월드 -z... (회전 +90°)
+    { matrix: trs(0, 0, ROOM.z0), length: ROOM.w, holes: hasWindows ? windows : doors },
+    { matrix: trs(0, 0, ROOM.z1, 0, Math.PI), length: ROOM.w, holes: hasWindows ? doors : [] },
     { matrix: trs(ROOM.x0, 0, 0, 0, Math.PI / 2), length: ROOM.d, holes: [] },
-    // 오른쪽 벽, -x를 바라봄
     { matrix: trs(ROOM.x1, 0, 0, 0, -Math.PI / 2), length: ROOM.d, holes: [] },
   ].map((w) => ({ ...w, holes: w.holes.filter(() => H > 0) }));
 }
@@ -114,14 +117,17 @@ export function buildWalls(bucket: MergeBucket, rng: Rng): void {
   }
 
   // 창·문 개구부 안쪽 면(벽 두께)
+  const hasWindows = BACK_OPENINGS.some((o) => o.kind === 'window');
   for (const o of BACK_OPENINGS) {
+    const onFront = hasWindows && o.kind === 'door';
+    const z = onFront ? ROOM.z1 + WALL_T / 2 : ROOM.z0 - WALL_T / 2;
     const x0 = o.cx - o.w / 2, x1 = o.cx + o.w / 2;
     const h = o.y1 - o.y0;
     const side = new THREE.BoxGeometry(0.02, h, WALL_T);
-    bucket.add('plaster', side.clone(), trs(x0 - 0.01, o.y0 + h / 2, ROOM.z0 - WALL_T / 2));
-    bucket.add('plaster', side, trs(x1 + 0.01, o.y0 + h / 2, ROOM.z0 - WALL_T / 2));
+    bucket.add('plaster', side.clone(), trs(x0 - 0.01, o.y0 + h / 2, z));
+    bucket.add('plaster', side, trs(x1 + 0.01, o.y0 + h / 2, z));
     const top = new THREE.BoxGeometry(o.w + 0.04, 0.02, WALL_T);
-    bucket.add('plaster', top, trs(o.cx, o.y1 + 0.01, ROOM.z0 - WALL_T / 2));
+    bucket.add('plaster', top, trs(o.cx, o.y1 + 0.01, z));
   }
 }
 
@@ -142,8 +148,9 @@ export function buildCeiling(bucket: MergeBucket, rng: Rng): void {
   g.rotateX(Math.PI / 2);
   projectUV(g, 'x', { along: 2.2, across: 2.2 });
   bucket.add('ceiling', g, trs(0, ROOM.h, 0));
-  // 보: z 방향으로 가로지른다
-  for (const x of [-2.75, 0.3, 2.95]) {
+  // 보: 방 폭에 맞춰 2~3개
+  const xs = ROOM.w < 7 ? [-ROOM.w * 0.28, ROOM.w * 0.28] : [-ROOM.w * 0.32, 0, ROOM.w * 0.32];
+  for (const x of xs) {
     const beam = bevelBox(0.14, 0.17, ROOM.d, 0.01, 2);
     projectUV(beam, 'z', { along: 1.2, across: 0.5, offset: [r.float(), r.float()] });
     bucket.add('walnut', beam, trs(x, ROOM.h - 0.085, 0));

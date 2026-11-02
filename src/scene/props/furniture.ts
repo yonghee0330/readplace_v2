@@ -2,7 +2,9 @@
 import * as THREE from 'three';
 import { Rng } from '../../core/rng';
 import { MergeBucket, bevelBox, projectUV, taperLeg, trs } from '../geom';
-import { BENCH, CHAIRS, COFFEE_TABLE, COUNTER, ISLAND, READING_TABLE } from '../layout';
+import {
+  BAR_TABLE, BENCH, CHAIRS, COFFEE_TABLE, COUNTER, ISLANDS, READING_TABLE, isPresent,
+} from '../layout';
 import { BookCollector, displayBook, stackBooks } from './books';
 
 /** k는 밝기 배율(판재마다 색조 차이). */
@@ -11,39 +13,57 @@ function woodPart(bucket: MergeBucket, r: Rng, mat: string, g: THREE.BufferGeome
   bucket.add(mat, g, m, new THREE.Color(k, k, k));
 }
 
-export function buildIsland(bucket: MergeBucket, rng: Rng, books: BookCollector): void {
-  const r = rng.fork('island');
-  const { x, z, w, d, h } = ISLAND;
-  const base = trs(x, 0, z);
-  const at = (m: THREE.Matrix4) => base.clone().multiply(m);
-  // 굽 + 몸통(세로 판재) + 상판
-  woodPart(bucket, r, 'walnut', bevelBox(w - 0.12, 0.08, d - 0.12, 0.01), 'x', at(trs(0, 0.04, 0)));
-  const bodyH = h - 0.08 - 0.04;
-  const nSlat = 14;
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < nSlat; i++) {
-      const sw = (w - 0.06) / nSlat;
-      woodPart(bucket, r, 'honey', bevelBox(sw - 0.004, bodyH, 0.018, 0.003, 1), 'y',
-        at(trs(-w / 2 + 0.03 + sw * (i + 0.5), 0.08 + bodyH / 2, side * (d / 2 - 0.04))), 1 + r.range(-0.05, 0.05));
-    }
-  }
-  for (const side of [-1, 1]) {
-    woodPart(bucket, r, 'honey', bevelBox(0.02, bodyH, d - 0.08, 0.004), 'y', at(trs(side * (w / 2 - 0.04), 0.08 + bodyH / 2, 0)));
-  }
-  woodPart(bucket, r, 'honey', bevelBox(w, 0.04, d, 0.012, 3), 'x', at(trs(0, h - 0.02, 0)));
+/** 의자 한 개. m은 바닥 중앙, 앉은 사람은 +z. */
+export function buildChairAt(bucket: MergeBucket, r: Rng, m: THREE.Matrix4): void {
+  buildChair(bucket, r, m);
+}
 
-  // 위에 눕힌 책 더미와 세운 추천 책
-  const top = h;
-  stackBooks(at(trs(-0.5, top, 0.14, 0, 0.1)), r, books, 5);
-  stackBooks(at(trs(-0.18, top, -0.18, 0, -0.08)), r, books, 4);
-  stackBooks(at(trs(0.32, top, 0.2, 0, 0.05)), r, books, 6);
-  stackBooks(at(trs(0.45, top, -0.2, 0, 0.18)), r, books, 3);
-  displayBook(at(trs(-0.48, top, -0.22, 0, 0.2)), r, books, bucket);
-  displayBook(at(trs(0.08, top, 0.24, 0, -0.15)), r, books, bucket);
-  displayBook(at(trs(0.62, top, 0.12, 0, Math.PI - 0.3)), r, books, bucket);
+export function buildIslands(bucket: MergeBucket, rng: Rng, books: BookCollector): void {
+  ISLANDS.forEach((isl, idx) => {
+    const r = rng.fork(`island-${idx}`);
+    const { x, z, ry, w, d, h, kind } = isl;
+    const base = trs(x, 0, z, 0, ry);
+    const at = (m: THREE.Matrix4) => base.clone().multiply(m);
+    woodPart(bucket, r, 'walnut', bevelBox(w - 0.1, 0.08, d - 0.1, 0.01), 'x', at(trs(0, 0.04, 0)));
+    const bodyH = h - 0.08 - 0.04;
+    if (kind === 'flat') {
+      const nSlat = Math.max(10, Math.round(w * 9));
+      for (const side of [-1, 1]) {
+        for (let i = 0; i < nSlat; i++) {
+          const sw = (w - 0.06) / nSlat;
+          woodPart(bucket, r, 'honey', bevelBox(sw - 0.004, bodyH, 0.018, 0.003, 1), 'y',
+            at(trs(-w / 2 + 0.03 + sw * (i + 0.5), 0.08 + bodyH / 2, side * (d / 2 - 0.04))), 1 + r.range(-0.05, 0.05));
+        }
+      }
+      for (const side of [-1, 1]) {
+        woodPart(bucket, r, 'honey', bevelBox(0.02, bodyH, d - 0.08, 0.004), 'y', at(trs(side * (w / 2 - 0.04), 0.08 + bodyH / 2, 0)));
+      }
+      woodPart(bucket, r, 'honey', bevelBox(w, 0.04, d, 0.012, 3), 'x', at(trs(0, h - 0.02, 0)));
+    } else {
+      // 입식 매대: 좁고 높은 몸통 + 상단 선반
+      woodPart(bucket, r, 'honey', bevelBox(w - 0.08, bodyH, d - 0.08, 0.008), 'y', at(trs(0, 0.08 + bodyH / 2, 0)));
+      woodPart(bucket, r, 'honey', bevelBox(w + 0.04, 0.035, d + 0.04, 0.01, 2), 'x', at(trs(0, h - 0.02, 0)));
+      woodPart(bucket, r, 'honey', bevelBox(w - 0.05, 0.025, d - 0.12, 0.006), 'x', at(trs(0, h * 0.55, 0.02)));
+    }
+    const top = h;
+    stackBooks(at(trs(-w * 0.25, top, 0.1, 0, 0.1)), r, books, kind === 'flat' ? 5 : 3);
+    stackBooks(at(trs(w * 0.2, top, -0.1, 0, -0.1)), r, books, kind === 'flat' ? 4 : 2);
+    if (kind === 'flat') {
+      displayBook(at(trs(-w * 0.3, top, -0.2, 0, 0.2)), r, books, bucket);
+      displayBook(at(trs(w * 0.25, top, 0.18, 0, -0.2)), r, books, bucket);
+    } else {
+      displayBook(at(trs(0, top, 0.05, 0, 0.1)), r, books, bucket);
+    }
+  });
+}
+
+/** @deprecated buildIslands 사용 */
+export function buildIsland(bucket: MergeBucket, rng: Rng, books: BookCollector): void {
+  buildIslands(bucket, rng, books);
 }
 
 export function buildReadingTable(bucket: MergeBucket, rng: Rng, books: BookCollector): void {
+  if (!isPresent(READING_TABLE) || READING_TABLE.w < 0.1) return;
   const r = rng.fork('table');
   const { x, z, w, d, h } = READING_TABLE;
   const base = trs(x, 0, z);
@@ -110,7 +130,25 @@ function buildChair(bucket: MergeBucket, r: Rng, m: THREE.Matrix4): void {
   bucket.add('cushion', projectUV(bevelBox(sw - 0.05, 0.035, sd - 0.05, 0.015, 3), 'x', { along: 0.25, across: 0.25 }), at(trs(0, seatH + 0.017, 0.01)));
 }
 
+/** 창가 바테이블(높은 상판 + 다리). */
+export function buildBarTable(bucket: MergeBucket, rng: Rng, books: BookCollector): void {
+  if (!isPresent(BAR_TABLE) || BAR_TABLE.w < 0.1) return;
+  const r = rng.fork('bar');
+  const { x, z, ry, w, d, h } = BAR_TABLE;
+  const base = trs(x, 0, z, 0, ry);
+  const at = (m: THREE.Matrix4) => base.clone().multiply(m);
+  woodPart(bucket, r, 'honey', bevelBox(w, 0.04, d, 0.012, 3), 'x', at(trs(0, h - 0.02, 0)));
+  woodPart(bucket, r, 'walnut', bevelBox(w - 0.08, 0.06, d - 0.08, 0.006), 'x', at(trs(0, h - 0.07, 0)));
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    woodPart(bucket, r, 'walnut', taperLeg(h - 0.08, 0.05, 0.032), 'y', at(trs(sx * (w / 2 - 0.1), 0, sz * (d / 2 - 0.08))));
+  }
+  stackBooks(at(trs(-w * 0.25, h, 0, 0, 0.2)), r, books, 2);
+  const mug = new THREE.CylinderGeometry(0.038, 0.035, 0.09, 16);
+  bucket.add('ceramic', mug, at(trs(w * 0.2, h + 0.045, 0)), 0xe8dfd0);
+}
+
 export function buildCounter(bucket: MergeBucket, rng: Rng, books: BookCollector): void {
+  if (!isPresent(COUNTER) || COUNTER.w < 0.1) return;
   const r = rng.fork('counter');
   const { x, z, ry, w, d, h } = COUNTER;
   const base = trs(x, 0, z, 0, ry);
@@ -158,6 +196,7 @@ export function buildCounter(bucket: MergeBucket, rng: Rng, books: BookCollector
 
 /** 창가 벤치: 판재 좌석 + 테이퍼 다리 + 앞 가로대 + 방석 2개 + 쿠션에 기댄 책. */
 export function buildBench(bucket: MergeBucket, rng: Rng, books: BookCollector): void {
+  if (!isPresent(BENCH) || BENCH.w < 0.1) return;
   const r = rng.fork('bench');
   const { x, z, w, d, h } = BENCH;
   const at = (m: THREE.Matrix4) => trs(x, 0, z).multiply(m);
@@ -177,6 +216,7 @@ export function buildBench(bucket: MergeBucket, rng: Rng, books: BookCollector):
 
 /** 소파 앞 낮은 테이블: 둥근 모서리 상판 + 아래 선반 + 다리, 위에 책·찻잔. */
 export function buildCoffeeTable(bucket: MergeBucket, rng: Rng, books: BookCollector): void {
+  if (!isPresent(COFFEE_TABLE) || COFFEE_TABLE.w < 0.1) return;
   const r = rng.fork('coffee');
   const { x, z, ry, w, d, h } = COFFEE_TABLE;
   const base = trs(x, 0, z, 0, ry);

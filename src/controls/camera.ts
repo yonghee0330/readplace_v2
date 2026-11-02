@@ -4,17 +4,18 @@ import type { CamPreset } from '../core/params';
 import { ROOM } from '../scene/layout';
 
 export const CAM_PRESETS: Record<CamPreset, { pos: [number, number, number]; target: [number, number, number]; fov: number }> = {
-  overview: { pos: [2.55, 1.72, 2.7], target: [-1.5, 0.85, -1.15], fov: 58 },
-  window: { pos: [-1.0, 1.45, 0.2], target: [-2.3, 1.15, -3.0], fov: 50 },
-  avatar: { pos: [1.4, 2.1, 3.1], target: [0.0, 0.7, -0.4], fov: 50 },
+  // 입구 쪽에서 허브 중앙을 내려다봄
+  overview: { pos: [2.8, 2.4, 3.2], target: [0, 0.9, 0.2], fov: 58 },
+  window: { pos: [0.4, 1.5, -0.6], target: [0.15, 1.2, -3.2], fov: 52 },
+  avatar: { pos: [1.2, 2.0, 3.4], target: [0.2, 0.85, 2.2], fov: 50 },
 };
-/** 세로 화면(모바일)용 시점: 더 낮고 가깝게, 서가 높이에 맞춘다. */
+/** 세로 화면(모바일)용 시점 */
 const PORTRAIT: Partial<typeof CAM_PRESETS> = {
-  overview: { pos: [2.1, 1.5, 2.45], target: [-1.2, 1.0, -1.75], fov: 68 },
+  overview: { pos: [2.2, 2.2, 2.8], target: [0, 0.95, 0.1], fov: 66 },
 };
 
 export function createCamera(aspect: number): THREE.PerspectiveCamera {
-  const cam = new THREE.PerspectiveCamera(CAM_PRESETS.overview.fov, aspect, 0.05, 80);
+  const cam = new THREE.PerspectiveCamera(CAM_PRESETS.overview.fov, aspect, 0.05, 120);
   applyPreset(cam, 'overview');
   return cam;
 }

@@ -2,8 +2,9 @@
 import { ROOM, colliders, type Collider } from '../scene/layout';
 
 export const CELL = 0.25;
-const MARGIN = 0.3;
-const WALL_MARGIN = 0.25;
+/** 아바타 반경 여유. 서점 통로(~0.9m)를 막지 않게 0.3→0.2 */
+const MARGIN = 0.2;
+const WALL_MARGIN = 0.22;
 
 export interface Pt { x: number; z: number }
 

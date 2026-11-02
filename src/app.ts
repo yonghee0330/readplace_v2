@@ -21,14 +21,20 @@ import { loadBook, setCoverApiBase, type ReadingBook } from './reader/book';
 import { FocusMode, type FocusReader } from './reader/focus';
 import { buildBookstore, type Bookstore } from './scene/bookstore';
 import { BookCard } from './ui/bookCard';
+import { BookBadgeHits } from './ui/bookBadgeHits';
 import { BookPeekSheet } from './ui/bookPeek';
 import { BookSheet } from './ui/bookSheet';
-import { SEATS, SPAWN, SPAWNS, colliders } from './scene/layout';
+import {
+  PORTALS, SEATS, SPAWN, SPAWNS, applyLayout, colliders, currentSpaceId, spaceLabel,
+  type PortalDef, type SpaceId,
+} from './scene/layout';
 import { buildPostFx, type PostFx } from './scene/postfx';
+import { NavGrid } from './controls/pathfinding';
 import { Hud } from './ui/hud';
 import type { LoadingScreen } from './ui/loading';
 import { SettingsSheet } from './ui/settings';
 import { Sheet, anySheetOpen, closeOpenSheet } from './ui/sheet';
+import { SpaceSheet } from './ui/spaceSheet';
 import { Toasts } from './ui/toast';
 import { fetchBucheonWeather, weatherAria, type WeatherInfo } from './weather/bucheon';
 
@@ -128,6 +134,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     addEventListener('keydown', resume, true);
   }
 
+  const spaceSheet = new SpaceSheet();
   const hud = new Hud(ui, {
     exit: () => {
       sfx.play('tap');
@@ -142,6 +149,10 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     settings: () => {
       sfx.play('tap');
       settingsSheet.open();
+    },
+    spaces: () => {
+      sfx.play('tap');
+      spaceSheet.open((id) => askEnterPortal({ to: id, x: 0, z: 0, ry: 0, label: spaceLabel(id), w: 1, d: 1 }));
     },
     nod: () => nod(),
     book: () => toggleBook(),
@@ -192,7 +203,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
 
   // 첫 진입 안내
   if (!settings.introDismissed && !params.cam && !params.autoread) {
-    toasts.show('바닥을 눌러 걷기 · 드래그로 둘러보기 · 휠·핀치로 확대', {
+    toasts.show('바닥을 눌러 걷기 · 벽의 포털로 다른 공간 입장', {
       duration: 6000,
       kind: 'guide',
       action: {
@@ -275,7 +286,8 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     // NPC가 앉은 자리에 다른 사람이 앉으면 NPC는 잠시 비켜 준다(겹침 방지)
     const peerSeats = new Set([...peers.values()].map((s) => s.seatId).filter(Boolean));
     if (movement.seat) peerSeats.add(movement.seat.id);
-    for (const n of npcs) n.root.visible = params.npc && settings.npc && !peerSeats.has(n.seatId);
+    const inHub = currentSpaceId() === 'hub';
+    for (const n of npcs) n.root.visible = inHub && params.npc && settings.npc && !peerSeats.has(n.seatId);
     const count = peers.size + 1;
     hud.setCount(count);
     const readers: FocusReader[] = [];
@@ -305,8 +317,13 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     }
   }
 
+  function presenceRoom(): string {
+    const space = currentSpaceId();
+    return space === 'hub' ? params.room : `${params.room}-${space}`;
+  }
+
   async function connect(): Promise<'ok' | 'full'> {
-    const result = await presence.connect(params.room, instance, myState());
+    const result = await presence.connect(presenceRoom(), instance, myState());
     if (result === 'ok') syncPeers();
     return result;
   }
@@ -425,40 +442,164 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     return { pos, look };
   }
 
-  // ---------- 클릭 이동·앉기 ----------
+  // ---------- 클릭 이동·앉기·포털 ----------
   const hitGroup = new THREE.Group();
-  for (const c of colliders()) {
-    const box = new THREE.Mesh(new THREE.BoxGeometry(c.x1 - c.x0, c.h, c.z1 - c.z0), new THREE.MeshBasicMaterial({ visible: false }));
-    box.position.set((c.x0 + c.x1) / 2, c.h / 2, (c.z0 + c.z1) / 2);
-    box.userData.seats = c.seats ?? null;
-    hitGroup.add(box);
+  scene.add(hitGroup);
+  /** 포털 확인을 거절·닫은 뒤 같은 문 앞에서 바로 다시 뜨지 않게 */
+  let portalPromptIgnoreUntil = 0;
+  let portalPromptFor: SpaceId | null = null;
+
+  /** 한글 조사: 받침 없거나 ㄹ이면 '로', 있으면 '으로' */
+  function particleRo(word: string): string {
+    const ch = word[word.length - 1];
+    if (!ch) return '로';
+    const code = ch.charCodeAt(0);
+    if (code < 0xac00 || code > 0xd7a3) return '로';
+    const jong = (code - 0xac00) % 28;
+    return jong === 0 || jong === 8 ? '로' : '으로';
   }
-  hitGroup.updateMatrixWorld(true);
+
+  const portalSheet = new Sheet('공간 이동', 'portal-sheet');
+  let portalPending: PortalDef | null = null;
+  portalSheet.body.innerHTML = `<p class="sheet-text" data-portal-copy></p>
+    <div class="sheet-actions">
+      <button type="button" class="btn" data-act="cancel">여기에 머물기</button>
+      <button type="button" class="btn btn-primary" data-act="enter">들어가기</button>
+    </div>`;
+  const portalCopy = portalSheet.body.querySelector('[data-portal-copy]') as HTMLElement;
+  portalSheet.body.querySelector('[data-act="cancel"]')!.addEventListener('click', () => {
+    portalSheet.close();
+  });
+  portalSheet.body.querySelector('[data-act="enter"]')!.addEventListener('click', () => {
+    const p = portalPending;
+    portalSheet.close();
+    if (p) void enterSpace(p.to, p);
+  });
+  portalSheet.onClose = () => {
+    portalPending = null;
+    portalPromptIgnoreUntil = performance.now() + 2500;
+    portalPromptFor = null;
+  };
+
+  function askEnterPortal(portal: PortalDef): void {
+    if (switchingSpace || focus.active || anySheetOpen()) return;
+    if (portal.to === currentSpaceId()) return;
+    const name = spaceLabel(portal.to);
+    portalPending = portal;
+    portalPromptFor = portal.to;
+    portalSheet.el.querySelector('.sheet-title')!.textContent = name;
+    portalCopy.textContent = `${name}${particleRo(name)} 들어가시겠습니까?`;
+    portalSheet.open();
+  }
+
+  function rebuildHits(): void {
+    while (hitGroup.children.length) hitGroup.remove(hitGroup.children[0]);
+    for (const c of colliders()) {
+      const box = new THREE.Mesh(new THREE.BoxGeometry(c.x1 - c.x0, c.h, c.z1 - c.z0), new THREE.MeshBasicMaterial({ visible: false }));
+      box.position.set((c.x0 + c.x1) / 2, c.h / 2, (c.z0 + c.z1) / 2);
+      box.userData.seats = c.seats ?? null;
+      hitGroup.add(box);
+    }
+    for (const p of PORTALS) {
+      const box = new THREE.Mesh(new THREE.BoxGeometry(p.w, 2.2, Math.max(0.55, p.d + 0.35)), new THREE.MeshBasicMaterial({ visible: false }));
+      box.position.set(p.x, 1.1, p.z);
+      box.rotation.y = p.ry;
+      box.userData.portal = p;
+      hitGroup.add(box);
+    }
+    hitGroup.updateMatrixWorld(true);
+  }
+  rebuildHits();
+
+  let switchingSpace = false;
+  async function enterSpace(to: SpaceId, via?: PortalDef): Promise<void> {
+    if (switchingSpace || to === currentSpaceId() || focus.active) return;
+    switchingSpace = true;
+    if (movement.reading) {
+      movement.setReading(false);
+      me.setReadingBook(null);
+    }
+    movement.stop();
+    store.setActiveSpace(to);
+    applyLayout(to);
+    store.floor = store.spaces[to].floor;
+    movement.setSpace(new NavGrid(), [...SEATS]);
+    rebuildHits();
+    const spawn = SPAWN;
+    movement.place(spawn.x, spawn.z, spawn.ry);
+    follow.yaw = spawn.ry + Math.PI;
+    follow.follow(me.root.position, true);
+    setNpcsVisible(npcs, to === 'hub' && params.npc && settings.npc);
+    hud.setRoomName(spaceLabel(to));
+    toasts.show(to === 'hub' ? '원미서가로 돌아왔어요' : `${spaceLabel(to)}에 들어왔어요`);
+    portalPromptIgnoreUntil = performance.now() + 2000;
+    portalPromptFor = null;
+    // 공간마다 presence 채널을 나눠 다른 방 사람과 겹치지 않게
+    presence.disconnect();
+    for (const a of crowd.list('peer')) crowd.remove(a.id);
+    peers = new Map();
+    hud.setCount(1);
+    try {
+      const admission = await connect();
+      if (admission === 'full') {
+        toasts.show('이 공간은 자리가 가득 찼어요');
+        switchingSpace = false;
+        if (to !== 'hub') await enterSpace('hub');
+        return;
+      }
+      pushState(true);
+      syncPeers();
+    } finally {
+      switchingSpace = false;
+      void via;
+    }
+  }
+
   const ray = new THREE.Raycaster();
   const ring = makeRing();
   scene.add(ring.mesh);
 
+  function openBookPeek(actor: Actor): boolean {
+    const book = actor.book?.title
+      ? actor.book
+      : actor.bookTitle
+        ? { title: actor.bookTitle, author: '', publisher: '', coverUrl: null }
+        : null;
+    if (!book) return false;
+    bookPeek.open({
+      nickname: actor.nickname || '독자',
+      book,
+      blurb: actor.bookBlurb,
+    });
+    return true;
+  }
+
+  const badgeHits = new BookBadgeHits(ui, (actorId) => {
+    if (focus.active || anySheetOpen()) return;
+    const actor = crowd.get(actorId);
+    if (actor) openBookPeek(actor);
+  });
+
   function clickAt(clientX: number, clientY: number): void {
     if (focus.active || anySheetOpen()) return;
-    const ndc = new THREE.Vector2((clientX / innerWidth) * 2 - 1, -(clientY / innerHeight) * 2 + 1);
+    const rect = canvas.getBoundingClientRect();
+    // 머리 위 책 배지: 화면 좌표 히트(오버레이 레이어·빌보드 뒷면 문제 없음)
+    const badgeActor = crowd.pickBookBadge(clientX, clientY, camera, rect);
+    if (badgeActor && openBookPeek(badgeActor)) return;
+
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
     ray.setFromCamera(ndc, camera);
-    // 머리 위 책 배지(다른 사람·NPC)를 먼저 본다
-    const badgeHit = ray.intersectObjects(crowd.bookBadgeMeshes(), false)[0];
-    if (badgeHit) {
-      const id = String(badgeHit.object.userData.actorId ?? '');
-      const actor = crowd.get(id);
-      if (actor?.book?.title) {
-        bookPeek.open({
-          nickname: actor.nickname || '독자',
-          book: actor.book,
-          blurb: actor.bookBlurb,
-        });
-        return;
-      }
-    }
     const hits = ray.intersectObjects([...hitGroup.children, store.floor], false);
     const hit = hits[0];
     if (!hit) return;
+    const portal = hit.object.userData.portal as PortalDef | undefined;
+    if (portal) {
+      askEnterPortal(portal);
+      return;
+    }
     const seats = hit.object.userData.seats as string[] | null | undefined;
     if (seats) {
       const seat = movement.sitNear({ x: hit.point.x, z: hit.point.z }, seats) ?? movement.sitNear({ x: hit.point.x, z: hit.point.z });
@@ -479,6 +620,19 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     zoom: (f) => {
       if (!fixedCam && !follow.focused) follow.zoom(f);
     },
+  });
+
+  // 책 배지 위에 올리면 포인터로 클릭 가능함을 알린다
+  canvas.addEventListener('pointermove', (e) => {
+    if (focus.active || anySheetOpen()) {
+      canvas.style.cursor = '';
+      return;
+    }
+    const rect = canvas.getBoundingClientRect();
+    canvas.style.cursor = crowd.pickBookBadge(e.clientX, e.clientY, camera, rect) ? 'pointer' : '';
+  });
+  canvas.addEventListener('pointerleave', () => {
+    canvas.style.cursor = '';
   });
 
   addEventListener('keydown', (e) => {
@@ -563,7 +717,19 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       follow.update(dt);
     }
     crowd.update(dt, t, camera);
+    badgeHits.sync(crowd, camera, canvas, !focus.active && !anySheetOpen());
     ring.update(dt);
+    store.updatePortals(t);
+    // 빛나는 문 앞에 서면 확인만 띄움(자동 전환 없음). 포털끼리 직접 연결하지 않음.
+    if (!focus.active && !anySheetOpen() && performance.now() > portalPromptIgnoreUntil) {
+      const p = me.root.position;
+      for (const portal of PORTALS) {
+        if (Math.hypot(p.x - portal.x, p.z - portal.z) < 0.7) {
+          if (portalPromptFor !== portal.to) askEnterPortal(portal);
+          break;
+        }
+      }
+    }
   });
   loop.start();
 
@@ -593,6 +759,8 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       return max;
     },
     walkTo: (x: number, z: number) => movement.walkTo({ x, z }),
+    space: () => currentSpaceId(),
+    enterSpace: (id: SpaceId) => enterSpace(id),
     sit: (id: string) => {
       const s = SEATS.find((x) => x.id === id);
       return s ? movement.goSit(s) : false;

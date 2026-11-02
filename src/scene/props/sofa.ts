@@ -2,11 +2,12 @@
 import * as THREE from 'three';
 import { Rng } from '../../core/rng';
 import { MergeBucket, bevelBox, projectUV, taperLeg, trs } from '../geom';
-import { RUG, SOFA } from '../layout';
+import { RUG, SOFA, isPresent } from '../layout';
 
 const fabricUV = (g: THREE.BufferGeometry, r: Rng) => projectUV(g, 'x', { along: 0.35, across: 0.35, offset: [r.float(), r.float()] });
 
 export function buildSofa(bucket: MergeBucket, rng: Rng): void {
+  if (!isPresent(SOFA) || SOFA.w < 0.1) return;
   const r = rng.fork('sofa');
   const { x, z, ry, w, d } = SOFA;
   const base = trs(x, 0, z, 0, ry);
@@ -79,6 +80,7 @@ function blanket(r: Rng): THREE.BufferGeometry {
 }
 
 export function buildRug(bucket: MergeBucket): void {
+  if (!isPresent(RUG) || RUG.w < 0.1) return;
   const top = new THREE.PlaneGeometry(RUG.d, RUG.w);
   top.rotateX(-Math.PI / 2);
   top.rotateY(Math.PI / 2);

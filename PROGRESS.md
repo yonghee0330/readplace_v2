@@ -25,6 +25,16 @@
 - 한 일: 알라딘 제거. `server/kakao.ts` + `GET /api/kakao/search`, Vite `/api/kakao` 프록시. 표지 순서 카카오→Google→Open Library. `KAKAO_REST_API_KEY`·`.env.example` 갱신.
 - 확인 방법: `.env`에 REST 키 넣고 `npm run server` → `/health`의 `kakaoKey: true` → 책 펼치기로 한국어 표지 확인. 키 없이도 typecheck·build·폴백 동작.
 
+### 운영자 수정 (2026-11-02) — 비북스 실제 구역 레이아웃 + 이동 가능
+- 한 일: 1F 14×10m 구역(세미나·개인·서가 A/B/C·극장·소파·스토어)으로 장면 재배치. 칸막이 문 구멍 콜라이더, 통로·스폰 재조정, NavGrid MARGIN 0.2. SPAWN·SPAWNS 전부 빈 칸, 좌석 32/32 경로 도달. `Movement.place`가 막힌 칸이면 가까운 통로로 스냅.
+- 확인 방법: `npm run typecheck && npm run build`. preview에서 입장 후 구역 클릭 이동·소파 앉기. 내비 스크립트: SPAWN free, seats 32/32, zone paths ok.
+- SPEC과 달라진 점: 공간 크기·가구 배치가 기존 8×6 단일 방에서 실제 비북스 구역 레이아웃으로 확장(운영자 요청).
+
+### 운영자 수정 (2026-11-02) — 허브 + 포털 분리 공간
+- 한 일: 한 방에 모두 넣던 구성을 **중앙 허브(9×7)** + 포털 4개로 분리. 허브는 중앙 테이블·서가·창가 바테이블·매대·소파만. 포털로 세미나실 / 영화감상실 / 계단식 강연 / 1인 작업실 입장. 공간마다 내비·좌석·presence 채널(`room` / `room-seminar` …) 분리. 빛나는 문·문턱·상단 공간 이름 간판. 클릭/근접 시 확인 후 입장. HUD 우측 「공간」메뉴로도 이동. 포털 간 직접 연결 없음(허브↔각 방만). 카카오 표지 `fetchKakaoBook` 공통 경로로 정리.
+- 확인 방법: `npm run typecheck && npm run build`. `npm run server` 후 `/health`의 `kakaoKey: true`, 책 펼치기 표지. preview에서 포털 이름·공간 메뉴·확인 입장.
+- SPEC과 달라진 점: 단일 연속 공간 → 허브+서브룸 포털 구조(운영자 요청).
+
 ---
 
 ## 단계 1 — 스캐폴딩, 시드 난수, 품질 설정, 로딩 화면, 빈 장면

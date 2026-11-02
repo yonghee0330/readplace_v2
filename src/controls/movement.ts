@@ -21,7 +21,8 @@ const angleLerp = (a: number, b: number, k: number) => {
 };
 
 export class Movement {
-  readonly grid = new NavGrid();
+  grid = new NavGrid();
+  private seats: Seat[] = [...SEATS];
   private phase: Phase = { kind: 'idle' };
   seat: Seat | null = null;
   reading = false;
@@ -30,6 +31,15 @@ export class Movement {
   cameraYaw = 0;
 
   constructor(private me: Actor, private takenSeats: () => Set<string>, private onChange: () => void) {}
+
+  /** 공간 전환 후 내비·좌석 목록을 교체한다. */
+  setSpace(grid: NavGrid, seats: Seat[]): void {
+    this.grid = grid;
+    this.seats = seats;
+    this.seat = null;
+    this.phase = { kind: 'idle' };
+    this.reading = false;
+  }
 
   get state(): AvatarState {
     if (this.reading) return 'read';
@@ -63,7 +73,7 @@ export class Movement {
   /** 클릭한 가구에서 가장 가까운 빈 자리로 가서 앉는다. 비어 있는 자리가 없으면 null. */
   sitNear(p: Pt, seatIds?: string[]): Seat | null {
     const taken = this.takenSeats();
-    const candidates = SEATS.filter((s) => (!seatIds || seatIds.includes(s.id)) && !taken.has(s.id) && s.id !== this.seat?.id);
+    const candidates = this.seats.filter((s) => (!seatIds || seatIds.includes(s.id)) && !taken.has(s.id) && s.id !== this.seat?.id);
     if (!candidates.length) return null;
     candidates.sort((a, b) => (a.x - p.x) ** 2 + (a.z - p.z) ** 2 - ((b.x - p.x) ** 2 + (b.z - p.z) ** 2));
     const seat = candidates[0];
@@ -124,9 +134,10 @@ export class Movement {
     this.sync();
   }
 
-  /** 시작 위치 지정 */
+  /** 시작 위치 지정(막힌 칸이면 가까운 통로로) */
   place(x: number, z: number, ry: number): void {
-    this.me.root.position.set(x, 0, z);
+    const free = this.grid.nearestFree({ x, z }) ?? { x, z };
+    this.me.root.position.set(free.x, 0, free.z);
     this.me.root.rotation.y = ry;
     this.seat = null;
     this.phase = { kind: 'idle' };

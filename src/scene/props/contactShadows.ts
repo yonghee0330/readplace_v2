@@ -1,26 +1,38 @@
-// 가구 밑 접지 그림자. AO가 꺼진 낮은 품질에서도 가구가 바닥에 붙어 보이게 한다.
+// 가구·서가 발밑의 아주 옅은 접촉 그림자(머지드 쿼드). 실내 그림자를 보조한다.
 import * as THREE from 'three';
 import { MergeBucket, trs } from '../geom';
-import { BENCH, CHAIRS, COFFEE_TABLE, COUNTER, FLOOR_LAMPS, FLOOR_PLANTS, ISLAND, READING_TABLE, SHELF, SHELVES, SOFA } from '../layout';
+import {
+  BAR_TABLE, BENCH, CHAIRS, COFFEE_TABLE, COUNTER, FLOOR_LAMPS, FLOOR_PLANTS, ISLANDS,
+  READING_TABLE, SEMINAR_CHAIRS, SEMINAR_TABLE, SHELF, SHELVES, SOFA, SOLO_CHAIR,
+  SOLO_DESK, STAGE, STORE_CHAIRS, STORE_TABLE, THEATER, isPresent,
+} from '../layout';
 
 export function buildContactShadows(bucket: MergeBucket): void {
-  // k(0~1)는 그림자 진하기. 판을 살짝 작게 만들어 옅은 가장자리만 남기는 식으로 조절한다.
-  const add = (x: number, z: number, w: number, d: number, ry: number, k = 1) => {
-    // 진한 중심부(텍스처의 75%)가 가구 바닥 면적과 비슷해지도록 판 크기를 잡는다.
-    const s = 0.8 + 0.2 * k;
-    const g = new THREE.PlaneGeometry((w * 1.12 + 0.3) * s, (d * 1.12 + 0.3) * s);
+  const add = (x: number, z: number, w: number, d: number, ry: number, opacity = 0.85) => {
+    if (w < 0.05 || d < 0.05) return;
+    const g = new THREE.PlaneGeometry(w, d);
     g.rotateX(-Math.PI / 2);
-    bucket.add('contactShadow', g, trs(x, 0.003, z, 0, ry));
+    bucket.add('contactShadow', g, trs(x, 0.003, z, 0, ry), new THREE.Color(opacity, opacity, opacity));
   };
-  const pad = 0;
+  const pad = 0.06;
   for (const s of SHELVES) add(s.x + Math.sin(s.ry) * 0.04, s.z + Math.cos(s.ry) * 0.04, s.w + pad, SHELF.d + pad, s.ry, 0.9);
-  add(ISLAND.x, ISLAND.z, ISLAND.w + pad, ISLAND.d + pad, 0, 1);
-  add(READING_TABLE.x, READING_TABLE.z, READING_TABLE.w + pad, READING_TABLE.d + pad, 0, 0.6);
-  for (const c of CHAIRS) add(c.x, c.z, 0.62, 0.6, 0, 0.6);
-  add(SOFA.x, SOFA.z, SOFA.w + pad, SOFA.d + pad, SOFA.ry, 1);
-  add(COFFEE_TABLE.x, COFFEE_TABLE.z, COFFEE_TABLE.w + 0.2, COFFEE_TABLE.d + 0.2, COFFEE_TABLE.ry, 0.75);
-  add(BENCH.x, BENCH.z, BENCH.w + 0.24, BENCH.d + 0.24, 0, 0.65);
-  add(COUNTER.x, COUNTER.z, COUNTER.w + pad, COUNTER.d + pad, COUNTER.ry, 1);
-  for (const l of FLOOR_LAMPS) add(l.x, l.z, 0.48, 0.48, 0, 0.7);
-  for (const p of FLOOR_PLANTS) add(p.x, p.z, 0.55 * p.scale, 0.55 * p.scale, 0, 0.8);
+  for (const isl of ISLANDS) add(isl.x, isl.z, isl.w + pad, isl.d + pad, isl.ry, 0.88);
+  if (isPresent(READING_TABLE)) add(READING_TABLE.x, READING_TABLE.z, READING_TABLE.w + pad, READING_TABLE.d + pad, 0, 0.85);
+  if (isPresent(STORE_TABLE)) add(STORE_TABLE.x, STORE_TABLE.z, STORE_TABLE.w + pad, STORE_TABLE.d + pad, 0, 0.88);
+  if (isPresent(SEMINAR_TABLE)) add(SEMINAR_TABLE.x, SEMINAR_TABLE.z, SEMINAR_TABLE.w + pad, SEMINAR_TABLE.d + pad, 0, 0.88);
+  if (isPresent(SOLO_DESK)) add(SOLO_DESK.x, SOLO_DESK.z, SOLO_DESK.w + pad, SOLO_DESK.d + pad, 0, 0.8);
+  if (isPresent(COUNTER)) add(COUNTER.x, COUNTER.z, COUNTER.w + pad, COUNTER.d + pad, COUNTER.ry, 0.9);
+  if (isPresent(SOFA)) add(SOFA.x, SOFA.z, SOFA.w + pad, SOFA.d + pad, SOFA.ry, 0.9);
+  if (isPresent(BENCH)) add(BENCH.x, BENCH.z, BENCH.w + pad, BENCH.d + pad, 0, 0.8);
+  if (isPresent(BAR_TABLE)) add(BAR_TABLE.x, BAR_TABLE.z, BAR_TABLE.w + pad, BAR_TABLE.d + pad, 0, 0.85);
+  if (isPresent(COFFEE_TABLE)) add(COFFEE_TABLE.x, COFFEE_TABLE.z, COFFEE_TABLE.w + pad, COFFEE_TABLE.d + pad, COFFEE_TABLE.ry, 0.75);
+  if (isPresent(STAGE)) add(STAGE.x, STAGE.z, STAGE.w + pad, STAGE.d + pad, 0, 0.7);
+  if (isPresent(THEATER) && THEATER.rows > 0) {
+    add(THEATER.x, THEATER.z, THEATER.cols * THEATER.seatW + 0.4, THEATER.rows * THEATER.rowDepth + 0.3, THEATER.ry, 0.75);
+  }
+  for (const c of [...CHAIRS, ...STORE_CHAIRS, ...SEMINAR_CHAIRS, ...(isPresent(SOLO_CHAIR) ? [SOLO_CHAIR] : [])]) {
+    add(c.x, c.z, 0.4, 0.4, 0, 0.7);
+  }
+  for (const l of FLOOR_LAMPS) add(l.x, l.z, 0.35, 0.35, 0, 0.65);
+  for (const p of FLOOR_PLANTS) add(p.x, p.z, 0.4 * p.scale, 0.4 * p.scale, 0, 0.6);
 }

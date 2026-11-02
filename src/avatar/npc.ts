@@ -18,13 +18,22 @@ export function spawnNpcs(crowd: Crowd, rng: Rng): Actor[] {
   const r = rng.fork('npc');
   const count = r.int(2, 4);
   // 창가 자리를 먼저(서점 분위기), 나머지는 섞어서
-  const seats = [...SEATS].sort((a, b) => (a.id.startsWith('sofa') ? 1 : 0) - (b.id.startsWith('sofa') ? 1 : 0) || r.float() - 0.5);
+  // 창가·매장 테이블·소파를 먼저, 세미나·계단석은 가끔
+  const seats = [...SEATS].sort((a, b) => prefer(a) - prefer(b) || r.float() - 0.5);
   const picked: Seat[] = [];
   for (const s of seats) {
     if (picked.length >= count) break;
-    // 바로 옆자리에 붙어 앉지 않게 한 자리씩 띄운다(소파 가운데는 비워 둠)
-    if (s.id === 'sofa-2' || (s.id === 'chair-2' && picked.some((p) => p.id === 'chair-1'))) continue;
-    if (r.chance(0.8)) picked.push(s);
+    if (s.id === 'sofa-2' || s.id === 'solo-1') continue;
+    if (s.id.startsWith('seminar-') && !r.chance(0.35)) continue;
+    if (s.id.startsWith('theater-') && !r.chance(0.25)) continue;
+    if (picked.some((p) => Math.hypot(p.x - s.x, p.z - s.z) < 0.85)) continue;
+    if (r.chance(0.75)) picked.push(s);
+  }
+
+  function prefer(s: Seat): number {
+    if (s.id.startsWith('store-') || s.id.startsWith('chair-') || s.id.startsWith('bench-')) return 0;
+    if (s.id.startsWith('sofa-')) return 1;
+    return 2;
   }
 
   // 같은 책이 겹치지 않게 후보를 섞은 뒤 앞에서부터 쓴다

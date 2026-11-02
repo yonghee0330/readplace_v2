@@ -8,6 +8,7 @@ const ICON = {
   soundOn: '<path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11"/>',
   soundOff: '<path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4L18 18M6 18l1.6-1.6M16.4 7.6L18 6"/>',
+  door: '<path d="M6 4.5h9.5A1.5 1.5 0 0117 6v14H6z"/><path d="M6 20.5H4.5V4.8A1.3 1.3 0 015.8 3.5H6"/><circle cx="14.2" cy="12" r="0.9"/>',
   nod: '<circle cx="12" cy="8.5" r="4"/><path d="M5.5 20c.8-3.6 3.4-5.6 6.5-5.6s5.7 2 6.5 5.6"/><path d="M9.6 8.6c.7.6 1.6.6 2.4 0M12.6 8.6c.7.6 1.6.6 2.4 0" />',
   book: '<path d="M12 6.5c-2-1.4-4.6-1.8-7.5-1.3v12.5c2.9-.5 5.5-.1 7.5 1.3 2-1.4 4.6-1.8 7.5-1.3V5.2c-2.9-.5-5.5-.1-7.5 1.3z"/><path d="M12 6.5V19"/>',
   focus: '<path d="M4 8V5.5A1.5 1.5 0 015.5 4H8M16 4h2.5A1.5 1.5 0 0120 5.5V8M20 16v2.5a1.5 1.5 0 01-1.5 1.5H16M8 20H5.5A1.5 1.5 0 014 18.5V16"/><path d="M12 9c-1.2-.8-2.6-1-4-.7v6.4c1.4-.3 2.8-.1 4 .7 1.2-.8 2.6-1 4-.7V8.3c-1.4-.3-2.8-.1-4 .7z"/>',
@@ -20,6 +21,8 @@ export interface HudHandlers {
   exit(): void;
   sound(): void;
   settings(): void;
+  /** 공간 이동 메뉴 */
+  spaces(): void;
   nod(): void;
   book(): void;
   focus(): void;
@@ -33,6 +36,7 @@ export class Hud {
   private bookBtn: HTMLButtonElement;
   private pill: HTMLElement;
   private weatherEl: HTMLElement;
+  private roomEl: HTMLElement;
 
   constructor(parent: HTMLElement, h: HudHandlers) {
     this.root = document.createElement('div');
@@ -45,6 +49,7 @@ export class Hud {
       </div>
       <div class="hud-top hud-right">
         <div class="pill pill-count" role="status" aria-live="polite">${icon('people')}<span class="count-num">1</span><span class="count-cap">/${ROOM_CAPACITY}</span></div>
+        <button type="button" class="pill pill-icon" data-act="spaces" aria-label="공간 이동하기" aria-haspopup="dialog">${icon('door')}<span class="pill-text">공간</span></button>
         <button type="button" class="pill pill-icon" data-act="sound" aria-label="서점 소리 켜기" aria-pressed="false">${icon('soundOff')}</button>
         <button type="button" class="pill pill-icon" data-act="settings" aria-label="설정 열기" aria-haspopup="dialog">${icon('gear')}</button>
       </div>
@@ -61,9 +66,11 @@ export class Hud {
     this.bookBtn = q<HTMLButtonElement>('[data-act="book"]');
     this.pill = q('.hud-status');
     this.weatherEl = q('[data-weather]');
+    this.roomEl = q('.pill-room');
     this.actions = [...this.root.querySelectorAll<HTMLButtonElement>('.action')];
 
     q('[data-act="exit"]').addEventListener('click', () => h.exit());
+    q('[data-act="spaces"]').addEventListener('click', () => h.spaces());
     this.soundBtn.addEventListener('click', () => h.sound());
     q('[data-act="settings"]').addEventListener('click', () => h.settings());
     const guard = (fn: () => void) => (e: Event) => {
@@ -80,6 +87,10 @@ export class Hud {
   setCount(n: number): void {
     this.count.textContent = String(n);
     this.count.parentElement!.setAttribute('aria-label', `지금 함께 있는 사람 ${n}명, 최대 ${ROOM_CAPACITY}명`);
+  }
+
+  setRoomName(name: string): void {
+    this.roomEl.textContent = name;
   }
 
   setWeather(label: string): void {

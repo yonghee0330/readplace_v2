@@ -1,6 +1,7 @@
 // 다른 사람·NPC 머리 위 책을 눌렀을 때: 표지·제목·저자·짧은 소개.
 import { blurbForTitle } from '../avatar/bestsellers';
 import type { SharedBook } from '../net/presence';
+import { fetchKakaoBook } from '../reader/kakaoApi';
 import { Sheet } from './sheet';
 
 export interface PeekReader {
@@ -89,17 +90,7 @@ export class BookPeekSheet {
     if (book.coverUrl?.startsWith('http') && haveBlurb) return;
     this.status.textContent = '책 정보를 찾는 중…';
     try {
-      const q = new URLSearchParams({
-        title: book.title,
-        author: book.author,
-        publisher: book.publisher,
-      });
-      const res = await fetch(`/api/kakao/search?${q}`, { signal });
-      if (!res.ok) throw new Error('검색 실패');
-      const data = (await res.json()) as {
-        ok?: boolean;
-        item?: { coverUrl?: string; author?: string; publisher?: string; blurb?: string | null } | null;
-      };
+      const data = await fetchKakaoBook(book.title, book.author, book.publisher, signal);
       if (signal.aborted) return;
       if (!data.ok || !data.item) {
         if (!haveBlurb) {
