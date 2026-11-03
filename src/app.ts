@@ -144,8 +144,9 @@ export async function startApp(
   const postitStore = new PostitStore();
   const postitWall = new PostitWall(ui, postitStore, () => sessionNick, () => authorId, () => setPostitWall(false));
   void postitStore.init().then(() => {
-    store.eventBoard?.setNotes(postitStore.list());
-    postitStore.onChange((notes) => store.eventBoard?.setNotes(notes));
+    const syncBoard = () => store.eventBoard?.setNotes(postitStore.list());
+    syncBoard();
+    postitStore.onChange(() => syncBoard());
   });
   const bookCard = new BookCard(ui);
   const bookSheet = new BookSheet();

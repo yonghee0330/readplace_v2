@@ -1,4 +1,4 @@
-// 가오픈 포스트잇: 타입·색·모양·로컬 캐시 + Supabase 공유(Realtime).
+// 가오픈 포스트잇: 하루 단위 보드 + 로컬 캐시 + Supabase 공유(Realtime).
 
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { getSupabase, hasSupabaseConfig } from './supabaseClient';
@@ -18,6 +18,8 @@ export interface PostitNote {
   nickname: string;
   /** 작성 브라우저 id. 없으면 예전 노트(닉네임으로만 판별). */
   authorId?: string;
+  /** 보드 날짜 YYYY-MM-DD (Asia/Seoul) */
+  day: string;
   createdAt: number;
 }
 
@@ -38,10 +40,14 @@ export const POSTIT_SHAPES: { id: PostitShape; label: string }[] = [
 ];
 
 export const POSTIT_MAX_LEN = 40;
-export const POSTIT_MAX_COUNT = 120;
+/** 하루 보드당 최대 */
+export const POSTIT_MAX_PER_DAY = 80;
+/** 로컬·원격에서 유지할 최근 일수 */
+export const POSTIT_KEEP_DAYS = 45;
 
 const LOCAL_KEY = 'bbooks.postits';
 const CHANNEL = 'bbooks:postits';
+const TZ = 'Asia/Seoul';
 
 /** 예전 데모용 샘플(로컬에 남아 있으면 한 번 걷어낸다) */
 const LEGACY_SAMPLES = new Set([
@@ -50,13 +56,57 @@ const LEGACY_SAMPLES = new Set([
   '불편한 점·바람·인사를 남겨 주세요',
 ]);
 
+const dayFmt = new Intl.DateTimeFormat('en-CA', {
+  timeZone: TZ,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+const labelFmt = new Intl.DateTimeFormat('ko-KR', {
+  timeZone: TZ,
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  weekday: 'short',
+});
+
+/** Asia/Seoul 기준 YYYY-MM-DD */
+export function boardDayKey(ms: number = Date.now()): string {
+  return dayFmt.format(new Date(ms));
+}
+
+export function todayBoardDay(): string {
+  return boardDayKey();
+}
+
+export function formatBoardDayLabel(day: string): string {
+  // day는 YYYY-MM-DD — 정오 UTC로 파싱해 타임존 흔들림을 줄인다
+  const [y, m, d] = day.split('-').map(Number);
+  if (!y || !m || !d) return day;
+  const approx = Date.UTC(y, m - 1, d, 12, 0, 0);
+  return labelFmt.format(new Date(approx));
+}
+
+/** day ± n일 */
+export function shiftBoardDay(day: string, delta: number): string {
+  const [y, m, d] = day.split('-').map(Number);
+  const dt = new Date(Date.UTC(y!, m! - 1, d!, 12, 0, 0));
+  dt.setUTCDate(dt.getUTCDate() + delta);
+  return boardDayKey(dt.getTime());
+}
+
 function newId(): string {
   const a = new Uint8Array(8);
   crypto.getRandomValues(a);
   return Array.from(a, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-function clampNote(n: Partial<PostitNote> & { text?: string }): PostitNote | null {
+function isDayKey(v: unknown): v is string {
+  return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+}
+
+function clampNote(n: Partial<PostitNote> & { text?: string; board_day?: string }): PostitNote | null {
   const text = String(n.text ?? '').trim().slice(0, POSTIT_MAX_LEN);
   if (!text) return null;
   const color = POSTIT_COLORS.some((c) => c.id === n.color) ? (n.color as PostitColor) : 'yellow';
@@ -64,6 +114,8 @@ function clampNote(n: Partial<PostitNote> & { text?: string }): PostitNote | nul
   const authorId = typeof n.authorId === 'string' && n.authorId.length >= 8
     ? n.authorId.slice(0, 40)
     : undefined;
+  const createdAt = Number(n.createdAt) || Date.now();
+  const day = isDayKey(n.day) ? n.day : isDayKey(n.board_day) ? n.board_day : boardDayKey(createdAt);
   return {
     id: typeof n.id === 'string' && n.id ? n.id : newId(),
     text,
@@ -74,7 +126,8 @@ function clampNote(n: Partial<PostitNote> & { text?: string }): PostitNote | nul
     rot: Math.max(-12, Math.min(12, Number(n.rot) || 0)),
     nickname: String(n.nickname ?? '손님').slice(0, 40) || '손님',
     authorId,
-    createdAt: Number(n.createdAt) || Date.now(),
+    day,
+    createdAt,
   };
 }
 
@@ -84,13 +137,31 @@ export function isPostitMine(n: PostitNote, authorId: string, nickname: string):
   return n.nickname === nickname;
 }
 
+function pruneByDays(notes: PostitNote[]): PostitNote[] {
+  const today = todayBoardDay();
+  const oldest = shiftBoardDay(today, -(POSTIT_KEEP_DAYS - 1));
+  const byDay = new Map<string, PostitNote[]>();
+  for (const n of notes) {
+    if (n.day < oldest) continue;
+    const list = byDay.get(n.day) ?? [];
+    list.push(n);
+    byDay.set(n.day, list);
+  }
+  const out: PostitNote[] = [];
+  for (const [, list] of byDay) {
+    list.sort((a, b) => a.createdAt - b.createdAt);
+    out.push(...list.slice(-POSTIT_MAX_PER_DAY));
+  }
+  return out.sort((a, b) => a.createdAt - b.createdAt);
+}
+
 function readLocal(): PostitNote[] {
   try {
     const raw = localStorage.getItem(LOCAL_KEY);
     if (!raw) return [];
     const arr = JSON.parse(raw) as unknown;
     if (!Array.isArray(arr)) return [];
-    return arr.map((n) => clampNote(n as PostitNote)).filter(Boolean) as PostitNote[];
+    return pruneByDays(arr.map((n) => clampNote(n as PostitNote)).filter(Boolean) as PostitNote[]);
   } catch {
     return [];
   }
@@ -98,7 +169,7 @@ function readLocal(): PostitNote[] {
 
 function writeLocal(notes: PostitNote[]): void {
   try {
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(notes.slice(-POSTIT_MAX_COUNT)));
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(pruneByDays(notes)));
   } catch {
     /* ignore */
   }
@@ -133,12 +204,15 @@ export class PostitStore {
           remote.filter((n) => !(n.nickname === '비북스' && LEGACY_SAMPLES.has(n.text))),
         );
         writeLocal(notes);
-        if (remote.length === 0 && notes.length) {
-          for (const n of notes.slice(0, 8)) void this.pushRemote(n);
+        const today = todayBoardDay();
+        const todayLocal = notes.filter((n) => n.day === today);
+        const todayRemote = remote.filter((n) => n.day === today);
+        if (todayRemote.length === 0 && todayLocal.length) {
+          for (const n of todayLocal.slice(0, 8)) void this.pushRemote(n);
         }
       }
     }
-    this.notes = notes;
+    this.notes = pruneByDays(notes);
     this.emit();
     if (typeof BroadcastChannel !== 'undefined') {
       this.ch = new BroadcastChannel(CHANNEL);
@@ -194,26 +268,28 @@ export class PostitStore {
           }
           const row = payload.new as Record<string, unknown> | null;
           if (!row) return;
-          const n = clampNote({
-            id: String(row.id ?? ''),
-            text: String(row.text ?? ''),
-            color: row.color as PostitColor,
-            shape: row.shape as PostitShape,
-            x: Number(row.x),
-            y: Number(row.y),
-            rot: Number(row.rot),
-            nickname: String(row.nickname ?? '손님'),
-            authorId: row.author_id ? String(row.author_id) : undefined,
-            createdAt: row.created_at ? Date.parse(String(row.created_at)) : Date.now(),
-          });
+          const n = rowToNote(row);
           if (n) this.upsertLocal(n, false);
         },
       )
       .subscribe();
   }
 
-  list(): PostitNote[] {
+  /** 전체(보관 기간 안). */
+  listAll(): PostitNote[] {
     return [...this.notes];
+  }
+
+  /** 해당 날짜 보드. day 생략 시 오늘. */
+  list(day: string = todayBoardDay()): PostitNote[] {
+    return this.notes.filter((n) => n.day === day).sort((a, b) => a.createdAt - b.createdAt);
+  }
+
+  /** 쪽지가 있는 날짜 + 오늘(비어 있어도). 최신순. */
+  listDays(): string[] {
+    const set = new Set<string>([todayBoardDay()]);
+    for (const n of this.notes) set.add(n.day);
+    return [...set].sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
   }
 
   get(id: string): PostitNote | undefined {
@@ -233,10 +309,14 @@ export class PostitStore {
     y: number;
     nickname: string;
     authorId: string;
+    day?: string;
   }): Promise<PostitNote | null> {
-    if (this.notes.length >= POSTIT_MAX_COUNT) return null;
+    const day = input.day && isDayKey(input.day) ? input.day : todayBoardDay();
+    if (day !== todayBoardDay()) return null; // 지난 보드에는 붙이지 않음
+    if (this.list(day).length >= POSTIT_MAX_PER_DAY) return null;
     const note = clampNote({
       ...input,
+      day,
       id: newId(),
       rot: (Math.random() * 10 - 5),
       createdAt: Date.now(),
@@ -254,6 +334,7 @@ export class PostitStore {
   ): Promise<PostitNote | null> {
     const cur = this.notes.find((n) => n.id === id);
     if (!cur || !isPostitMine(cur, who.authorId, who.nickname)) return null;
+    if (cur.day !== todayBoardDay()) return null;
     const note = clampNote({
       ...cur,
       text: patch.text ?? cur.text,
@@ -261,6 +342,7 @@ export class PostitStore {
       shape: patch.shape ?? cur.shape,
       authorId: cur.authorId ?? who.authorId,
       nickname: cur.nickname,
+      day: cur.day,
     });
     if (!note) return null;
     this.upsertLocal(note, true);
@@ -271,6 +353,7 @@ export class PostitStore {
   async remove(id: string, who: { authorId: string; nickname: string }): Promise<boolean> {
     const cur = this.notes.find((n) => n.id === id);
     if (!cur || !isPostitMine(cur, who.authorId, who.nickname)) return false;
+    if (cur.day !== todayBoardDay()) return false;
     this.removeLocal(id, true);
     void this.deleteRemote(id);
     return true;
@@ -295,7 +378,7 @@ export class PostitStore {
     const i = this.notes.findIndex((n) => n.id === note.id);
     if (i >= 0) this.notes[i] = note;
     else this.notes.push(note);
-    if (this.notes.length > POSTIT_MAX_COUNT) this.notes = this.notes.slice(-POSTIT_MAX_COUNT);
+    this.notes = pruneByDays(this.notes);
     writeLocal(this.notes);
     this.emit();
     if (broadcast) {
@@ -308,68 +391,42 @@ export class PostitStore {
   }
 
   private emit(): void {
-    const snap = this.list();
+    const snap = this.listAll();
     for (const cb of this.listeners) cb(snap);
   }
 
   private merge(a: PostitNote[], b: PostitNote[]): PostitNote[] {
     const map = new Map<string, PostitNote>();
     for (const n of [...a, ...b]) map.set(n.id, n);
-    return [...map.values()].sort((x, y) => x.createdAt - y.createdAt).slice(-POSTIT_MAX_COUNT);
+    return pruneByDays([...map.values()]);
   }
 
   private async fetchRemote(): Promise<PostitNote[] | null> {
     const sb = getSupabase();
     if (!sb) return null;
+    const oldest = shiftBoardDay(todayBoardDay(), -(POSTIT_KEEP_DAYS - 1));
+    const limit = POSTIT_MAX_PER_DAY * POSTIT_KEEP_DAYS;
     try {
-      const { data, error } = await sb
+      let q = sb
         .from('bbooks_postits')
-        .select('id,text,color,shape,x,y,rot,nickname,author_id,created_at')
+        .select('id,text,color,shape,x,y,rot,nickname,author_id,board_day,created_at')
+        .gte('created_at', `${oldest}T00:00:00+09:00`)
         .order('created_at', { ascending: true })
-        .limit(POSTIT_MAX_COUNT);
-      if (error || !data) {
-        // author_id 컬럼이 아직 없으면 예전 스키마로 재시도
-        if (error) {
-          const fallback = await sb
-            .from('bbooks_postits')
-            .select('id,text,color,shape,x,y,rot,nickname,created_at')
-            .order('created_at', { ascending: true })
-            .limit(POSTIT_MAX_COUNT);
-          if (fallback.error || !fallback.data) return null;
-          return fallback.data
-            .map((row) =>
-              clampNote({
-                id: row.id,
-                text: row.text,
-                color: row.color,
-                shape: row.shape,
-                x: row.x,
-                y: row.y,
-                rot: row.rot,
-                nickname: row.nickname,
-                createdAt: row.created_at ? Date.parse(row.created_at) : Date.now(),
-              }),
-            )
-            .filter(Boolean) as PostitNote[];
-        }
-        return null;
+        .limit(limit);
+      let { data, error } = await q;
+      if (error) {
+        // board_day / author_id 없는 예전 스키마
+        const fallback = await sb
+          .from('bbooks_postits')
+          .select('id,text,color,shape,x,y,rot,nickname,created_at')
+          .order('created_at', { ascending: true })
+          .limit(limit);
+        if (fallback.error || !fallback.data) return null;
+        data = fallback.data as typeof data;
+        error = null;
       }
-      return data
-        .map((row) =>
-          clampNote({
-            id: row.id,
-            text: row.text,
-            color: row.color,
-            shape: row.shape,
-            x: row.x,
-            y: row.y,
-            rot: row.rot,
-            nickname: row.nickname,
-            authorId: (row as { author_id?: string }).author_id,
-            createdAt: row.created_at ? Date.parse(row.created_at) : Date.now(),
-          }),
-        )
-        .filter(Boolean) as PostitNote[];
+      if (error || !data) return null;
+      return pruneByDays(data.map((row) => rowToNote(row as Record<string, unknown>)).filter(Boolean) as PostitNote[]);
     } catch {
       return null;
     }
@@ -388,19 +445,16 @@ export class PostitStore {
         y: note.y,
         rot: note.rot,
         nickname: note.nickname,
+        board_day: note.day,
         created_at: new Date(note.createdAt).toISOString(),
       };
       if (note.authorId) row.author_id = note.authorId;
       const { error } = await sb.from('bbooks_postits').upsert(row);
       if (error) {
-        // author_id 미적용 DB면 컬럼 빼고 재시도
-        if (note.authorId) {
-          delete row.author_id;
-          const retry = await sb.from('bbooks_postits').upsert(row);
-          if (retry.error) console.warn('[bbooks] postit upsert', retry.error.message);
-        } else {
-          console.warn('[bbooks] postit upsert', error.message);
-        }
+        delete row.board_day;
+        if (note.authorId) delete row.author_id;
+        const retry = await sb.from('bbooks_postits').upsert(row);
+        if (retry.error) console.warn('[bbooks] postit upsert', retry.error.message);
       }
     } catch {
       /* 오프라인이면 로컬만 */
@@ -425,6 +479,23 @@ export class PostitStore {
     writeLocal(this.notes);
     this.emit();
   }
+}
+
+function rowToNote(row: Record<string, unknown>): PostitNote | null {
+  const createdAt = row.created_at ? Date.parse(String(row.created_at)) : Date.now();
+  return clampNote({
+    id: String(row.id ?? ''),
+    text: String(row.text ?? ''),
+    color: row.color as PostitColor,
+    shape: row.shape as PostitShape,
+    x: Number(row.x),
+    y: Number(row.y),
+    rot: Number(row.rot),
+    nickname: String(row.nickname ?? '손님'),
+    authorId: row.author_id ? String(row.author_id) : undefined,
+    day: row.board_day ? String(row.board_day) : undefined,
+    createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
+  });
 }
 
 export function colorHex(c: PostitColor): string {

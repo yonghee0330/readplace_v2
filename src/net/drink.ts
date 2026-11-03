@@ -4,24 +4,24 @@ export type DrinkKind = 'water' | 'coffee' | 'tea';
 
 export const DRINK_OPTIONS: { id: DrinkKind; label: string; hint: string; color: string }[] = [
   { id: 'water', label: '물 마시기', hint: '컵을 입에 대고 벌컥벌컥', color: '#9ec9e0' },
-  { id: 'coffee', label: '커피 마시기', hint: '여유롭게 다섯 모금', color: '#5a3820' },
-  { id: 'tea', label: '차 마시기', hint: '천천히 열 모금', color: '#c9b26a' },
+  { id: 'coffee', label: '커피 마시기', hint: '천천히 세 모금 음미', color: '#5a3820' },
+  { id: 'tea', label: '차 마시기', hint: '천천히 세 모금 음미', color: '#c9b26a' },
 ];
 
-/** 마시기 모션 타이밍(초). */
+/** 마시기 모션 타이밍(초). 커피·차는 세 번, 길게 음미. */
 export const DRINK_TIMING = {
   waterRaise: 0.38,
   waterGulp: 2.9,
   waterLower: 0.42,
-  raise: 0.42,
-  lower: 0.45,
-  sipUp: 0.28,
-  sipTip: 0.42,
-  sipDown: 0.3,
-  coffeePause: 0.72,
-  teaPause: 0.48,
-  coffeeSips: 5,
-  teaSips: 10,
+  raise: 0.65,
+  lower: 0.6,
+  sipUp: 0.7,
+  sipTip: 1.15,
+  sipDown: 0.7,
+  coffeePause: 1.7,
+  teaPause: 1.9,
+  coffeeSips: 3,
+  teaSips: 3,
 } as const;
 
 function multiSipDuration(sips: number, pause: number): number {

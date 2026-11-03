@@ -6,7 +6,7 @@ import {
   type Profile, type Settings,
 } from '../core/storage';
 import type { HairStyle } from '../net/presence';
-import { randomNickname, warmHometownDong } from '../net/nickname';
+import { characterBlurb, randomNickname, warmHometownDong } from '../net/nickname';
 import { Sheet } from './sheet';
 
 const QUALITY_LABEL: Record<Settings['quality'], string> = { auto: '자동', low: '낮음', medium: '보통', high: '높음' };
@@ -53,7 +53,7 @@ export class SettingsSheet {
           <div><div class="field-label">닉네임</div><div class="nick" aria-live="polite"></div></div>
           <button type="button" class="btn" data-act="reroll" aria-label="닉네임 다시 뽑기">다시 뽑기</button>
         </div>
-        <p class="field-note">동네 이름 + 세계문학 등장인물이에요. 이 브라우저에 저장되고, 동네는 접속 지역을 대략 맞춥니다.</p>
+        <p class="field-note" data-nick-blurb></p>
       </div>
       <fieldset class="field">
         <legend>아바타 색</legend>
@@ -94,8 +94,8 @@ export class SettingsSheet {
       if (this.manager) return;
       const btn = b.querySelector<HTMLButtonElement>('[data-act="reroll"]');
       if (btn) btn.disabled = true;
-      void warmHometownDong().then((dong) => {
-        this.profile.nickname = randomNickname(Math.random, dong);
+      void warmHometownDong().then(() => {
+        this.profile.nickname = randomNickname();
         this.commitProfile();
         if (btn) btn.disabled = false;
       });
@@ -161,6 +161,8 @@ export class SettingsSheet {
     b.querySelectorAll<HTMLButtonElement>('[data-hair]').forEach((btn) => btn.setAttribute('aria-checked', String(btn.dataset.hair === this.profile.hair)));
     const nick = b.querySelector('.nick');
     if (nick) nick.textContent = this.manager ? `${this.profile.nickname} (대표)` : this.profile.nickname;
+    const blurb = b.querySelector('[data-nick-blurb]');
+    if (blurb) blurb.textContent = this.manager ? '서든리 매니저(대표) 전용 아바타예요.' : characterBlurb(this.profile.nickname);
     b.querySelectorAll<HTMLInputElement>('[data-set]').forEach((i) => {
       const key = i.dataset.set as 'reducedMotion' | 'npc' | 'keyboardMove' | 'music';
       i.checked = Boolean(this.settings[key]);
