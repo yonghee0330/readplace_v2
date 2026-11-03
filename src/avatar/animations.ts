@@ -189,15 +189,18 @@ export class AvatarAnimator {
       }
     }
 
-    const drinkW = Math.max(drinkMouth, drinkHold * 0.85);
-    const sipMute = 1 - Math.min(1, drinkW * 1.15);
+    // 마시는 시늉: 입안에 넣지 않고, 손·잔을 앞으로 내밀어 잘 보이게
+    const present = Math.max(drinkHold, drinkMouth * 0.85);
+    const sipLift = drinkMouth;
+    const drinkW = Math.max(present, sipLift * 0.5);
+    const sipMute = 1 - Math.min(1, drinkW * 1.1);
 
-    // 팔: 걷기(다리와 반대), 읽기(앞으로 모아 책을 듦), 마시기(오른팔 크게)
+    // 팔: 걷기(다리와 반대), 읽기, 마시기(가슴 앞으로 내밀기)
     const readArmX = -1.05, readArmZ = 0.38;
-    // 손에 들 때 / 입에 댈 때 각도 — 멀리서도 보이게 크게
-    const armRaise = -1.05 * drinkHold - 1.72 * drinkMouth;
-    const armZ = 0.35 * drinkHold + 0.72 * drinkMouth;
-    const armY = -0.22 * drinkHold - 0.55 * drinkMouth;
+    // 너무 높이 올리지 않고(~-1.2), 옆으로 벌려 잔이 몸 앞에 보이게
+    const armRaise = -0.92 * present - 0.28 * sipLift;
+    const armZ = 0.52 * present + 0.1 * sipLift;
+    const armY = -0.12 * present - 0.1 * sipLift;
     a.armL.rotation.x = -swing * 0.45 * (1 - this.readW) * sipMute + readArmX * this.readW * sipMute;
     a.armR.rotation.x = swing * 0.45 * (1 - this.readW) * sipMute + readArmX * this.readW * sipMute
       + armRaise;
@@ -205,11 +208,12 @@ export class AvatarAnimator {
     a.armR.rotation.z = -0.12 * (1 - this.readW) * sipMute + readArmZ * this.readW * sipMute
       + armZ;
     a.armR.rotation.y = armY;
+    // 어깨를 살짝 앞으로 — 잔이 카메라에 잘 잡히게
+    a.armR.position.z = 0.055 * present;
 
-    // 머리: 읽을 때 숙임. 마실 때는 뒤로 젖히고 모금마다 살짝 흔들림.
-    const gulpNod = drinkMouth > 0.8 ? drinkTip * 0.12 : 0;
+    // 머리: 읽을 때 숙임. 마실 때는 살짝만 끄덕(입에 대지 않음).
     let headX = 0.28 * this.readW * sipMute + Math.sin(this.time * 0.9) * 0.02 * (1 - this.walkW)
-      - 0.38 * drinkMouth - 0.08 * drinkHold - gulpNod;
+      - 0.06 * sipLift - 0.03 * drinkTip;
     let headZ = Math.sin(this.time * 0.6) * 0.03 * (1 - this.walkW) * (1 - this.readW) * sipMute;
 
     // 가끔 페이지 넘기는 손짓
@@ -238,20 +242,25 @@ export class AvatarAnimator {
       if (this.bowT > 0.8) this.bowT = -1;
     }
 
-    // 잔: 크게 보이게 + 기울임. 몸도 살짝 따라 기울여 동작이 읽히게.
+    // 잔: 크게·앞에 두고 기울이는 시늉만. 몸도 살짝만 따라감.
     if (this.sipT >= 0) {
       a.cup.visible = true;
-      const size = 1.15 + 0.35 * drinkW + 0.12 * drinkTip;
+      const size = 1.4 + 0.25 * present + 0.1 * drinkTip;
       a.cup.scale.setScalar(size);
-      a.cup.rotation.x = 0.35 + 0.95 * drinkTip + 0.25 * drinkMouth;
-      a.cup.rotation.z = -0.4 - 0.15 * drinkMouth;
-      a.body.rotation.x += -0.06 * drinkMouth - 0.04 * drinkTip;
-      if (this.sipKind === 'water' && drinkMouth > 0.9) {
-        a.body.position.y += 0.012 * drinkTip;
+      a.cup.position.set(0.02, -0.17 + 0.015 * sipLift, 0.04 + 0.05 * present);
+      a.cup.rotation.x = 0.25 + 0.55 * drinkTip + 0.12 * sipLift;
+      a.cup.rotation.y = 0.15;
+      a.cup.rotation.z = -0.35;
+      a.body.rotation.x += -0.03 * sipLift - 0.02 * drinkTip;
+      if (this.sipKind === 'water' && sipLift > 0.85) {
+        a.body.position.y += 0.008 * drinkTip;
       }
     } else {
       a.cup.visible = false;
+      a.cup.position.set(0.01, -0.175, 0.02);
+      a.cup.rotation.set(0.35, 0.2, -0.4);
       a.armR.rotation.y = 0;
+      a.armR.position.z = 0;
     }
 
     a.head.rotation.x = headX;
