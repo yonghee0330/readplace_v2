@@ -358,6 +358,25 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
 }
 .action.is-disabled:hover::after, .action.is-disabled:focus-visible::after { opacity: 1; }
 
+/* ---------- 음료 선택 ---------- */
+.drink-choices { display: grid; gap: 10px; margin: 4px 0 8px; }
+.drink-choice {
+  display: flex; align-items: center; gap: 14px; width: 100%;
+  min-height: 64px; padding: 12px 14px; border: 1px solid rgba(36, 37, 31, 0.12);
+  border-radius: 16px; background: #fff; color: var(--green); cursor: pointer; text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+.drink-choice:hover { background: #f7f1e5; border-color: rgba(36, 37, 31, 0.22); }
+.drink-choice:active { transform: scale(0.98); }
+.drink-swatch {
+  width: 36px; height: 36px; border-radius: 50%; flex: none;
+  background: var(--drink, #9ec9e0);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(40, 25, 10, 0.12);
+}
+.drink-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.drink-name { font: 600 16px/1.25 var(--sans); }
+.drink-hint { font-size: 13px; color: #7a6a55; }
+
 /* ---------- 토스트 ---------- */
 .toasts {
   position: absolute; top: max(66px, calc(env(safe-area-inset-top) + 56px)); left: 50%; transform: translateX(-50%);
@@ -865,12 +884,14 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   .pill-text { display: none; }
   .pill { min-height: 38px; }
   .pill-room { font-size: 13px; }
-  .action { min-width: 0; width: 22vw; max-width: 92px; height: 58px; padding: 0 4px; font-size: 11px; gap: 2px; }
-  .action .icon { width: 22px; height: 22px; }
+  .action { min-width: 0; width: 17.5vw; max-width: 78px; height: 56px; padding: 0 2px; font-size: 10px; gap: 2px; }
+  .action .icon { width: 20px; height: 20px; }
   /* 홈 인디케이터·사파리 하단 바에 액션이 잘리지 않게 */
   .hud-actions {
-    gap: 6px;
+    gap: 4px;
     bottom: max(12px, calc(env(safe-area-inset-bottom) + 8px));
+    width: calc(100vw - 12px);
+    justify-content: center;
   }
   .sheet-backdrop { place-items: end center; }
   .sheet {

@@ -74,6 +74,9 @@ export function buildPortals(bucket: MergeBucket): void {
     const boardW = Math.min(1.45, p.w + 0.5);
     wood('walnut', bevelBox(boardW, 0.28, 0.05, 0.006), 'x', at(trs(0, 2.48, 0.04)));
 
+    // 열린 문(1인실 등): 문짝 없이 문틀만 — 등 뒤로 밖이 보임
+    if (p.open) continue;
+
     // ——— 나무 문짝 ———
     const doorH = 2.05;
     const doorT = 0.045;
@@ -102,7 +105,7 @@ export function buildPortals(bucket: MergeBucket): void {
       wood('honey', bevelBox(panelW, upperH, doorT - panelInset, 0.003), 'y', at(trs(px, midY + rail * 0.5 + upperH / 2, z - 0.004)));
       wood('honey', bevelBox(panelW, lowerH, doorT - panelInset, 0.003), 'y', at(trs(px, rail + 0.04 + lowerH / 2, z - 0.004)));
     }
-    // 손잡이(어두운 나무 + 작은 금속 느낌)
+    // 손잡이
     const hx = leafW / 2 - stile - 0.04;
     wood('walnut', bevelBox(0.018, 0.12, 0.028, 0.004), 'y', at(trs(hx, doorH * 0.48, z + 0.028)));
     wood('walnut', bevelBox(0.04, 0.018, 0.018, 0.003), 'x', at(trs(hx - 0.012, doorH * 0.48, z + 0.038)));

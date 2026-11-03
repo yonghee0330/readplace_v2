@@ -159,7 +159,12 @@ export class LocalPresence extends PeerTracker implements Presence {
     } else if (m.type === 'state' && isPlayerState(m.state)) {
       if (Number.isFinite(m.joinedAt)) this.note(m.state.id, m.joinedAt!);
       if (!m.pending) this.upsert(m.state);
-    } else if (m.type === 'action' && m.action && typeof m.action.from === 'string' && m.action.type === 'nod') {
+    } else if (
+      m.type === 'action'
+      && m.action
+      && typeof m.action.from === 'string'
+      && (m.action.type === 'nod' || m.action.type === 'drink')
+    ) {
       if (m.action.from !== this.selfId) {
         this.touch(m.action.from);
         this.emitAction({ ...m.action, nickname: String(m.action.nickname).slice(0, 40) });

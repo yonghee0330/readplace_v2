@@ -188,7 +188,11 @@ export class WsPresence extends PeerTracker implements Presence {
       this.done('ok');
     } else if (m.type === 'state' && isPlayerState(m.state)) {
       this.upsert(m.state);
-    } else if (m.type === 'action' && m.action?.type === 'nod' && typeof m.action.from === 'string') {
+    } else if (
+      m.type === 'action'
+      && (m.action?.type === 'nod' || m.action?.type === 'drink')
+      && typeof m.action.from === 'string'
+    ) {
       if (m.action.from !== this.selfId) this.emitAction({ ...m.action, nickname: String(m.action.nickname).slice(0, 40) });
     } else if (m.type === 'leave' && typeof m.id === 'string') {
       this.remove(m.id);

@@ -30,7 +30,9 @@ import { BookBadgeHits } from './ui/bookBadgeHits';
 import { BookPeekSheet } from './ui/bookPeek';
 import { BookSheet } from './ui/bookSheet';
 import { CinemaWatch } from './ui/cinemaWatch';
+import { DrinkSheet } from './ui/drinkSheet';
 import { PostitWall } from './ui/postitWall';
+import { drinkToast, isDrinkKind, type DrinkKind } from './net/drink';
 import { PostitStore } from './net/postit';
 import {
   EVENT_BOARD, PORTALS, SCREEN, SEATS, SPAWN, SPAWNS, applyLayout, colliders, currentSpaceId, isPresent, spaceLabel,
@@ -216,6 +218,7 @@ export async function startApp(
     },
     sit: () => sitDown(),
     nod: () => nod(),
+    drink: () => openDrink(),
     book: () => toggleBook(),
     focus: () => setFocus(!focus.active),
   });
@@ -393,6 +396,11 @@ export async function startApp(
       toasts.show(`${a.nickname}님이 눈인사했어요`);
       crowd.get(a.from)?.avatar.anim.bow();
       sfx.play('nod');
+    } else if (a.type === 'drink' && isDrinkKind(a.drink)) {
+      const what = a.drink === 'water' ? '물' : a.drink === 'coffee' ? '커피' : '차';
+      toasts.show(`${a.nickname}님이 ${what}을 마셨어요`);
+      crowd.get(a.from)?.avatar.anim.sip(a.drink);
+      sfx.play('tap');
     }
   }
 
@@ -414,6 +422,10 @@ export async function startApp(
 
   // ---------- 액션 ----------
   let lastNod = -Infinity;
+  let lastDrink = -Infinity;
+  const DRINK_COOLDOWN = 2500;
+  const drinkSheet = new DrinkSheet((kind) => sipDrink(kind));
+
   function sitDown(): void {
     if (focus.active) return;
     sfx.play('tap');
@@ -435,6 +447,25 @@ export async function startApp(
     presence.sendAction({ type: 'nod', from: myId, nickname: sessionNick, t: Date.now() });
     toasts.show('눈인사를 건넸어요');
     hud.cooldown('nod', NOD_COOLDOWN);
+  }
+
+  function openDrink(): void {
+    if (!connected || focus.active) return;
+    if (performance.now() - lastDrink < DRINK_COOLDOWN) return;
+    sfx.play('tap');
+    drinkSheet.open();
+  }
+
+  function sipDrink(kind: DrinkKind): void {
+    if (!connected) return;
+    const now = performance.now();
+    if (now - lastDrink < DRINK_COOLDOWN) return;
+    lastDrink = now;
+    me.avatar.anim.sip(kind);
+    sfx.play('tap');
+    presence.sendAction({ type: 'drink', drink: kind, from: myId, nickname: sessionNick, t: Date.now() });
+    toasts.show(drinkToast(kind));
+    hud.cooldown('drink', DRINK_COOLDOWN);
   }
 
   function applyBook(book: ReadingBook, focusMode: boolean): void {
@@ -860,6 +891,7 @@ export async function startApp(
     else if (e.key === '2') toggleBook();
     else if (e.key === '3') setFocus(!focus.active);
     else if (e.key === '4') sitDown();
+    else if (e.key === '5') openDrink();
   });
 
   // ---------- 품질 ----------

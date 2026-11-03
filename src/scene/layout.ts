@@ -26,6 +26,8 @@ export interface PortalDef {
   label: string;
   /** 클릭/트리거 박스 크기 */
   w: number; d: number;
+  /** true면 문짝 없이 문틀만(1인실처럼 등 뒤가 뚫려 보이게) */
+  open?: boolean;
 }
 
 export interface PartitionWall {
@@ -363,8 +365,8 @@ function makeSolo(): SpaceLayout {
     seats: [chairSeat('solo-1', chair, 0.42, -1)],
     spawn,
     spawns: [spawn],
-    // 문 안쪽으로 들여 내비·근접 탐지가 막히지 않게 (벽 여유 0.22 안쪽)
-    portals: [{ to: 'hub', x: 0, z: -0.95, ry: Math.PI, label: '비북스-M', w: 0.82, d: 0.32 }],
+    // 문 안쪽으로 들여 내비·근접 탐지가 막히지 않게. open: 문짝 없이 등 뒤가 보임
+    portals: [{ to: 'hub', x: 0, z: -0.95, ry: Math.PI, label: '비북스-M', w: 0.82, d: 0.32, open: true }],
   };
 }
 

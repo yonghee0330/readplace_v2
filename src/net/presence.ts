@@ -31,12 +31,14 @@ export interface PlayerState {
   t: number;
 }
 
-export type ActionType = 'nod' | 'join' | 'leave';
+export type ActionType = 'nod' | 'join' | 'leave' | 'drink';
 export interface ActionEvent {
   type: ActionType;
   from: string;
   nickname: string;
   t: number;
+  /** type==='drink'일 때 물·커피·차 */
+  drink?: 'water' | 'coffee' | 'tea';
 }
 
 export type PresenceStatus = 'connecting' | 'connected' | 'reconnecting';

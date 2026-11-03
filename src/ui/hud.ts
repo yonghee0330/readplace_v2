@@ -14,6 +14,7 @@ const ICON = {
   nod: '<circle cx="12" cy="8.5" r="4"/><path d="M5.5 20c.8-3.6 3.4-5.6 6.5-5.6s5.7 2 6.5 5.6"/><path d="M9.6 8.6c.7.6 1.6.6 2.4 0M12.6 8.6c.7.6 1.6.6 2.4 0" />',
   book: '<path d="M12 6.5c-2-1.4-4.6-1.8-7.5-1.3v12.5c2.9-.5 5.5-.1 7.5 1.3 2-1.4 4.6-1.8 7.5-1.3V5.2c-2.9-.5-5.5-.1-7.5 1.3z"/><path d="M12 6.5V19"/>',
   focus: '<path d="M4 8V5.5A1.5 1.5 0 015.5 4H8M16 4h2.5A1.5 1.5 0 0120 5.5V8M20 16v2.5a1.5 1.5 0 01-1.5 1.5H16M8 20H5.5A1.5 1.5 0 014 18.5V16"/><path d="M12 9c-1.2-.8-2.6-1-4-.7v6.4c1.4-.3 2.8-.1 4 .7 1.2-.8 2.6-1 4-.7V8.3c-1.4-.3-2.8-.1-4 .7z"/>',
+  drink: '<path d="M7 4.5h10l-.8 12.2A2.2 2.2 0 0113.99 19H10a2.2 2.2 0 01-2.2-2.3L7 4.5z"/><path d="M7.2 8.2h9.6"/><path d="M16.8 7.2c1.4 0 2.5 1 2.5 2.4S18.2 12 16.8 12"/>',
 } as const;
 
 export const icon = (name: keyof typeof ICON) =>
@@ -27,6 +28,7 @@ export interface HudHandlers {
   spaces(): void;
   sit(): void;
   nod(): void;
+  drink(): void;
   book(): void;
   focus(): void;
 }
@@ -60,6 +62,7 @@ export class Hud {
       <nav class="hud-actions" aria-label="동작">
         <button type="button" class="action" data-act="sit" aria-label="앉기 (단축키 4)" data-tip="연결 중">${icon('sit')}<span>앉기</span></button>
         <button type="button" class="action" data-act="nod" aria-label="눈인사 (단축키 1)" data-tip="연결 중">${icon('nod')}<span>눈인사</span></button>
+        <button type="button" class="action" data-act="drink" aria-label="음료 마시기 (단축키 5)" data-tip="연결 중">${icon('drink')}<span>음료</span></button>
         <button type="button" class="action" data-act="book" aria-label="책 펼치기 (단축키 2)" aria-pressed="false" data-tip="연결 중">${icon('book')}<span>책 펼치기</span></button>
         <button type="button" class="action" data-act="focus" aria-label="읽기 모드 (단축키 3)" data-tip="연결 중">${icon('focus')}<span>읽기 모드</span></button>
       </nav>`;
@@ -83,6 +86,7 @@ export class Hud {
     };
     q('[data-act="sit"]').addEventListener('click', guard(h.sit));
     q('[data-act="nod"]').addEventListener('click', guard(h.nod));
+    q('[data-act="drink"]').addEventListener('click', guard(h.drink));
     this.bookBtn.addEventListener('click', guard(h.book));
     q('[data-act="focus"]').addEventListener('click', guard(h.focus));
     this.setCount(1);
@@ -134,7 +138,7 @@ export class Hud {
     this.root.inert = hidden;
   }
 
-  cooldown(act: 'nod', ms: number): void {
+  cooldown(act: 'nod' | 'drink', ms: number): void {
     const b = this.root.querySelector<HTMLButtonElement>(`[data-act="${act}"]`)!;
     b.classList.add('is-cooling');
     b.setAttribute('aria-disabled', 'true');

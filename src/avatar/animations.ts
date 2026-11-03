@@ -1,8 +1,11 @@
-// 뼈 없는 트랜스폼 애니메이션: 숨쉬기, 걷기, 앉기 전환, 읽기(책 들고 고개 숙임, 가끔 페이지 넘김), 눈인사, 깜빡임.
+// 뼈 없는 트랜스폼 애니메이션: 숨쉬기, 걷기, 앉기 전환, 읽기(책 들고 고개 숙임, 가끔 페이지 넘김), 눈인사, 마시기, 깜빡임.
+import { DRINK_OPTIONS, type DrinkKind } from '../net/drink';
 import type { AvatarState } from '../net/presence';
 import type { Avatar } from './avatar';
 
 const damp = (cur: number, target: number, rate: number, dt: number) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
+
+const SIP_DUR = 1.85;
 
 export class AvatarAnimator {
   state: AvatarState = 'stand';
@@ -16,6 +19,7 @@ export class AvatarAnimator {
   private readW = 0;
   private phase = 0;
   private bowT = -1;
+  private sipT = -1;
   private blinkT = -1;
   private nextBlink = 2 + Math.random() * 3;
   private pageT = -1;
@@ -36,6 +40,18 @@ export class AvatarAnimator {
 
   get bowing(): boolean {
     return this.bowT >= 0;
+  }
+
+  /** 음료 마시기: 잔을 들고 한 모금 */
+  sip(kind: DrinkKind): void {
+    this.sipT = 0;
+    const hex = DRINK_OPTIONS.find((d) => d.id === kind)?.color ?? '#9ec9e0';
+    this.a.setCupLiquid(hex);
+    this.a.cup.visible = true;
+  }
+
+  get sipping(): boolean {
+    return this.sipT >= 0;
   }
 
   update(dt: number, _t: number): void {
@@ -63,14 +79,21 @@ export class AvatarAnimator {
 
     // 팔: 걷기(다리와 반대), 읽기(앞으로 모아 책을 듦)
     const readArmX = -1.05, readArmZ = 0.38;
-    a.armL.rotation.x = -swing * 0.45 * (1 - this.readW) + readArmX * this.readW;
-    a.armR.rotation.x = swing * 0.45 * (1 - this.readW) + readArmX * this.readW;
+    const sipW = this.sipT >= 0
+      ? Math.sin(Math.min(1, this.sipT / SIP_DUR) * Math.PI)
+      : 0;
+    a.armL.rotation.x = -swing * 0.45 * (1 - this.readW) * (1 - sipW) + readArmX * this.readW * (1 - sipW);
+    a.armR.rotation.x = swing * 0.45 * (1 - this.readW) * (1 - sipW) + readArmX * this.readW * (1 - sipW)
+      - 1.35 * sipW;
     a.armL.rotation.z = 0.12 * (1 - this.readW) - readArmZ * this.readW;
-    a.armR.rotation.z = -0.12 * (1 - this.readW) + readArmZ * this.readW;
+    a.armR.rotation.z = -0.12 * (1 - this.readW) * (1 - sipW) + readArmZ * this.readW * (1 - sipW)
+      + 0.55 * sipW;
+    a.armR.rotation.y = -0.35 * sipW;
 
-    // 머리: 읽을 때 숙임, 평소엔 아주 살짝 끄덕임
-    let headX = 0.28 * this.readW + Math.sin(this.time * 0.9) * 0.02 * (1 - this.walkW);
-    let headZ = Math.sin(this.time * 0.6) * 0.03 * (1 - this.walkW) * (1 - this.readW);
+    // 머리: 읽을 때 숙임, 평소엔 아주 살짝 끄덕임. 마실 때는 살짝 뒤로.
+    let headX = 0.28 * this.readW * (1 - sipW) + Math.sin(this.time * 0.9) * 0.02 * (1 - this.walkW)
+      - 0.22 * sipW;
+    let headZ = Math.sin(this.time * 0.6) * 0.03 * (1 - this.walkW) * (1 - this.readW) * (1 - sipW);
 
     // 가끔 페이지 넘기는 손짓
     if (this.readW > 0.8) {
@@ -97,6 +120,24 @@ export class AvatarAnimator {
       a.body.rotation.x += 0.2 * k;
       if (this.bowT > 0.8) this.bowT = -1;
     }
+
+    // 마시기
+    if (this.sipT >= 0) {
+      this.sipT += dt;
+      a.cup.visible = true;
+      a.cup.rotation.x = 0.35 + 0.55 * sipW;
+      a.cup.scale.setScalar(0.85 + 0.2 * sipW);
+      if (this.sipT > SIP_DUR) {
+        this.sipT = -1;
+        a.cup.visible = false;
+        a.cup.rotation.x = 0.35;
+        a.armR.rotation.y = 0;
+      }
+    } else {
+      a.cup.visible = false;
+      a.armR.rotation.y = 0;
+    }
+
     a.head.rotation.x = headX;
     a.head.rotation.z = headZ;
 
@@ -112,7 +153,7 @@ export class AvatarAnimator {
       if (this.blinkT >= 0.13) this.blinkT = -1;
     }
 
-    a.book.visible = this.readW > 0.45;
+    a.book.visible = this.readW > 0.45 && this.sipT < 0;
     a.book.scale.setScalar(Math.min(1, this.readW * 1.3));
   }
 }

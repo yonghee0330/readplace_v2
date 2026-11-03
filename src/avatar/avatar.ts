@@ -393,6 +393,31 @@ function legGeometry(): THREE.BufferGeometry {
   return paint(g, (y) => (y < -0.15 ? SHOE : PANTS));
 }
 
+/** 손에 드는 잔(도자기 + 음료 수면). liquid는 정점 색으로. */
+function cupGeometry(liquid: THREE.Color): THREE.BufferGeometry {
+  const ceramic = new THREE.Color('#f2ebe0');
+  const parts: THREE.BufferGeometry[] = [];
+  const body = new THREE.CylinderGeometry(0.028, 0.024, 0.055, 14, 1, true);
+  body.translate(0, 0.028, 0);
+  parts.push(paint(body, ceramic));
+  const bottom = new THREE.CircleGeometry(0.024, 14);
+  bottom.rotateX(-Math.PI / 2);
+  parts.push(paint(bottom, ceramic));
+  const rim = new THREE.TorusGeometry(0.028, 0.0035, 8, 18);
+  rim.rotateX(Math.PI / 2);
+  rim.translate(0, 0.055, 0);
+  parts.push(paint(rim, ceramic));
+  const drink = new THREE.CircleGeometry(0.025, 14);
+  drink.rotateX(-Math.PI / 2);
+  drink.translate(0, 0.05, 0);
+  parts.push(paint(drink, liquid));
+  const handle = new THREE.TorusGeometry(0.016, 0.004, 8, 14, Math.PI);
+  handle.rotateY(Math.PI / 2);
+  handle.translate(0.03, 0.03, 0);
+  parts.push(paint(handle, ceramic));
+  return merge(parts);
+}
+
 /** 두 손에 드는 펼친 책. */
 function heldBookGeometry(cover: THREE.Color): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
@@ -427,6 +452,8 @@ export class Avatar {
   readonly legR = new THREE.Group();
   readonly eyes: THREE.Mesh;
   readonly book: THREE.Mesh;
+  /** 마실 때 오른손에 드는 잔 */
+  readonly cup: THREE.Mesh;
   readonly anim: AvatarAnimator;
   private meshes: THREE.Mesh[] = [];
   private look: AvatarLook;
@@ -438,8 +465,16 @@ export class Avatar {
     this.eyes.position.set(0, -0.01, 0.192);
     this.book = new THREE.Mesh(heldBookGeometry(new THREE.Color('#8c2f2a')), SHARED);
     this.book.visible = false;
+    this.cup = new THREE.Mesh(cupGeometry(new THREE.Color('#9ec9e0')), SHARED);
+    this.cup.visible = false;
     this.build();
     this.anim = new AvatarAnimator(this);
+  }
+
+  /** 잔 속 음료 색을 바꾼다. */
+  setCupLiquid(hex: string): void {
+    this.cup.geometry.dispose();
+    this.cup.geometry = cupGeometry(new THREE.Color(hex));
   }
 
   private build(): void {
@@ -484,6 +519,11 @@ export class Avatar {
     this.body.add(this.book);
     this.book.position.set(0, 0.2, 0.2);
     this.book.rotation.x = -0.55;
+    // 오른팔 끝(손 근처)에 잔
+    this.armR.add(this.cup);
+    this.cup.position.set(0.01, -0.175, 0.02);
+    this.cup.rotation.set(0.35, 0.2, -0.4);
+    this.cup.scale.setScalar(1);
   }
 
   setLook(look: AvatarLook): void {

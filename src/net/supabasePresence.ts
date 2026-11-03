@@ -86,7 +86,12 @@ export class SupabasePresence extends PeerTracker implements Presence {
     });
     ch.on('broadcast', { event: 'action' }, ({ payload }) => {
       const a = payload as ActionEvent;
-      if (a && typeof a.from === 'string' && a.type === 'nod' && a.from !== this.selfId) {
+      if (
+        a
+        && typeof a.from === 'string'
+        && (a.type === 'nod' || a.type === 'drink')
+        && a.from !== this.selfId
+      ) {
         this.touch(a.from);
         this.emitAction({ ...a, nickname: String(a.nickname ?? '').slice(0, 40) });
       }
