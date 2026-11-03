@@ -11,7 +11,7 @@
 |---|---|
 | 저장소 | https://github.com/yonghee0330/readplace_v2 |
 | `main` 브랜치 | 단계 1~5 + 읽기 모드. PR #1(세션 2)·PR #2(GitHub Pages 자동 배포) **병합 완료** |
-| 배포 | https://yonghee0330.github.io/readplace_v2/ — `main`에 올라가면 자동 재배포 |
+| 배포 | https://meta.bbooks.co.kr/ — `main`에 올라가면 자동 재배포 |
 | `session-3-finish` 브랜치 | 세션 3(단계 6 마무리·7·8) 작업 브랜치 |
 | 통과한 단계 | 1, 2, 3, 4, 5 (단계 6은 e2e 하나만 남음) |
 | 남은 단계 | 6 마무리, 7(소리·PWA·접근성·성능), 8(e2e 전체·최종 캡처·README 완성) |
@@ -148,6 +148,6 @@ HANDOFF.md, CLAUDE.md, SPEC-v3.md(맨 위 v3.1 변경 포함), PROGRESS.md를 �
 
 ## 8. 열려 있는 것
 
-- PR #1(세션 2)·PR #2(GitHub Pages 자동 배포): `main`에 병합 완료. https://yonghee0330.github.io/readplace_v2/ 에 배포됨
+- PR #1(세션 2)·PR #2(GitHub Pages 자동 배포): `main`에 병합 완료. https://meta.bbooks.co.kr/ 에 배포됨
 - 세션 3 작업은 `session-3-finish` 브랜치 → 초안 PR
 - 클라우드 세션에 걸어 둔 PR 점검 예약 1건(2026-11-01 13:40 UTC)은 변화가 없으면 아무것도 하지 않는다. 데스크톱 작업과 충돌하지 않는다.

@@ -167,6 +167,6 @@
 - 세션 1: 폴더 준비, PLAN.md 작성. 환경 확인 결과 — npm 열림, Playwright 1.63 + 크로미움 설치됨, ko.wikisource.org·gongu.copyright.or.kr 차단, GitHub 저장소 미연결.
 - 세션 1: 단계 1·2 완료, 커밋·푸시.
 - 세션 2: 단계 3~5 완료 + 단계 6 대부분, 브랜치 `session-2-avatar-hud-presence`에 커밋·푸시, 초안 PR.
-- PR #1(세션 2)·PR #2(GitHub Pages 자동 배포) main에 병합. https://yonghee0330.github.io/readplace_v2/
+- PR #1(세션 2)·PR #2(GitHub Pages 자동 배포) main에 병합. https://meta.bbooks.co.kr/
 - 세션 3(Claude Code 데스크톱, Mac): `session-3-finish` 브랜치. Playwright 크로미움(headless shell 1243) 설치.
 - 결정(운영자): 실제 책 본문 없음 → 9장 삭제, 3-9는 집중 독서 화면. 실내 그림자 광원은 SpotLight. 기본 구조는 산사와 같게.

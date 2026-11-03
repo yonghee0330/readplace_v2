@@ -2,7 +2,7 @@
 
 부천 원미동 동네 서점 **비북스**를 옮긴 3D 온라인 공간입니다. 방문객이 아바타로 들어와 부천 날씨에 맞는 서점에 앉아, 각자 자기 책을 함께 읽습니다. 실제 책 본문은 보여주지 않습니다.
 
-> 진행 상황: **단계 1~8 완료**(서점 장면, 아바타·이동, HUD, 함께 있기, 읽기 모드, 소리·PWA·접근성, e2e·최종 캡처). 배포: https://yonghee0330.github.io/readplace_v2/ · 단계별 기록은 `PROGRESS.md`, 시각 품질 판정은 `docs/screens/REVIEW.md`.
+> 진행 상황: **단계 1~8 완료**(서점 장면, 아바타·이동, HUD, 함께 있기, 읽기 모드, 소리·PWA·접근성, e2e·최종 캡처). 배포: https://meta.bbooks.co.kr/ · 단계별 기록은 `PROGRESS.md`, 시각 품질 판정은 `docs/screens/REVIEW.md`.
 
 ![함께 있는 서점](docs/screens/with-visitors.png)
 
@@ -123,8 +123,10 @@ assets/models/ 외부 glb 교체용(비어 있음)
 
 ## 배포(GitHub Pages)
 
-`main`에 올라오면 `.github/workflows/deploy.yml`이 타입 검사·빌드 후 https://yonghee0330.github.io/readplace_v2/ 에 배포합니다. 처음 한 번은 저장소 Settings → Pages → Source를 **GitHub Actions**로 바꿔야 합니다. 정적 호스팅이라 Local 모드(같은 브라우저 탭끼리)로 동작하고, 다른 기기끼리 만나는 ws 모드는 중계 서버를 따로 띄워야 합니다.
+`main`에 올라오면 `.github/workflows/deploy.yml`이 타입 검사·빌드 후 https://meta.bbooks.co.kr/ 에 배포합니다. 처음 한 번은 저장소 Settings → Pages → Source를 **GitHub Actions**로 바꿔야 합니다. 정적 호스팅이라 Local 모드(같은 브라우저 탭끼리)로 동작하고, 다른 기기끼리 만나는 ws 모드는 중계 서버를 따로 띄워야 합니다.
 
+- **커스텀 도메인**: `meta.bbooks.co.kr`(DNS에 `meta` CNAME → `yonghee0330.github.io`, Pages 설정의 Custom domain, HTTPS 강제). 이전 주소(`yonghee0330.github.io/readplace_v2/`)는 새 주소로 301 이동합니다. 도메인은 Pages 설정에 저장되어 있어 저장소에 CNAME 파일은 없습니다.
+- Supabase 함께 있기·카카오 표지는 저장소 Secrets(`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`)가 빌드에 들어갈 때 켜지고, Edge Function `kakao-search`는 `npx supabase functions deploy kakao-search --project-ref <ref> --no-verify-jwt`로 따로 배포합니다(카카오 키는 `supabase secrets set`).
 - 모든 경로가 상대 경로(`base: './'`, manifest의 `start_url`·`scope`가 `./`, 서비스워커 `./sw.js`)라 하위 경로(`/readplace_v2/`)든 도메인 루트든 그대로 동작합니다.
 - 다른 정적 호스팅(Cloudflare Pages·Netlify 등)은 `npm run build` 후 `dist/`를 올리면 됩니다.
 - 서비스워커는 빌드 결과물에서만 등록됩니다(`npm run dev`에서는 등록하지 않음). 새로 배포하면 파일 목록 해시로 캐시 버전이 바뀌어 옛 캐시를 지웁니다.
