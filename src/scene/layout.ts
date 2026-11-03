@@ -12,7 +12,13 @@ export interface RoomBounds {
 export interface Opening { cx: number; w: number; y0: number; y1: number; kind: 'window' | 'door' }
 export interface Placement { x: number; z: number; ry: number }
 export interface Seat { id: string; x: number; z: number; ry: number; y: number; approach: 1 | -1 }
-export interface Collider { x0: number; x1: number; z0: number; z1: number; h: number; seatable: boolean; seats?: string[] }
+export interface Collider {
+  x0: number; x1: number; z0: number; z1: number; h: number;
+  seatable: boolean;
+  seats?: string[];
+  /** 클릭 시 포스트잇 보드 열기 */
+  eventBoard?: boolean;
+}
 export interface PortalDef {
   /** 이 포털이 보내는 곳(허브의 포털은 서브룸, 서브룸은 보통 hub) */
   to: SpaceId;
@@ -496,11 +502,19 @@ export function seatApproach(s: Seat, dist = 0.5): { x: number; z: number } {
 
 export function colliders(): Collider[] {
   const list: Collider[] = [];
-  const rect = (cx: number, cz: number, w: number, d: number, ry: number, h: number, seats?: string[]) => {
+  const rect = (
+    cx: number, cz: number, w: number, d: number, ry: number, h: number,
+    seats?: string[],
+    flags?: { eventBoard?: boolean },
+  ) => {
     if (w <= 0.01 || d <= 0.01) return;
     const rot = Math.abs(Math.sin(ry)) > 0.5;
     const hw = (rot ? d : w) / 2, hd = (rot ? w : d) / 2;
-    list.push({ x0: cx - hw, x1: cx + hw, z0: cz - hd, z1: cz + hd, h, seatable: !!seats, seats });
+    list.push({
+      x0: cx - hw, x1: cx + hw, z0: cz - hd, z1: cz + hd, h,
+      seatable: !!seats, seats,
+      eventBoard: flags?.eventBoard,
+    });
   };
   for (const s of SHELVES) rect(s.x, s.z, s.w, SHELF.d, s.ry, SHELF.h);
   for (const p of PARTITIONS) {
@@ -549,7 +563,8 @@ export function colliders(): Collider[] {
     }
   }
   if (isPresent(EVENT_BOARD)) {
-    rect(EVENT_BOARD.x, EVENT_BOARD.z, EVENT_BOARD.w, 0.12, EVENT_BOARD.ry, EVENT_BOARD.h + 1.0);
+    // 클릭으로 포스트잇 UI를 열 수 있게 표시(걷기는 막고, 클릭은 보드로 처리)
+    rect(EVENT_BOARD.x, EVENT_BOARD.z, EVENT_BOARD.w, 0.28, EVENT_BOARD.ry, EVENT_BOARD.h + 1.0, undefined, { eventBoard: true });
   }
   if (isPresent(COFFEE_TABLE)) rect(COFFEE_TABLE.x, COFFEE_TABLE.z, COFFEE_TABLE.w, COFFEE_TABLE.d, COFFEE_TABLE.ry, COFFEE_TABLE.h);
   if (isPresent(SCREEN)) rect(SCREEN.x, SCREEN.z, 0.08, SCREEN.w, SCREEN.ry, SCREEN.h + 0.6);

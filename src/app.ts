@@ -273,14 +273,15 @@ export async function startApp(
 
   // 첫 진입 안내
   if (!settings.introDismissed && !params.cam && !params.autoread) {
-    toasts.show('창가 포스트잇 보드에 인사·바람·제보를 남겨 주세요', {
-      duration: 7500,
+    toasts.show('창가 보드에 인사·바람·제보를 남겨 주세요', {
+      duration: 8000,
       kind: 'guide',
       action: {
-        label: '다시 보지 않기',
+        label: '보드 열기',
         onClick: () => {
           settings.introDismissed = true;
           saveSettings(settings);
+          if (currentSpaceId() === 'hub') setPostitWall(true);
         },
       },
     });
@@ -646,6 +647,7 @@ export async function startApp(
       const box = new THREE.Mesh(new THREE.BoxGeometry(c.x1 - c.x0, c.h, c.z1 - c.z0), new THREE.MeshBasicMaterial({ visible: false }));
       box.position.set((c.x0 + c.x1) / 2, c.h / 2, (c.z0 + c.z1) / 2);
       box.userData.seats = c.seats ?? null;
+      if (c.eventBoard) box.userData.eventBoard = true;
       hitGroup.add(box);
     }
     for (const p of PORTALS) {
@@ -764,28 +766,32 @@ export async function startApp(
       ? [boardMesh, ...hitGroup.children, store.floor]
       : [...hitGroup.children, store.floor];
     const hits = ray.intersectObjects(targets, false);
-    const hit = hits[0];
-    if (!hit) return;
-    if (hit.object.userData.screen) {
+    if (!hits.length) return;
+    // 보드·스크린·문·의자처럼 상호작용 가능한 히트를 일반 가구 충돌보다 우선
+    const pick = hits.find((h) => {
+      const u = h.object.userData;
+      return !!(u.eventBoard || u.screen || u.portal || (u.seats && (u.seats as string[]).length));
+    }) ?? hits[0];
+    if (pick.object.userData.screen) {
       setCinemaWatch(true);
       return;
     }
-    if (hit.object.userData.eventBoard) {
+    if (pick.object.userData.eventBoard) {
       setPostitWall(true);
       return;
     }
-    const portal = hit.object.userData.portal as PortalDef | undefined;
+    const portal = pick.object.userData.portal as PortalDef | undefined;
     if (portal) {
       askEnterPortal(portal);
       return;
     }
-    const seats = hit.object.userData.seats as string[] | null | undefined;
+    const seats = pick.object.userData.seats as string[] | null | undefined;
     if (seats) {
-      const seat = movement.sitNear({ x: hit.point.x, z: hit.point.z }, seats) ?? movement.sitNear({ x: hit.point.x, z: hit.point.z });
+      const seat = movement.sitNear({ x: pick.point.x, z: pick.point.z }, seats) ?? movement.sitNear({ x: pick.point.x, z: pick.point.z });
       if (!seat) toasts.show('빈 자리가 없어요');
       else ring.show(seat.x, seat.z);
     } else {
-      const dest = movement.walkTo({ x: hit.point.x, z: hit.point.z });
+      const dest = movement.walkTo({ x: pick.point.x, z: pick.point.z });
       if (dest) ring.show(dest.x, dest.z);
     }
     pushState(true);
@@ -817,10 +823,11 @@ export async function startApp(
       -((e.clientY - rect.top) / rect.height) * 2 + 1,
     );
     ray.setFromCamera(ndc, camera);
-    const board = store.eventBoard?.hitMesh;
-    if (board && currentSpaceId() === 'hub') {
-      const bh = ray.intersectObject(board, false);
-      if (bh[0]) {
+    if (currentSpaceId() === 'hub') {
+      const board = store.eventBoard?.hitMesh;
+      const boardTargets = board ? [board, ...hitGroup.children] : hitGroup.children;
+      const bh = ray.intersectObjects(boardTargets, false);
+      if (bh.some((h) => h.object.userData.eventBoard)) {
         canvas.style.cursor = 'pointer';
         return;
       }
@@ -927,10 +934,9 @@ export async function startApp(
     ring.update(dt);
     {
       const p = me.root.position;
-      // 1인실 빛나는 문은 카메라 시선 기준(모바일 드래그 대응)
       store.updatePortals(t, { x: p.x, z: p.z, ry: lookYaw(), space: currentSpaceId() });
     }
-    // 빛나는 문 앞에 서면 확인만 띄움(자동 전환 없음). 포털끼리 직접 연결하지 않음.
+    // 포털 문 앞에 서면 확인만 띄움(자동 전환 없음). 포털끼리 직접 연결하지 않음.
     if (!focus.active && !cinemaWatch.active && !postitWall.active && !anySheetOpen() && performance.now() > portalPromptIgnoreUntil) {
       const p = me.root.position;
       for (const portal of PORTALS) {
@@ -957,7 +963,11 @@ export async function startApp(
       const p = me.root.position;
       if (Math.hypot(p.x - EVENT_BOARD.x, p.z - EVENT_BOARD.z) < 1.6) {
         boardHintShown = true;
-        toasts.show('포스트잇 보드를 누르면 메시지를 남길 수 있어요', { duration: 4500, kind: 'guide' });
+        toasts.show('보드를 누르면 포스트잇을 남길 수 있어요', {
+          duration: 5000,
+          kind: 'guide',
+          action: { label: '열기', onClick: () => setPostitWall(true) },
+        });
       }
     }
   });
