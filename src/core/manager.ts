@@ -7,7 +7,7 @@ export const MANAGER_COLOR = '#d9a0a8';
 export const MANAGER_SESSION_KEY = 'bbooks.manager';
 
 /** 기본 코드. `VITE_MANAGER_CODE`로 덮어쓸 수 있다. */
-const DEFAULT_CODE = 'suddenly2026';
+const DEFAULT_CODE = 'sudden2026';
 
 export function managerCode(): string {
   const fromEnv = (import.meta.env.VITE_MANAGER_CODE as string | undefined)?.trim();
