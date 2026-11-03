@@ -1,4 +1,5 @@
 // 카메라: 캡처용 고정 시점(?cam=overview|avatar|window)과 아바타를 따라가는 3인칭 오빗.
+// 시선·줌은 현재 방(ROOM) 안으로 묶어, 공간 너머 허공으로 무한히 나가지 않게 한다.
 import * as THREE from 'three';
 import type { CamPreset } from '../core/params';
 import { ROOM } from '../scene/layout';
@@ -15,7 +16,7 @@ const PORTRAIT: Partial<typeof CAM_PRESETS> = {
 };
 
 export function createCamera(aspect: number): THREE.PerspectiveCamera {
-  const cam = new THREE.PerspectiveCamera(CAM_PRESETS.overview.fov, aspect, 0.05, 120);
+  const cam = new THREE.PerspectiveCamera(CAM_PRESETS.overview.fov, aspect, 0.05, 80);
   applyPreset(cam, 'overview');
   return cam;
 }
@@ -41,21 +42,32 @@ export function applyPreset(cam: THREE.PerspectiveCamera, preset: CamPreset): TH
 
 
 const DEG = Math.PI / 180;
-const MIN_PITCH = 15 * DEG, MAX_PITCH = 78 * DEG;
-/** 멀리 당기면 서점 전체를 조망한다. 가까울 때만 벽 안으로 붙인다. */
-export const MIN_DIST = 1.5, MAX_DIST = 14;
+const MIN_PITCH = 12 * DEG, MAX_PITCH = 62 * DEG;
+export const MIN_DIST = 1.35;
+
+/** 현재 방 크기에 맞는 최대 오빗 거리 — 방 대각선의 ~38%, 허브도 크게 나가지 않음. */
+export function maxOrbitDist(): number {
+  const span = Math.hypot(ROOM.w, ROOM.d);
+  return THREE.MathUtils.clamp(span * 0.38, 2.6, 6.2);
+}
+
+/** 방 안에서 아바타·공간을 잘 담는 기본 거리. */
+export function idealOrbitDist(): number {
+  const span = Math.hypot(ROOM.w, ROOM.d);
+  return THREE.MathUtils.clamp(span * 0.28, 2.0, 3.6);
+}
 
 /**
- * 3인칭 오빗 카메라. 아바타를 부드럽게 따라가고(댐핑), 드래그로 돌리고, 휠·핀치로 1.5~14m 줌,
- * 상하 각도 15°~78°. 가까이에서는 벽 밖으로 못 나가고, 멀리 당기면 방 밖으로 나가 전체를 본다.
+ * 3인칭 오빗 카메라. 아바타를 부드럽게 따라가고(댐핑), 드래그로 돌리고, 휠·핀치로 줌.
+ * 거리는 방 크기에 묶고, 카메라는 벽·천장 밖으로 거의 나가지 않아 공간 너머 허공을 보지 않는다.
  */
 export class FollowCamera {
   yaw: number;
-  pitch = 22 * DEG;
-  distance = 3.3;
+  pitch = 28 * DEG;
+  distance = 3.2;
   readonly target = new THREE.Vector3();
   private goal = new THREE.Vector3();
-  private shown = { yaw: 0, pitch: 22 * DEG, dist: 3.3 };
+  private shown = { yaw: 0, pitch: 28 * DEG, dist: 3.2 };
   reducedMotion = false;
 
   constructor(private cam: THREE.PerspectiveCamera, yaw: number) {
@@ -64,7 +76,7 @@ export class FollowCamera {
   }
 
   /** 바라볼 높이(아바타 발 기준). 세로 화면에서는 더 위를 봐서 바닥이 화면을 덮지 않게 한다. */
-  lookHeight = 0.62;
+  lookHeight = 0.72;
 
   /** 따라갈 점 */
   follow(p: THREE.Vector3, snap = false): void {
@@ -78,7 +90,17 @@ export class FollowCamera {
   }
 
   zoom(factor: number): void {
-    this.distance = THREE.MathUtils.clamp(this.distance * factor, MIN_DIST, MAX_DIST);
+    this.distance = THREE.MathUtils.clamp(this.distance * factor, MIN_DIST, maxOrbitDist());
+  }
+
+  /** 공간 전환 시: 거리·각도를 그 방에 맞게 다시 잡는다. */
+  fitToSpace(preferIdeal = true): void {
+    const max = maxOrbitDist();
+    if (preferIdeal || this.distance > max) this.distance = idealOrbitDist();
+    this.distance = THREE.MathUtils.clamp(this.distance, MIN_DIST, max);
+    this.pitch = THREE.MathUtils.clamp(this.pitch, MIN_PITCH, MAX_PITCH);
+    this.shown.dist = this.distance;
+    this.shown.pitch = this.pitch;
   }
 
   /** 읽기 모드: 아바타 어깨 너머에서 책과 서점이 함께 보이는 구도. 끝나면 원래 오빗으로 돌아간다. */
@@ -96,6 +118,9 @@ export class FollowCamera {
 
   update(dt: number): void {
     const k = (rate: number) => (this.reducedMotion ? 1 : 1 - Math.exp(-rate * dt));
+    const maxD = maxOrbitDist();
+    // 방이 바뀌었거나 줌이 한도를 넘으면 끌어당긴다
+    if (this.distance > maxD) this.distance = maxD;
     this.target.lerp(this.goal, k(6));
     const dy = Math.atan2(Math.sin(this.yaw - this.shown.yaw), Math.cos(this.yaw - this.shown.yaw));
     this.shown.yaw += dy * k(7);
@@ -106,15 +131,18 @@ export class FollowCamera {
       Math.sin(this.shown.pitch),
       Math.cos(this.shown.yaw) * Math.cos(this.shown.pitch),
     );
-    // 줌이 멀수록 벽·천장 여유를 넓혀 서점 전체가 한눈에 들어오게 한다
-    const zoomT = THREE.MathUtils.clamp((this.shown.dist - MIN_DIST) / (MAX_DIST - MIN_DIST), 0, 1);
-    const slack = zoomT * zoomT * 5.2;
-    const d = Math.min(this.shown.dist, roomExit(this.target, dir, slack) - 0.18);
-    const orbitPos = this.target.clone().addScaledVector(dir, Math.max(0.4, d));
-    // 가까이에서는 기존 시야를 유지하고, 멀리 당길수록 시야를 넓혀 구석까지 담는다
-    const nearFov = this.cam.aspect < 0.8 ? 62 : 55;
-    const wide = Math.max(0, (zoomT - 0.3) / 0.7);
-    this.cam.fov = nearFov + wide * wide * 14;
+    // 벽·천장 밖으로 거의 나가지 않음(끼임만 막는 아주 작은 여유)
+    const slack = 0.12;
+    const hit = roomExit(this.target, dir, slack) - 0.22;
+    const d = Math.min(this.shown.dist, Math.max(0.55, hit));
+    const orbitPos = this.target.clone().addScaledVector(dir, d);
+    // 방 안에 남도록 한 번 더 클램프
+    clampInsideRoom(orbitPos, 0.2);
+
+    const zoomT = THREE.MathUtils.clamp((this.shown.dist - MIN_DIST) / Math.max(0.01, maxD - MIN_DIST), 0, 1);
+    const nearFov = this.cam.aspect < 0.8 ? 60 : 52;
+    // 줌 아웃해도 과하게 넓어지지 않게(공간 왜곡·허공 노출 완화)
+    this.cam.fov = nearFov + zoomT * 6;
     this.cam.updateProjectionMatrix();
     // 읽기 모드 구도와 섞기(약 0.8초)
     if (this.focusPose) this.lastFocus = this.focusPose;
@@ -143,7 +171,14 @@ function roomExit(p: THREE.Vector3, dir: THREE.Vector3, slack = 0): number {
     else if (d < -1e-6) t = Math.min(t, (lo - pos) / d);
   };
   axis(p.x, dir.x, ROOM.x0 - slack, ROOM.x1 + slack);
-  axis(p.y, dir.y, 0.05, ROOM.h - 0.12 + slack * 0.85);
+  axis(p.y, dir.y, 0.08, ROOM.h - 0.18 + slack * 0.4);
   axis(p.z, dir.z, ROOM.z0 - slack, ROOM.z1 + slack);
   return t;
+}
+
+/** 카메라 위치를 방 안(약간 안쪽)으로 밀어 넣는다. */
+function clampInsideRoom(p: THREE.Vector3, pad: number): void {
+  p.x = THREE.MathUtils.clamp(p.x, ROOM.x0 + pad, ROOM.x1 - pad);
+  p.y = THREE.MathUtils.clamp(p.y, 0.35, ROOM.h - 0.25);
+  p.z = THREE.MathUtils.clamp(p.z, ROOM.z0 + pad, ROOM.z1 - pad);
 }

@@ -1,10 +1,10 @@
 // 조명: 창 방향 키라이트(그림자), 실내 전구, 반구광, 바닥의 창빛 패치, 약한 환경 반사.
-// 부천 날씨(비·눈·맑음)에 따라 창빛 색·세기를 살짝 바꾼다. 영화감상실은 어둡게.
+// 부천 날씨(비·눈·맑음)에 따라 창빛 색·세기를 살짝 바꾼다. 공간마다 램프 위치를 맞춘다.
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { QualityProfile } from '../core/quality';
 import type { WeatherKind } from '../weather/bucheon';
-import { BACK_OPENINGS, ROOM, type SpaceId } from './layout';
+import { BACK_OPENINGS, ROOM, SPACE_ORDER, type SpaceId } from './layout';
 import type { LampAnchor } from './props/lamps';
 import { windowLightTexture } from './textures';
 
@@ -20,7 +20,14 @@ export interface Lighting {
   setCinemaPlaying(on: boolean): void;
 }
 
-export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene, lamps: LampAnchor[], q: QualityProfile): Lighting {
+const WARM = 0xffb873;
+
+export function buildLighting(
+  renderer: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  lampsBySpace: Partial<Record<SpaceId, LampAnchor[]>>,
+  q: QualityProfile,
+): Lighting {
   const group = new THREE.Group();
   group.name = 'lighting';
 
@@ -41,25 +48,19 @@ export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
   key.shadow.radius = 3;
   group.add(key, target);
 
-  // 실내 전구(2700K 느낌)
-  const warm = 0xffb873;
+  // 공간별 전구(전환 시 위치를 맞춘다)
   const points: THREE.PointLight[] = [];
-  for (const l of lamps) {
-    const p = new THREE.PointLight(warm, l.kind === 'floor' ? 1.4 : 1.5, 0, 2);
-    p.position.copy(l.position);
-    points.push(p);
-    group.add(p);
-  }
-  // 그림자 담당 실내 광원: 평대 위 펜던트에서 아래로 비추는 SpotLight(PointLight 그림자는 6면이라 비용 6배)
-  const islandPendant = lamps.find((l) => l.kind === 'pendant')!;
-  const spot = new THREE.SpotLight(warm, 9, 0, 1.05, 0.85, 2);
-  spot.position.copy(islandPendant.position).add(new THREE.Vector3(0.45, 0.02, 0));
-  spot.target.position.set(spot.position.x, 0, spot.position.z);
+  const spot = new THREE.SpotLight(WARM, 9, 0, 1.05, 0.85, 2);
   spot.shadow.bias = -0.0006;
   spot.shadow.normalBias = 0.02;
   spot.shadow.camera.near = 0.2;
   spot.shadow.camera.far = 4;
   group.add(spot, spot.target);
+
+  // 창 없는 방 보조 필(세미나·강연)
+  const roomFill = new THREE.PointLight(0xffe0b8, 0, 14, 2);
+  roomFill.position.set(0, 2.15, 0.4);
+  group.add(roomFill);
 
   const hemi = new THREE.HemisphereLight(0xf2e1c4, 0x4f3622, 0.65);
   group.add(hemi);
@@ -80,7 +81,7 @@ export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
   soloAmb.position.set(0.15, 1.85, 0.2);
   group.add(soloLamp, soloAmb);
 
-  // 바닥의 창 모양 밝은 영역: 창 네 모서리를 빛 방향으로 바닥에 투영한 평행사변형
+  // 바닥의 창 모양 밝은 영역: 허브 창만(초기 레이아웃 기준)
   const patchTex = windowLightTexture(3, 2);
   const patchMat = new THREE.MeshBasicMaterial({
     color: 0xdde6ee, alphaMap: patchTex, transparent: true, opacity: 0.22,
@@ -95,11 +96,9 @@ export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
       return new THREE.Vector3(x + KEY_DIR.x * t, 0.004, ROOM.z0 + KEY_DIR.z * t);
     });
     const g = new THREE.BufferGeometry();
-    // 창 아래쪽이 벽 가까이, 위쪽이 방 안쪽에 닿는다. uv의 v는 창 높이 방향.
     g.setAttribute('position', new THREE.Float32BufferAttribute(corners.flatMap((c) => [c.x, c.y, c.z]), 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1, 1, 1], 2));
     g.setIndex([0, 2, 1, 1, 2, 3]);
-    // 법선이 없으면 AO 법선 패스에서 NaN이 나와 Bloom이 화면 전체를 검게 번지게 한다.
     g.setAttribute('normal', new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0], 3));
     const m = new THREE.Mesh(g, patchMat);
     m.renderOrder = 1;
@@ -108,7 +107,6 @@ export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
     group.add(m);
   }
 
-  // 아주 약한 환경 반사(나무 니스·유리·금속이 죽지 않게)
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   scene.environmentIntensity = 0.18;
@@ -118,6 +116,42 @@ export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
   let weather: WeatherKind = 'rain';
   let mood: SpaceId = 'hub';
   let cinemaPlaying = false;
+
+  /** 활성 공간의 램프 앵커에 PointLight·Spot을 맞춘다. */
+  const syncSpaceLamps = (space: SpaceId) => {
+    const anchors = lampsBySpace[space] ?? [];
+    while (points.length < anchors.length) {
+      const p = new THREE.PointLight(WARM, 1.5, 0, 2);
+      points.push(p);
+      group.add(p);
+    }
+    for (let i = 0; i < points.length; i++) {
+      const a = anchors[i];
+      const p = points[i]!;
+      if (!a) {
+        p.intensity = 0;
+        p.visible = false;
+        continue;
+      }
+      p.visible = true;
+      p.position.copy(a.position);
+      p.intensity = a.kind === 'floor' ? 1.4 : 1.6;
+      p.distance = 0;
+      p.decay = 2;
+    }
+    const pend = anchors.find((a) => a.kind === 'pendant') ?? anchors[0];
+    if (pend) {
+      spot.visible = true;
+      spot.position.copy(pend.position);
+      if (pend.kind === 'pendant') spot.position.x += 0.35;
+      spot.target.position.set(pend.position.x, 0, pend.position.z);
+      spot.target.updateMatrixWorld();
+      spot.intensity = 8;
+    } else {
+      spot.visible = false;
+      spot.intensity = 0;
+    }
+  };
 
   const tintForWeather = () => {
     if (weather === 'clear') {
@@ -150,17 +184,30 @@ export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
   const applyMood = () => {
     const cinema = mood === 'cinema';
     const solo = mood === 'solo';
+    const seminar = mood === 'seminar';
+    const lecture = mood === 'lecture';
     const playing = cinema && cinemaPlaying;
     const hush = cinema || solo;
-    lamps.forEach((l, i) => {
-      if (points[i]) points[i].intensity = hush ? 0 : (l.kind === 'floor' ? 1.4 : 1.5);
-    });
-    spot.intensity = hush ? 0 : 9;
+
+    // 기본: 공간 램프 동기화(허브·세미나·강연). 영화/1인실은 아래에서 끈다.
+    syncSpaceLamps(mood);
+
+    if (hush) {
+      for (const p of points) p.intensity = 0;
+      spot.intensity = 0;
+      spot.visible = false;
+    }
+
     cinemaFill.intensity = playing ? 0.05 : cinema ? 0.85 : 0;
     cinemaBack.intensity = playing ? 0.02 : cinema ? 0.45 : 0;
     cinemaAmb.intensity = playing ? 0.04 : cinema ? 0.55 : 0;
     soloLamp.intensity = solo ? 2.4 : 0;
     soloAmb.intensity = solo ? 0.55 : 0;
+    // 창 없는 세미나·강연: 테이블/무대 펜던트 + 천장 필
+    roomFill.intensity = seminar ? 1.35 : lecture ? 1.1 : 0;
+    if (seminar) roomFill.position.set(0, 2.2, 0.2);
+    if (lecture) roomFill.position.set(-0.4, 2.25, 0.3);
+
     if (playing) {
       key.intensity = 0.02;
       hemi.intensity = 0.06;
@@ -188,6 +235,20 @@ export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
       for (const m of patches) m.visible = false;
       scene.environmentIntensity = 0.12;
       key.color.setHex(0xffe2b8);
+    } else if (seminar || lecture) {
+      // 창 없음: 키라이트는 약하게, 반구·펜던트·필로 밝게
+      key.intensity = lastQ.shadows ? 0.45 : 0.28;
+      hemi.intensity = lastQ.shadows ? 0.85 : 0.95;
+      hemi.color.setHex(0xfff0dc);
+      hemi.groundColor.setHex(0x5a4030);
+      patchMat.opacity = 0;
+      for (const m of patches) m.visible = false;
+      scene.environmentIntensity = 0.22;
+      // 펜던트 스팟을 테이블/무대 위로
+      if (spot.visible) spot.intensity = seminar ? 10 : 8;
+      for (const p of points) {
+        if (p.visible) p.intensity = Math.max(p.intensity, 1.8);
+      }
     } else {
       for (const m of patches) m.visible = true;
       scene.environmentIntensity = 0.18;
@@ -201,7 +262,6 @@ export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
     if (qq.shadows) key.shadow.mapSize.set(qq.shadowMapSize, qq.shadowMapSize);
     spot.castShadow = qq.shadows && qq.shadowLights >= 2;
     spot.shadow.mapSize.set(1024, 1024);
-    // 그림자가 없으면 키라이트가 벽을 뚫고 방 전체를 비추므로 크게 낮추고 창빛 패치를 키운다.
     key.intensity = qq.shadows ? 1.25 : 0.35;
     patchMat.opacity = qq.shadows ? 0.1 : 0.32;
     hemi.intensity = qq.shadows ? 0.65 : 0.85;
@@ -214,6 +274,12 @@ export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
     spot.shadow.map = null;
     renderer.shadowMap.needsUpdate = true;
   };
+
+  // 허브 램프로 초기화
+  for (const id of SPACE_ORDER) {
+    if (!lampsBySpace[id]) lampsBySpace[id] = [];
+  }
+  syncSpaceLamps('hub');
   applyQuality(q);
 
   const setWeather = (kind: WeatherKind) => {

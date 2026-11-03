@@ -592,6 +592,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     const spawn = SPAWN;
     movement.place(spawn.x, spawn.z, spawn.ry);
     follow.yaw = spawn.ry + Math.PI;
+    follow.fitToSpace(true);
     follow.follow(me.root.position, true);
     setNpcsVisible(npcs, to === 'hub' && params.npc && settings.npc);
     hud.setRoomName(spaceLabel(to));

@@ -139,7 +139,7 @@ export async function buildBookstore(
   const spaces = {} as Record<SpaceId, SpaceView>;
   let totalBooks = 0;
   let totalPlanks = 0;
-  let hubLamps: ReturnType<typeof buildLamps> = [];
+  const lampsBySpace: Partial<Record<SpaceId, ReturnType<typeof buildLamps>>> = {};
   const sharedGlass: { mesh: THREE.Mesh | null } = { mesh: null };
 
   await loading.begin('바닥·벽');
@@ -151,7 +151,7 @@ export async function buildBookstore(
     spaces[id] = built.view;
     totalBooks += built.books;
     totalPlanks += built.planks;
-    if (id === 'hub') hubLamps = built.lamps;
+    lampsBySpace[id] = built.lamps;
     built.view.group.visible = id === 'hub';
     root.add(built.view.group);
   }
@@ -171,7 +171,7 @@ export async function buildBookstore(
   if (sharedGlass.mesh) spaces.hub.group.add(windowRain.mesh);
 
   await loading.begin('조명·후처리');
-  const lighting = buildLighting(renderer, scene, hubLamps, q);
+  const lighting = buildLighting(renderer, scene, lampsBySpace, q);
   root.add(lighting.group);
   const exterior = buildExterior(rng, q.rainParticles);
   root.add(exterior.group);
