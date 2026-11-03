@@ -3,7 +3,7 @@
 import type { QualityLevel } from '../core/params';
 import {
   HAIR_STYLES, OUTFIT_COLORS, saveProfile, saveSettings,
-  type NatureLevel, type Profile, type Settings,
+  type Profile, type Settings,
 } from '../core/storage';
 import type { HairStyle } from '../net/presence';
 import { randomNickname } from '../net/nickname';
@@ -11,7 +11,6 @@ import { Sheet } from './sheet';
 
 const QUALITY_LABEL: Record<Settings['quality'], string> = { auto: '자동', low: '낮음', medium: '보통', high: '높음' };
 const HAIR_LABEL: Record<HairStyle, string> = { bangs: '앞머리', bob: '단발', short: '짧은 머리', curtain: '가르마' };
-const NATURE_LABEL: Record<NatureLevel, string> = { off: '끔', low: '약하게', mid: '보통', high: '크게' };
 
 export interface SettingsHandlers {
   quality(q: QualityLevel | 'auto'): void;
@@ -20,7 +19,7 @@ export interface SettingsHandlers {
   npc(v: boolean): void;
   keyboardMove(v: boolean): void;
   music(v: boolean): void;
-  nature(v: NatureLevel): void;
+  musicVolume(v: number): void;
 }
 
 export class SettingsSheet {
@@ -68,13 +67,12 @@ export class SettingsSheet {
       <fieldset class="field">
         <legend>서점 음악</legend>
         <label class="field-row toggle"><span>잔잔한 배경음악</span><input type="checkbox" data-set="music" /></label>
-        <p class="field-note">상단 소리 버튼을 켠 뒤에 재생돼요.</p>
-      </fieldset>
-      <fieldset class="field">
-        <legend>자연 소리 (비·새)</legend>
-        <div class="seg" role="radiogroup" aria-label="자연 소리">
-          ${(['off', 'low', 'mid', 'high'] as const).map((k) => `<button type="button" role="radio" data-nature="${k}" aria-checked="false">${NATURE_LABEL[k]}</button>`).join('')}
+        <div class="field-row volume-row">
+          <span class="field-label" id="vol-label">볼륨</span>
+          <input type="range" class="volume-slider" data-vol min="0" max="100" step="1" aria-labelledby="vol-label" />
+          <span class="volume-value" data-vol-val aria-hidden="true">45</span>
         </div>
+        <p class="field-note">상단 소리 버튼을 켠 뒤에 재생돼요.</p>
       </fieldset>
       <label class="field field-row toggle"><span>모션 줄이기</span><input type="checkbox" data-set="reducedMotion" /></label>
       <label class="field field-row toggle"><span>NPC 독자 표시</span><input type="checkbox" data-set="npc" /></label>
@@ -108,14 +106,15 @@ export class SettingsSheet {
         this.commitProfile();
       }),
     );
-    b.querySelectorAll<HTMLButtonElement>('[data-nature]').forEach((btn) =>
-      btn.addEventListener('click', () => {
-        this.settings.nature = btn.dataset.nature as NatureLevel;
-        saveSettings(this.settings);
-        this.render();
-        this.h.nature(this.settings.nature);
-      }),
-    );
+    const vol = b.querySelector<HTMLInputElement>('[data-vol]')!;
+    vol.addEventListener('input', () => {
+      const v = Number(vol.value);
+      this.settings.musicVolume = v;
+      saveSettings(this.settings);
+      const label = b.querySelector('[data-vol-val]');
+      if (label) label.textContent = String(v);
+      this.h.musicVolume(v);
+    });
     b.querySelectorAll<HTMLInputElement>('[data-set]').forEach((input) =>
       input.addEventListener('change', () => {
         const key = input.dataset.set as 'reducedMotion' | 'npc' | 'keyboardMove' | 'music';
@@ -152,12 +151,15 @@ export class SettingsSheet {
     b.querySelectorAll<HTMLButtonElement>('[data-q]').forEach((btn) => btn.setAttribute('aria-checked', String(btn.dataset.q === this.settings.quality)));
     b.querySelectorAll<HTMLButtonElement>('[data-color]').forEach((btn) => btn.setAttribute('aria-checked', String(btn.dataset.color === this.profile.color)));
     b.querySelectorAll<HTMLButtonElement>('[data-hair]').forEach((btn) => btn.setAttribute('aria-checked', String(btn.dataset.hair === this.profile.hair)));
-    b.querySelectorAll<HTMLButtonElement>('[data-nature]').forEach((btn) => btn.setAttribute('aria-checked', String(btn.dataset.nature === this.settings.nature)));
     const nick = b.querySelector('.nick');
     if (nick) nick.textContent = this.manager ? `${this.profile.nickname} (대표)` : this.profile.nickname;
     b.querySelectorAll<HTMLInputElement>('[data-set]').forEach((i) => {
       const key = i.dataset.set as 'reducedMotion' | 'npc' | 'keyboardMove' | 'music';
       i.checked = Boolean(this.settings[key]);
     });
+    const vol = b.querySelector<HTMLInputElement>('[data-vol]');
+    if (vol) vol.value = String(this.settings.musicVolume);
+    const volVal = b.querySelector('[data-vol-val]');
+    if (volVal) volVal.textContent = String(this.settings.musicVolume);
   }
 }

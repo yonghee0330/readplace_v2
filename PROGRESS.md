@@ -57,8 +57,20 @@
 - 확인 방법: `npm run typecheck && npm run build`. 시작 화면·HUD 이름, 벽면 문형 포털, 중앙 8석 테이블.
 
 ### 운영자 수정 (2026-11-03) — NPC 서서 읽기 · 1인실 1명 · 서점 BGM
-- 한 일: NPC 4명 고정(중앙 홀 2·세미나 1·계단식 강연 서가 앞 1) — 앉지 않고 서서 책 읽기. 1인실 presence 정원 1, 이용 중이면 「현재 이용 중입니다. 기다려주세요.」 후 허브로. 배경음악 YouTube(`xjOG0beBrgM`) 기본, 설정에서 음악 on/off·자연소리(비·새) 세기. 영화 감상 중에는 BGM·앰비언트 잠시 끔.
-- 확인 방법: `npm run typecheck && npm run build`. 허브·세미나·강연에서 NPC 서서 읽기. 탭 2개로 1인실 동시 입장 시 두 번째 거절. 소리 켜면 BGM·자연소리, 설정에서 조절.
+- 한 일: NPC 4명 고정(중앙 홀 2·세미나 1·계단식 강연 서가 앞 1) — 앉지 않고 서서 책 읽기. 1인실 presence 정원 1, 이용 중이면 「현재 이용 중입니다. 기다려주세요.」 후 허브로. 배경음악 YouTube(`xjOG0beBrgM`) 기본, 설정에서 음악 on/off·볼륨(0–100). 자연소리는 제거. 영화 감상 중에는 BGM·앰비언트 잠시 끔.
+- 확인 방법: `npm run typecheck && npm run build`. 허브·세미나·강연에서 NPC 서서 읽기. 탭 2개로 1인실 동시 입장 시 두 번째 거절. 소리 켜면 BGM, 설정에서 볼륨 조절.
+
+### 운영자 수정 (2026-11-03) — BGM만 · 볼륨 슬라이더
+- 한 일: 자연소리 UI·재생 제거. 설정에 배경음악 볼륨(0–100) 슬라이더 추가, localStorage 유지.
+- 확인 방법: `npm run typecheck && npm run build`. 소리 켠 뒤 설정에서 볼륨 드래그 시 BGM 크기 변함.
+
+### 운영자 수정 (2026-11-03) — 포스트잇 작성·자리 고르기
+- 한 일: 창가 보드 클릭 → 작성 UI(입력 포커스) → 「붙이기」 → 보드에서 자리 클릭. 고스트 미리보기·압정·취소. localStorage(+탭 Broadcast) 유지, Supabase `bbooks_postits` 있으면 공유. 보드 근처 안내 토스트.
+- 확인 방법: `npm run typecheck && npm run build`. 허브 창가 보드 클릭 → 메시지 작성 → 붙이기 → 자리 선택 → 새로고침 후에도 남음.
+
+### 운영자 수정 (2026-11-03) — 포스트잇 Supabase 반영
+- 한 일: `bbooks-meta`에 `bbooks_postits` 테이블·RLS·Realtime publication 적용. 클라이언트에 postgres_changes 구독 추가(폴링 보조).
+- 확인 방법: 기기/탭 2개에서 보드에 붙이면 상대에게도 나타남. `npm run typecheck && npm run build`.
 - SPEC과 달라진 점: NPC는 앉기→서가 앞 서서 읽기(운영자 요청). 서점 음악은 Web Audio 패드 대신 YouTube 임베드(운영자 지정 곡).
 
 ---

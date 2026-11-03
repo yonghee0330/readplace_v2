@@ -1,5 +1,6 @@
-// 가오픈 포스트잇: 타입·색·모양·로컬/Supabase 저장.
+// 가오픈 포스트잇: 타입·색·모양·로컬 캐시 + Supabase 공유(Realtime).
 
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { getSupabase, hasSupabaseConfig } from './supabaseClient';
 
 export type PostitColor = 'yellow' | 'pink' | 'mint' | 'sky' | 'lavender' | 'peach';
@@ -40,11 +41,12 @@ export const POSTIT_MAX_COUNT = 120;
 const LOCAL_KEY = 'bbooks.postits';
 const CHANNEL = 'bbooks:postits';
 
-const SEED: Omit<PostitNote, 'id' | 'createdAt'>[] = [
-  { text: '비북스-M 가오픈을 축하해요!', color: 'yellow', shape: 'square', x: 0.18, y: 0.22, rot: -4, nickname: '비북스' },
-  { text: '창가에서 책 읽는 느낌이 좋아요', color: 'mint', shape: 'round', x: 0.62, y: 0.28, rot: 3, nickname: '비북스' },
-  { text: '불편한 점·바람·인사를 남겨 주세요', color: 'sky', shape: 'tag', x: 0.38, y: 0.58, rot: -2, nickname: '비북스' },
-];
+/** 예전 데모용 샘플(로컬에 남아 있으면 한 번 걷어낸다) */
+const LEGACY_SAMPLES = new Set([
+  '비북스-M 가오픈을 축하해요!',
+  '창가에서 책 읽는 느낌이 좋아요',
+  '불편한 점·바람·인사를 남겨 주세요',
+]);
 
 function newId(): string {
   const a = new Uint8Array(8);
@@ -97,21 +99,27 @@ export class PostitStore {
   private listeners = new Set<PostitListener>();
   private ch: BroadcastChannel | null = null;
   private poll = 0;
+  private rt: RealtimeChannel | null = null;
+  /** Supabase 테이블이 준비됐는지(없으면 로컬만) */
+  remoteReady = false;
 
   async init(): Promise<void> {
-    let notes = readLocal();
-    if (notes.length === 0) {
-      notes = SEED.map((s) => clampNote({ ...s, id: newId(), createdAt: Date.now() })!);
-      writeLocal(notes);
-    }
+    const local = readLocal();
+    let notes = local.filter((n) => !(n.nickname === '비북스' && LEGACY_SAMPLES.has(n.text)));
+    if (notes.length !== local.length) writeLocal(notes);
     if (hasSupabaseConfig()) {
       const remote = await this.fetchRemote();
-      if (remote && remote.length) {
-        notes = this.merge(notes, remote);
+      if (remote) {
+        this.remoteReady = true;
+        notes = this.merge(
+          notes,
+          remote.filter((n) => !(n.nickname === '비북스' && LEGACY_SAMPLES.has(n.text))),
+        );
         writeLocal(notes);
-      } else if (notes.length) {
-        // 원격이 비어 있으면 시드·로컬을 한 번 올려 둔다(실패해도 로컬 유지)
-        for (const n of notes.slice(0, 8)) void this.pushRemote(n);
+        // 원격이 비어 있고 로컬만 있으면 한 번 올린다
+        if (remote.length === 0 && notes.length) {
+          for (const n of notes.slice(0, 8)) void this.pushRemote(n);
+        }
       }
     }
     this.notes = notes;
@@ -124,8 +132,9 @@ export class PostitStore {
         this.upsertLocal(n, false);
       };
     }
-    if (hasSupabaseConfig()) {
-      this.poll = window.setInterval(() => void this.refreshRemote(), 20000);
+    if (this.remoteReady) {
+      this.subscribeRealtime();
+      this.poll = window.setInterval(() => void this.refreshRemote(), 30000);
     }
   }
 
@@ -133,6 +142,49 @@ export class PostitStore {
     this.ch?.close();
     this.ch = null;
     clearInterval(this.poll);
+    const sb = getSupabase();
+    if (this.rt && sb) {
+      void sb.removeChannel(this.rt);
+      this.rt = null;
+    }
+  }
+
+  private subscribeRealtime(): void {
+    const sb = getSupabase();
+    if (!sb || this.rt) return;
+    this.rt = sb
+      .channel('bbooks_postits')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bbooks_postits' },
+        (payload) => {
+          if (payload.eventType === 'DELETE') {
+            const id = (payload.old as { id?: string } | null)?.id;
+            if (!id) return;
+            const next = this.notes.filter((n) => n.id !== id);
+            if (next.length === this.notes.length) return;
+            this.notes = next;
+            writeLocal(this.notes);
+            this.emit();
+            return;
+          }
+          const row = payload.new as Record<string, unknown> | null;
+          if (!row) return;
+          const n = clampNote({
+            id: String(row.id ?? ''),
+            text: String(row.text ?? ''),
+            color: row.color as PostitColor,
+            shape: row.shape as PostitShape,
+            x: Number(row.x),
+            y: Number(row.y),
+            rot: Number(row.rot),
+            nickname: String(row.nickname ?? '손님'),
+            createdAt: row.created_at ? Date.parse(String(row.created_at)) : Date.now(),
+          });
+          if (n) this.upsertLocal(n, false);
+        },
+      )
+      .subscribe();
   }
 
   list(): PostitNote[] {
@@ -224,9 +276,9 @@ export class PostitStore {
 
   private async pushRemote(note: PostitNote): Promise<void> {
     const sb = getSupabase();
-    if (!sb) return;
+    if (!sb || !this.remoteReady) return;
     try {
-      await sb.from('bbooks_postits').upsert({
+      const { error } = await sb.from('bbooks_postits').upsert({
         id: note.id,
         text: note.text,
         color: note.color,
@@ -237,8 +289,9 @@ export class PostitStore {
         nickname: note.nickname,
         created_at: new Date(note.createdAt).toISOString(),
       });
+      if (error) console.warn('[bbooks] postit upsert', error.message);
     } catch {
-      /* 테이블 없으면 로컬만 */
+      /* 오프라인이면 로컬만 */
     }
   }
 

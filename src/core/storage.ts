@@ -23,7 +23,6 @@ export const OUTFIT_COLORS = ['#c9583e', '#e0a53b', '#5b8a5a', '#3f6e8c', '#8a5a
 export const HAIR_STYLES: HairStyle[] = ['bangs', 'bob', 'short'];
 
 export interface Profile { nickname: string; color: string; hair: HairStyle }
-export type NatureLevel = 'off' | 'low' | 'mid' | 'high';
 
 export interface Settings {
   quality: QualityLevel | 'auto';
@@ -32,18 +31,13 @@ export interface Settings {
   sound: boolean;
   /** 유튜브 서점 BGM(기본 켜짐) */
   music: boolean;
-  /** 빗소리·새소리 자연 앰비언트 */
-  nature: NatureLevel;
+  /** BGM 볼륨 0~100 */
+  musicVolume: number;
   keyboardMove: boolean;
   introDismissed: boolean;
 }
 
-export const NATURE_GAIN: Record<NatureLevel, number> = {
-  off: 0,
-  low: 0.28,
-  mid: 0.55,
-  high: 0.85,
-};
+export const DEFAULT_MUSIC_VOLUME = 45;
 
 const PROFILE_KEY = 'bbooks.profile';
 const SETTINGS_KEY = 'bbooks.settings';
@@ -68,12 +62,13 @@ export function loadSettings(): Settings {
     npc: true,
     sound: false,
     music: true,
-    nature: 'mid',
+    musicVolume: DEFAULT_MUSIC_VOLUME,
     keyboardMove: false,
     introDismissed: false,
   });
   if (s.music === undefined) s.music = true;
-  if (!s.nature || !(s.nature in NATURE_GAIN)) s.nature = 'mid';
+  if (!Number.isFinite(s.musicVolume)) s.musicVolume = DEFAULT_MUSIC_VOLUME;
+  s.musicVolume = Math.max(0, Math.min(100, Math.round(s.musicVolume)));
   return s;
 }
 export function saveSettings(s: Settings): void {

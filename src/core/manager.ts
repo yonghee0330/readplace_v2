@@ -2,8 +2,8 @@
 
 export const MANAGER_NICKNAME = '서든리 매니저';
 export const MANAGER_TITLE = '(대표)';
-/** 분홍·모브 티셔츠 */
-export const MANAGER_COLOR = '#d9a0a8';
+/** 먼지 낀 핑크 티셔츠(아바타 본체와 동일) */
+export const MANAGER_COLOR = '#d6b0ab';
 export const MANAGER_SESSION_KEY = 'bbooks.manager';
 
 /** 기본 코드. `VITE_MANAGER_CODE`로 덮어쓸 수 있다. */

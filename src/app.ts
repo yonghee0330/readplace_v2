@@ -14,7 +14,7 @@ import { ROOM_CAPACITY, apiBaseFromWs, resolvePresence, type Params, type Qualit
 import { detectQuality, profileFor, type QualityProfile } from './core/quality';
 import { Rng } from './core/rng';
 import { MANAGER_COLOR, MANAGER_NICKNAME } from './core/manager';
-import { loadProfile, loadSettings, NATURE_GAIN, saveSettings, type Profile, type Settings } from './core/storage';
+import { loadProfile, loadSettings, saveSettings, type Profile, type Settings } from './core/storage';
 import { LocalPresence } from './net/localPresence';
 import { randomNickname } from './net/nickname';
 import { newId, sanitizeSharedBook, type ActionEvent, type Presence, type PlayerState, type SharedBook } from './net/presence';
@@ -33,7 +33,7 @@ import { CinemaWatch } from './ui/cinemaWatch';
 import { PostitWall } from './ui/postitWall';
 import { PostitStore } from './net/postit';
 import {
-  PORTALS, SCREEN, SEATS, SPAWN, SPAWNS, applyLayout, colliders, currentSpaceId, isPresent, spaceLabel,
+  EVENT_BOARD, PORTALS, SCREEN, SEATS, SPAWN, SPAWNS, applyLayout, colliders, currentSpaceId, isPresent, spaceLabel,
   type PortalDef, type SpaceId,
 } from './scene/layout';
 import { buildPostFx, type PostFx } from './scene/postfx';
@@ -172,11 +172,12 @@ export async function startApp(
   const bgm = new BookstoreBgm();
   const sfx = new Sfx(amb);
   amb.setMusicSynth(false);
-  amb.setNatureLevel(NATURE_GAIN[settings.nature]);
+  amb.setNatureLevel(0);
   function applySoundLayers(): void {
     const on = settings.sound;
     amb.setEnabled(on);
-    amb.setNatureLevel(on ? NATURE_GAIN[settings.nature] : 0);
+    amb.setNatureLevel(0);
+    bgm.setVolume(settings.musicVolume);
     bgm.setEnabled(on && settings.music);
   }
   if (settings.sound) {
@@ -264,9 +265,9 @@ export async function startApp(
       settings.music = v;
       if (settings.sound) bgm.setEnabled(v);
     },
-    nature: (v) => {
-      settings.nature = v;
-      amb.setNatureLevel(settings.sound ? NATURE_GAIN[v] : 0);
+    musicVolume: (v) => {
+      settings.musicVolume = v;
+      bgm.setVolume(v);
     },
   }, autoLevel, { manager: isManager });
 
@@ -579,6 +580,7 @@ export async function startApp(
   /** 포털 확인을 거절·닫은 뒤 같은 문 앞에서 바로 다시 뜨지 않게 */
   let portalPromptIgnoreUntil = 0;
   let portalPromptFor: SpaceId | null = null;
+  let boardHintShown = false;
 
   /** 한글 조사: 받침 없거나 ㄹ이면 '로', 있으면 '으로' */
   function particleRo(word: string): string {
@@ -941,6 +943,23 @@ export async function startApp(
         }
       }
     }
+    // 창가 포스트잇 보드 근처면 한 번 안내
+    if (
+      currentSpaceId() === 'hub'
+      && store.eventBoard
+      && !focus.active
+      && !cinemaWatch.active
+      && !postitWall.active
+      && !anySheetOpen()
+      && !boardHintShown
+      && isPresent(EVENT_BOARD)
+    ) {
+      const p = me.root.position;
+      if (Math.hypot(p.x - EVENT_BOARD.x, p.z - EVENT_BOARD.z) < 1.6) {
+        boardHintShown = true;
+        toasts.show('포스트잇 보드를 누르면 메시지를 남길 수 있어요', { duration: 4500, kind: 'guide' });
+      }
+    }
   });
   loop.start();
 
@@ -990,6 +1009,8 @@ export async function startApp(
         placeAtSeat(me, s);
       }
     },
+    postits: () => postitStore.list(),
+    openPostitWall: () => setPostitWall(true),
   };
 
   // 첫 프레임(그림자 포함)이 그려진 뒤 로딩을 걷고 준비 완료 표시

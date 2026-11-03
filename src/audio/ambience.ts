@@ -45,7 +45,7 @@ export class Ambience {
   /** 합성 패드 음악(유튜브 BGM 쓸 때는 끔) */
   musicSynth = false;
   /** 자연 소리(비·새) 0~1. 날씨 버스와 별도로 항상 깔 수 있다. */
-  natureLevel = 0.55;
+  natureLevel = 0;
   enabled = false;
 
   /** 사용자 동작(클릭·키) 안에서만 부른다. 처음이면 AudioContext와 소리 그래프를 만든다. */
@@ -65,12 +65,12 @@ export class Ambience {
     this.sfxBus = ctx.createGain();
     this.sfxBus.gain.value = 0.9;
     this.sfxBus.connect(this.master);
-    // 날씨 버스(시각 연동) + 자연소리 버스(설정으로 항상 비·새 믹스)
+    // 날씨·자연소리는 끔(BGM만 사용). 버스는 두되 게인 0 — 효과음(sfx)만 마스터로.
     this.weatherBus = ctx.createGain();
-    this.weatherBus.gain.value = 0.18;
+    this.weatherBus.gain.value = 0;
     this.weatherBus.connect(this.master);
     this.natureBus = ctx.createGain();
-    this.natureBus.gain.value = this.natureLevel * 0.45;
+    this.natureBus.gain.value = 0;
     this.natureBus.connect(this.master);
     this.rainGain = ctx.createGain();
     this.snowGain = ctx.createGain();
@@ -87,15 +87,14 @@ export class Ambience {
     this.buildRain(ctx, this.rainGain);
     this.buildSnow(ctx, this.snowGain);
     this.buildClear(ctx, this.clearGain);
-    this.buildNatureBed(ctx, this.natureBus);
+    // 자연소리·합성 패드는 쓰지 않음(유튜브 BGM)
     this.buildPad(ctx, this.musicBus);
-    this.applyNatureGain();
     return ctx;
   }
 
-  /** 자연 소리(빗소리·새소리) 세기. 0이면 끔. */
-  setNatureLevel(level: number): void {
-    this.natureLevel = Math.max(0, Math.min(1, level));
+  /** 자연 소리는 더 이상 쓰지 않음(항상 0). */
+  setNatureLevel(_level: number): void {
+    this.natureLevel = 0;
     this.applyNatureGain();
   }
 
@@ -176,59 +175,7 @@ export class Ambience {
     };
   }
 
-  /** 설정용 자연소리 침대: 빗소리 + 새소리(날씨와 무관). */
-  private buildNatureBed(ctx: AudioContext, out: AudioNode): void {
-    const noise = loopSource(ctx, whiteNoise(ctx, 3));
-    const band = ctx.createBiquadFilter();
-    band.type = 'bandpass';
-    band.frequency.value = 1300;
-    band.Q.value = 0.45;
-    const low = ctx.createBiquadFilter();
-    low.type = 'lowpass';
-    low.frequency.value = 4200;
-    const rain = ctx.createGain();
-    rain.gain.value = 0.055;
-    noise.connect(band).connect(low).connect(rain).connect(out);
-    const air = loopSource(ctx, pinkNoise(ctx, 4));
-    const airLp = ctx.createBiquadFilter();
-    airLp.type = 'lowpass';
-    airLp.frequency.value = 220;
-    const airG = ctx.createGain();
-    airG.gain.value = 0.04;
-    air.connect(airLp).connect(airG).connect(out);
-    noise.start();
-    air.start();
-
-    const chirp = () => {
-      if (this.enabled && this.natureLevel > 0.05) {
-        const t = ctx.currentTime + 0.02;
-        const pan = ctx.createStereoPanner();
-        pan.pan.value = Math.random() * 1.4 - 0.7;
-        const notes = 2 + Math.floor(Math.random() * 3);
-        let f0 = 1800 + Math.random() * 1400;
-        for (let i = 0; i < notes; i++) {
-          const o = ctx.createOscillator();
-          const eg = ctx.createGain();
-          const start = t + i * (0.07 + Math.random() * 0.05);
-          const f = f0 * (0.92 + Math.random() * 0.2);
-          o.type = 'sine';
-          o.frequency.setValueAtTime(f, start);
-          o.frequency.exponentialRampToValueAtTime(f * (1.15 + Math.random() * 0.2), start + 0.06);
-          eg.gain.setValueAtTime(0.0001, start);
-          eg.gain.exponentialRampToValueAtTime(0.014 + Math.random() * 0.01, start + 0.012);
-          eg.gain.exponentialRampToValueAtTime(0.0001, start + 0.09);
-          o.connect(eg).connect(pan).connect(out);
-          o.start(start);
-          o.stop(start + 0.12);
-          f0 = f;
-        }
-      }
-      window.setTimeout(chirp, 3200 + Math.random() * 7000);
-    };
-    window.setTimeout(chirp, 2000 + Math.random() * 2500);
-  }
-
-  // ---------- 빗소리(창밖, 작게) ----------
+  // ---------- 빗소리(창밖, 작게) — 버스 게인 0이라 들리지 않음 ----------
   private buildRain(ctx: AudioContext, out: AudioNode): void {
     const noise = loopSource(ctx, whiteNoise(ctx, 3));
     const band = ctx.createBiquadFilter();

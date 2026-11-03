@@ -73,14 +73,19 @@ function drawShape(
 function paintBoard(ctx: CanvasRenderingContext2D, notes: PostitNote[]): void {
   const w = TEX_W;
   const h = TEX_H;
-  // 코르크 바탕
+  // 코르크 바탕(시드 고정 — 노트 갱신 때마다 알갱이가 바뀌지 않게)
   ctx.fillStyle = '#c4a06a';
   ctx.fillRect(0, 0, w, h);
+  let seed = 0xC0C0;
+  const rnd = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 0x100000000;
+  };
   for (let i = 0; i < 1800; i++) {
-    const x = Math.random() * w;
-    const y = Math.random() * h;
-    ctx.fillStyle = Math.random() > 0.5 ? 'rgba(90,60,30,0.12)' : 'rgba(255,230,180,0.1)';
-    ctx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
+    const x = rnd() * w;
+    const y = rnd() * h;
+    ctx.fillStyle = rnd() > 0.5 ? 'rgba(90,60,30,0.12)' : 'rgba(255,230,180,0.1)';
+    ctx.fillRect(x, y, 1 + rnd() * 2, 1 + rnd() * 2);
   }
   // 테두리 안쪽
   ctx.strokeStyle = 'rgba(70,45,20,0.35)';
@@ -89,15 +94,15 @@ function paintBoard(ctx: CanvasRenderingContext2D, notes: PostitNote[]): void {
 
   // 상단 안내
   ctx.fillStyle = '#f3ead8';
-  ctx.fillRect(w * 0.18, 18, w * 0.64, 36);
+  ctx.fillRect(w * 0.08, 16, w * 0.84, 40);
   ctx.strokeStyle = 'rgba(90,70,40,0.3)';
   ctx.lineWidth = 2;
-  ctx.strokeRect(w * 0.18, 18, w * 0.64, 36);
+  ctx.strokeRect(w * 0.08, 16, w * 0.84, 40);
   ctx.fillStyle = '#2c2a24';
-  ctx.font = '700 20px "Noto Serif KR", serif';
+  ctx.font = '700 16px "Noto Serif KR", serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('가오픈 포스트잇', w / 2, 36);
+  ctx.fillText('b.books-M 공간이 생겼어요!', w / 2, 36);
 
   for (const n of notes) {
     const pw = 78;
@@ -176,9 +181,11 @@ export function buildEventBoard(bucket: MergeBucket): EventBoardProp | null {
     map: tex,
     roughness: 0.92,
     metalness: 0,
+    side: THREE.DoubleSide,
   });
-  const hitMesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
-  hitMesh.position.set(0, yCenter, depth / 2 + 0.01);
+  // 클릭 영역을 조금 넓혀 창가에서도 잘 잡히게 한다
+  const hitMesh = new THREE.Mesh(new THREE.PlaneGeometry(w + 0.08, h + 0.08), mat);
+  hitMesh.position.set(0, yCenter, depth / 2 + 0.02);
   hitMesh.name = 'event-board-face';
   hitMesh.userData.eventBoard = true;
 
