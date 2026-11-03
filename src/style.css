@@ -131,6 +131,84 @@ button { font: inherit; }
   line-height: 1.25;
   color: #f7efe0;
 }
+/* 제목의 M — 겉으론 글자, 누르면 매니저 코드 입력 */
+.start-m-secret {
+  appearance: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: default;
+  vertical-align: baseline;
+}
+.start-m-secret:focus-visible {
+  outline: 2px solid rgba(196, 164, 106, 0.7);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.manager-gate {
+  z-index: 22;
+  background: rgba(14, 12, 10, 0.72);
+  backdrop-filter: blur(6px);
+}
+.manager-gate-card {
+  width: min(360px, calc(100vw - 32px));
+  padding: 28px 24px 22px;
+  border-radius: 16px;
+  background: #f7f1e5;
+  color: var(--green);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  text-align: center;
+}
+.manager-gate-kicker {
+  margin: 0 0 6px;
+  font: 500 12px/1.3 var(--serif);
+  letter-spacing: 0.14em;
+  color: #8a7a65;
+}
+.manager-gate-title {
+  margin: 0;
+  font: 700 22px/1.3 var(--serif);
+}
+.manager-gate-copy {
+  margin: 10px 0 18px;
+  font-size: 14px;
+  color: #5b4f40;
+  line-height: 1.55;
+}
+.manager-gate-label { display: block; }
+.manager-gate-input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid rgba(36, 37, 31, 0.18);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font: 500 16px/1.3 var(--sans);
+  text-align: center;
+  letter-spacing: 0.08em;
+  background: #fff;
+  color: var(--green);
+}
+.manager-gate-input:focus {
+  outline: 2px solid #8a5a22;
+  outline-offset: 1px;
+}
+.manager-gate-error {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: #a33;
+}
+.manager-gate-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 8px;
+  margin-top: 18px;
+}
+.manager-gate-actions .btn { min-height: 44px; width: 100%; justify-content: center; }
 .start-copy {
   margin: 14px 0 22px;
   font-family: var(--serif);
@@ -218,7 +296,7 @@ button { font: inherit; }
 .icon { width: 20px; height: 20px; flex: none; }
 #ui { position: fixed; inset: 0; z-index: 10; pointer-events: none; font-family: var(--sans); }
 #ui > * { pointer-events: none; }
-#ui button, #ui select, #ui label, #ui input, #ui .pill, #ui .sheet-backdrop, #ui .toast, #ui .book-badge-hit, #ui .cinema-watch { pointer-events: auto; }
+#ui button, #ui select, #ui label, #ui input, #ui textarea, #ui .pill, #ui .sheet-backdrop, #ui .toast, #ui .book-badge-hit, #ui .cinema-watch, #ui .postit-wall { pointer-events: auto; }
 
 /* 머리 위 책 배지 HTML 히트(투명 버튼, 3D 배지 위에 맞춤) */
 .book-badge-hits { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
@@ -573,6 +651,183 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   color: #f3ead8;
 }
 
+/* ---------- 가오픈 포스트잇 월 ---------- */
+.postit-wall {
+  position: absolute; inset: 0; z-index: 6;
+  opacity: 0; transition: opacity 0.4s ease;
+  display: grid; place-items: center;
+}
+.postit-wall.is-in { opacity: 1; }
+.postit-wall-dim {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at center, rgba(30, 22, 14, 0.55) 0%, rgba(12, 10, 8, 0.92) 75%);
+  cursor: pointer;
+}
+.postit-wall-stage {
+  position: relative; z-index: 1;
+  width: min(720px, calc(100vw - 20px));
+  max-height: min(92vh, 900px);
+  display: flex; flex-direction: column; gap: 12px;
+  pointer-events: none;
+}
+.postit-wall-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  color: #f3ead8;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+}
+.postit-wall-kicker {
+  margin: 0 0 2px;
+  font: 500 12px/1.3 var(--serif);
+  letter-spacing: 0.12em;
+  opacity: 0.75;
+}
+.postit-wall-title {
+  margin: 0;
+  font: 700 24px/1.25 var(--serif);
+}
+.postit-wall-lead {
+  margin: 6px 0 0;
+  font-size: 13px;
+  opacity: 0.85;
+  line-height: 1.5;
+}
+.postit-wall-exit {
+  background: rgba(20, 16, 12, 0.72);
+  color: #f3ead8;
+  flex: none;
+}
+.postit-board {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 512 / 460;
+  max-height: min(52vh, 480px);
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(255, 230, 180, 0.18), transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(90, 60, 30, 0.2), transparent 45%),
+    #c4a06a;
+  box-shadow:
+    inset 0 0 0 8px rgba(70, 45, 20, 0.28),
+    0 18px 50px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  pointer-events: auto;
+  touch-action: none;
+}
+.postit-board.is-placing {
+  cursor: crosshair;
+  outline: 2px dashed rgba(255, 220, 150, 0.7);
+  outline-offset: -10px;
+}
+.postit-note {
+  position: absolute;
+  width: 96px;
+  min-height: 88px;
+  padding: 14px 10px 18px;
+  background: var(--c, #ffe566);
+  box-shadow: 2px 3px 0 rgba(40, 25, 10, 0.18);
+  color: #2a241c;
+  pointer-events: none;
+}
+.postit-note.shape-round { border-radius: 14px; }
+.postit-note.shape-square { border-radius: 2px; }
+.postit-note.shape-tag {
+  border-radius: 2px 8px 8px 2px;
+  clip-path: polygon(12% 0, 100% 0, 100% 100%, 12% 100%, 0 50%);
+  padding-left: 16px;
+}
+.postit-note.shape-heart {
+  width: 92px;
+  min-height: 86px;
+  border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
+  display: grid;
+  place-items: center;
+  padding: 22px 12px 16px;
+}
+.postit-note-text {
+  margin: 0;
+  font: 600 12px/1.35 var(--sans);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.postit-note-nick {
+  display: block;
+  margin-top: 6px;
+  font-size: 10px;
+  opacity: 0.55;
+}
+.postit-composer {
+  pointer-events: auto;
+  background: rgba(247, 241, 229, 0.96);
+  border-radius: 14px;
+  padding: 12px 14px 14px;
+  color: var(--green);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+  display: grid;
+  gap: 10px;
+}
+.postit-composer.is-placing {
+  box-shadow: 0 0 0 2px #c08a4e, 0 12px 36px rgba(0, 0, 0, 0.28);
+}
+.postit-swatches, .postit-shapes {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.postit-swatch {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 2px solid transparent;
+  background: var(--c);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+.postit-swatch[aria-checked='true'] {
+  border-color: var(--green);
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--green);
+}
+.postit-shape {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(36, 37, 31, 0.18);
+  background: #fff;
+  cursor: pointer;
+  font: 500 13px/1 var(--sans);
+  color: var(--green);
+}
+.postit-shape[aria-checked='true'] {
+  background: var(--green);
+  color: var(--paper);
+  border-color: var(--green);
+}
+.postit-input-wrap { position: relative; display: block; }
+.postit-input {
+  width: 100%;
+  resize: none;
+  border: 1px solid rgba(36, 37, 31, 0.16);
+  border-radius: 10px;
+  padding: 10px 12px 24px;
+  font: 500 15px/1.45 var(--sans);
+  background: #fff;
+  color: var(--green);
+}
+.postit-count {
+  position: absolute; right: 10px; bottom: 8px;
+  font-size: 11px; color: #8a7a65;
+}
+.postit-composer-actions {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.postit-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #6b5d4b;
+  line-height: 1.4;
+  flex: 1;
+}
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
 @media (max-width: 520px) {
   .pill-text { display: none; }
   .pill { min-height: 38px; }
@@ -616,9 +871,17 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   .book-card-cover { width: 40px; height: 58px; }
   .book-card.is-focus .book-card-cover { width: 52px; height: 76px; }
   .book-card-title { font-size: 13px; }
+  .postit-wall-stage { width: calc(100vw - 12px); gap: 8px; }
+  .postit-wall-title { font-size: 20px; }
+  .postit-board { max-height: 42vh; }
+  .postit-note { width: 78px; min-height: 72px; padding: 12px 8px 14px; }
+  .postit-note-text { font-size: 11px; }
+  .postit-composer { padding: 10px 12px 12px; border-radius: 12px 12px 0 0; }
+  .postit-composer-actions { flex-direction: column; align-items: stretch; }
+  .postit-composer-actions .btn { width: 100%; min-height: 46px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hud, .toast, .sheet-backdrop, .focus, .action, .pill { transition: none; }
+  .hud, .toast, .sheet-backdrop, .focus, .action, .pill, .postit-wall { transition: none; }
 }
 /* 설정의 "모션 줄이기"도 시스템 설정과 똑같이 전환 연출을 끈다 */
 .reduce-motion .hud, .reduce-motion .toast, .reduce-motion .sheet-backdrop, .reduce-motion .focus,

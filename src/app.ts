@@ -13,6 +13,7 @@ import { Loop } from './core/loop';
 import { ROOM_CAPACITY, apiBaseFromWs, resolvePresence, type Params, type QualityLevel } from './core/params';
 import { detectQuality, profileFor, type QualityProfile } from './core/quality';
 import { Rng } from './core/rng';
+import { MANAGER_COLOR, MANAGER_NICKNAME } from './core/manager';
 import { loadProfile, loadSettings, NATURE_GAIN, saveSettings, type Profile, type Settings } from './core/storage';
 import { LocalPresence } from './net/localPresence';
 import { randomNickname } from './net/nickname';
@@ -29,6 +30,8 @@ import { BookBadgeHits } from './ui/bookBadgeHits';
 import { BookPeekSheet } from './ui/bookPeek';
 import { BookSheet } from './ui/bookSheet';
 import { CinemaWatch } from './ui/cinemaWatch';
+import { PostitWall } from './ui/postitWall';
+import { PostitStore } from './net/postit';
 import {
   PORTALS, SCREEN, SEATS, SPAWN, SPAWNS, applyLayout, colliders, currentSpaceId, isPresent, spaceLabel,
   type PortalDef, type SpaceId,
@@ -45,10 +48,23 @@ import { fetchBucheonWeather, weatherAria, type WeatherInfo } from './weather/bu
 
 const NOD_COOLDOWN = 3000;
 
-export async function startApp(params: Params, canvas: HTMLCanvasElement, loading: LoadingScreen, systemReducedMotion: boolean): Promise<void> {
+export async function startApp(
+  params: Params,
+  canvas: HTMLCanvasElement,
+  loading: LoadingScreen,
+  systemReducedMotion: boolean,
+  opts: { manager?: boolean } = {},
+): Promise<void> {
+  const isManager = !!opts.manager;
   const settings: Settings = loadSettings();
   if (systemReducedMotion) settings.reducedMotion = settings.reducedMotion || systemReducedMotion;
   const profile: Profile = loadProfile();
+  if (isManager) {
+    // 매니저 계정은 고정 닉·외형(일반 프로필과 분리)
+    profile.nickname = MANAGER_NICKNAME;
+    profile.color = MANAGER_COLOR;
+    profile.hair = 'curtain';
+  }
   const reducedMotion = () => settings.reducedMotion;
   const applyMotionClass = () => document.documentElement.classList.toggle('reduce-motion', settings.reducedMotion);
   applyMotionClass();
@@ -87,8 +103,15 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   scene.add(crowd.group, crowd.overlay);
   const myId = newId();
   // 탭마다 닉네임이 겹치면 이 탭에서만 다시 뽑는다(저장된 프로필은 그대로)
-  let sessionNick = profile.nickname;
-  const me: Actor = crowd.add(myId, 'me', sessionNick, profile, true);
+  let sessionNick = isManager ? MANAGER_NICKNAME : profile.nickname;
+  const meLook = isManager
+    ? { color: MANAGER_COLOR, hair: 'curtain' as const, manager: true }
+    : { color: profile.color, hair: profile.hair };
+  const me: Actor = crowd.add(myId, 'me', sessionNick, meLook, true);
+  if (isManager) {
+    me.isManager = true;
+    me.accent = MANAGER_COLOR;
+  }
   const npcs = spawnNpcs(crowd, rng);
   const refreshNpcs = () => syncNpcVisibility(npcs, currentSpaceId(), params.npc && settings.npc);
   refreshNpcs();
@@ -115,6 +138,12 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   const toasts = new Toasts(ui);
   const focus = new FocusMode(ui, () => setFocus(false));
   const cinemaWatch = new CinemaWatch(ui, () => setCinemaWatch(false));
+  const postitStore = new PostitStore();
+  const postitWall = new PostitWall(ui, postitStore, () => sessionNick, () => setPostitWall(false));
+  void postitStore.init().then(() => {
+    store.eventBoard?.setNotes(postitStore.list());
+    postitStore.onChange((notes) => store.eventBoard?.setNotes(notes));
+  });
   const bookCard = new BookCard(ui);
   const bookSheet = new BookSheet();
   const bookPeek = new BookPeekSheet();
@@ -217,6 +246,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   const settingsSheet = new SettingsSheet(settings, profile, {
     quality: (s) => applyQuality(levelFor(s)),
     profile: (p) => {
+      if (isManager) return;
       sessionNick = p.nickname;
       me.avatar.setLook(p);
       me.nickname = p.nickname;
@@ -238,12 +268,12 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       settings.nature = v;
       amb.setNatureLevel(settings.sound ? NATURE_GAIN[v] : 0);
     },
-  }, autoLevel);
+  }, autoLevel, { manager: isManager });
 
   // 첫 진입 안내
   if (!settings.introDismissed && !params.cam && !params.autoread) {
-    toasts.show('가오픈 중이에요. 편하게 둘러보시고 의견 남겨 주세요', {
-      duration: 7000,
+    toasts.show('창가 포스트잇 보드에 인사·바람·제보를 남겨 주세요', {
+      duration: 7500,
       kind: 'guide',
       action: {
         label: '다시 보지 않기',
@@ -269,9 +299,17 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   function myState(): PlayerState {
     const p = me.root.position;
     return {
-      id: myId, nickname: sessionNick, color: profile.color, hair: profile.hair,
-      position: [round(p.x), round(p.y), round(p.z)], rotationY: round(me.root.rotation.y),
-      state: movement.state, seatId: movement.seatId, book: sharedBook(), t: Date.now(),
+      id: myId,
+      nickname: sessionNick,
+      color: isManager ? MANAGER_COLOR : profile.color,
+      hair: isManager ? 'curtain' : profile.hair,
+      position: [round(p.x), round(p.y), round(p.z)],
+      rotationY: round(me.root.rotation.y),
+      state: movement.state,
+      seatId: movement.seatId,
+      book: sharedBook(),
+      role: isManager ? 'manager' : null,
+      t: Date.now(),
     };
   }
   function pushState(force = false): void {
@@ -310,13 +348,17 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     for (const s of peers.values()) {
       let a = crowd.get(s.id);
       if (!a) {
-        a = crowd.add(s.id, 'peer', s.nickname, { color: s.color, hair: s.hair }, true);
+        a = crowd.add(s.id, 'peer', s.nickname, {
+          color: s.color,
+          hair: s.role === 'manager' ? 'curtain' : s.hair,
+          manager: s.role === 'manager',
+        }, true);
         a.root.position.set(...s.position);
         a.root.rotation.y = s.rotationY;
       }
       a.pushRemote(s, now);
-      // 닉네임이 겹치면 id가 큰 쪽이 이 탭에서만 다시 뽑는다
-      if (s.nickname === sessionNick && myId > s.id) {
+      // 닉네임이 겹치면 id가 큰 쪽이 이 탭에서만 다시 뽑는다(매니저는 고정)
+      if (!isManager && s.nickname === sessionNick && myId > s.id) {
         sessionNick = randomNickname();
         me.nickname = sessionNick;
         pushState(true);
@@ -461,6 +503,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     if (on) {
       if (!connected) return;
       if (cinemaWatch.active) setCinemaWatch(false);
+      if (postitWall.active) setPostitWall(false);
       // 이미 책을 펼친 상태면 같은 책으로 바로 집중 모드
       if (movement.reading && currentBook) {
         enterFocusWith(currentBook);
@@ -483,6 +526,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     if (on === cinemaWatch.active) return;
     if (on) {
       if (focus.active) setFocus(false);
+      if (postitWall.active) setPostitWall(false);
       // 영화 소리와 겹치지 않게 서점 BGM·앰비언트 잠시 끔
       amb.setEnabled(false);
       bgm.setEnabled(false);
@@ -497,6 +541,21 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     hud.setHidden(false);
     me.hideLabel = false;
     if (settings.sound) applySoundLayers();
+  }
+
+  function setPostitWall(on: boolean): void {
+    if (on === postitWall.active) return;
+    if (on) {
+      if (focus.active) setFocus(false);
+      if (cinemaWatch.active) setCinemaWatch(false);
+      postitWall.enter();
+      hud.setHidden(true);
+      me.hideLabel = true;
+      return;
+    }
+    postitWall.exit();
+    hud.setHidden(false);
+    me.hideLabel = false;
   }
 
   /** 읽기 모드 구도: 책 읽는 내 아바타를 앞쪽 비스듬한 위에서 본다(머리가 큰 아바타라 어깨 너머로는 책이 가려짐). */
@@ -568,7 +627,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   }
 
   function askEnterPortal(portal: PortalDef, opts?: { fromMenu?: boolean }): void {
-    if (switchingSpace || focus.active || cinemaWatch.active || anySheetOpen()) return;
+    if (switchingSpace || focus.active || cinemaWatch.active || postitWall.active || anySheetOpen()) return;
     if (portal.to === currentSpaceId()) return;
     if (!opts?.fromMenu && !portalUsable(portal)) return;
     const name = spaceLabel(portal.to);
@@ -614,6 +673,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   async function enterSpace(to: SpaceId, via?: PortalDef): Promise<void> {
     if (switchingSpace || to === currentSpaceId() || focus.active) return;
     if (cinemaWatch.active) setCinemaWatch(false);
+    if (postitWall.active) setPostitWall(false);
     switchingSpace = true;
     if (movement.reading) {
       movement.setReading(false);
@@ -686,7 +746,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   });
 
   function clickAt(clientX: number, clientY: number): void {
-    if (focus.active || cinemaWatch.active || anySheetOpen()) return;
+    if (focus.active || cinemaWatch.active || postitWall.active || anySheetOpen()) return;
     const rect = canvas.getBoundingClientRect();
     // 머리 위 책 배지: 화면 좌표 히트(오버레이 레이어·빌보드 뒷면 문제 없음)
     const badgeActor = crowd.pickBookBadge(clientX, clientY, camera, rect);
@@ -697,11 +757,19 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       -((clientY - rect.top) / rect.height) * 2 + 1,
     );
     ray.setFromCamera(ndc, camera);
-    const hits = ray.intersectObjects([...hitGroup.children, store.floor], false);
+    const boardMesh = store.eventBoard?.hitMesh;
+    const targets = boardMesh && currentSpaceId() === 'hub'
+      ? [boardMesh, ...hitGroup.children, store.floor]
+      : [...hitGroup.children, store.floor];
+    const hits = ray.intersectObjects(targets, false);
     const hit = hits[0];
     if (!hit) return;
     if (hit.object.userData.screen) {
       setCinemaWatch(true);
+      return;
+    }
+    if (hit.object.userData.eventBoard) {
+      setPostitWall(true);
       return;
     }
     const portal = hit.object.userData.portal as PortalDef | undefined;
@@ -731,9 +799,9 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     },
   });
 
-  // 책 배지 위에 올리면 포인터로 클릭 가능함을 알린다
+  // 책 배지·보드·스크린 위에 올리면 포인터로 클릭 가능함을 알린다
   canvas.addEventListener('pointermove', (e) => {
-    if (focus.active || cinemaWatch.active || anySheetOpen()) {
+    if (focus.active || cinemaWatch.active || postitWall.active || anySheetOpen()) {
       canvas.style.cursor = '';
       return;
     }
@@ -742,12 +810,20 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       canvas.style.cursor = 'pointer';
       return;
     }
+    const ndc = new THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    ray.setFromCamera(ndc, camera);
+    const board = store.eventBoard?.hitMesh;
+    if (board && currentSpaceId() === 'hub') {
+      const bh = ray.intersectObject(board, false);
+      if (bh[0]) {
+        canvas.style.cursor = 'pointer';
+        return;
+      }
+    }
     if (isPresent(SCREEN) && SCREEN.w > 0.1) {
-      const ndc = new THREE.Vector2(
-        ((e.clientX - rect.left) / rect.width) * 2 - 1,
-        -((e.clientY - rect.top) / rect.height) * 2 + 1,
-      );
-      ray.setFromCamera(ndc, camera);
       const hits = ray.intersectObjects(hitGroup.children, false);
       if (hits[0]?.object.userData.screen) {
         canvas.style.cursor = 'pointer';
@@ -765,11 +841,12 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     if (e.key === 'Escape') {
       // 시트가 열려 있으면 시트를 먼저 닫는다(포커스가 시트 밖에 있어도)
       if (anySheetOpen()) closeOpenSheet();
+      else if (postitWall.active) setPostitWall(false);
       else if (cinemaWatch.active) setCinemaWatch(false);
       else if (focus.active) setFocus(false);
       return;
     }
-    if (anySheetOpen() || cinemaWatch.active) return;
+    if (anySheetOpen() || cinemaWatch.active || postitWall.active) return;
     if (e.key === '1') nod();
     else if (e.key === '2') toggleBook();
     else if (e.key === '3') setFocus(!focus.active);
@@ -844,7 +921,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       follow.update(dt);
     }
     crowd.update(dt, t, camera);
-    badgeHits.sync(crowd, camera, canvas, !focus.active && !cinemaWatch.active && !anySheetOpen());
+    badgeHits.sync(crowd, camera, canvas, !focus.active && !cinemaWatch.active && !postitWall.active && !anySheetOpen());
     ring.update(dt);
     {
       const p = me.root.position;
@@ -852,7 +929,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       store.updatePortals(t, { x: p.x, z: p.z, ry: lookYaw(), space: currentSpaceId() });
     }
     // 빛나는 문 앞에 서면 확인만 띄움(자동 전환 없음). 포털끼리 직접 연결하지 않음.
-    if (!focus.active && !cinemaWatch.active && !anySheetOpen() && performance.now() > portalPromptIgnoreUntil) {
+    if (!focus.active && !cinemaWatch.active && !postitWall.active && !anySheetOpen() && performance.now() > portalPromptIgnoreUntil) {
       const p = me.root.position;
       for (const portal of PORTALS) {
         if (!portalUsable(portal)) continue;

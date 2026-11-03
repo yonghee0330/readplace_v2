@@ -156,7 +156,32 @@ function buildStool(bucket: MergeBucket, r: Rng, m: THREE.Matrix4): void {
   woodPart(bucket, r, 'honey', bevelBox(0.016, 0.016, legR * 2 - 0.04, 0.003), 'z', at(trs(0, 0.14, 0)));
 }
 
-/** 창가 바테이블(높은 상판 + 다리). */
+/** 높은 바 스툴(창가 바테이블용). seatH≈0.72. m은 바닥 중앙. */
+function buildBarStool(bucket: MergeBucket, r: Rng, m: THREE.Matrix4, seatH = 0.72): void {
+  const at = (mm: THREE.Matrix4) => m.clone().multiply(mm);
+  const top = new THREE.CylinderGeometry(0.175, 0.185, 0.032, 20);
+  projectUV(top, 'y', { offset: [r.float(), r.float()] });
+  bucket.add('honey', top, at(trs(0, seatH - 0.016, 0)), new THREE.Color(1, 1, 1).multiplyScalar(0.92 + r.range(0, 0.06)));
+  const cush = new THREE.CylinderGeometry(0.16, 0.16, 0.03, 18);
+  projectUV(cush, 'y', { along: 0.28, across: 0.28 });
+  bucket.add('cushion', cush, at(trs(0, seatH + 0.014, 0)));
+  // 가느다란 네 다리 + 발받침 링
+  const legR = 0.14;
+  for (const a of [0.55, 2.15, 3.75, 5.35]) {
+    const lx = Math.cos(a) * legR;
+    const lz = Math.sin(a) * legR;
+    woodPart(bucket, r, 'walnut', taperLeg(seatH - 0.028, 0.028, 0.018), 'y', at(trs(lx, 0, lz)));
+  }
+  const railY = seatH * 0.42;
+  woodPart(bucket, r, 'walnut', bevelBox(legR * 2 - 0.02, 0.014, 0.014, 0.003), 'x', at(trs(0, railY, 0)));
+  woodPart(bucket, r, 'walnut', bevelBox(0.014, 0.014, legR * 2 - 0.02, 0.003), 'z', at(trs(0, railY, 0)));
+  // 위쪽 보강 가로대
+  const railY2 = seatH * 0.72;
+  woodPart(bucket, r, 'walnut', bevelBox(legR * 1.6, 0.012, 0.012, 0.002), 'x', at(trs(0, railY2, 0)));
+  woodPart(bucket, r, 'walnut', bevelBox(0.012, 0.012, legR * 1.6, 0.002), 'z', at(trs(0, railY2, 0)));
+}
+
+/** 창가 바테이블(높은 상판 + 다리) + 바 스툴. */
 export function buildBarTable(bucket: MergeBucket, rng: Rng, books: BookCollector): void {
   if (!isPresent(BAR_TABLE) || BAR_TABLE.w < 0.1) return;
   const r = rng.fork('bar');
@@ -171,6 +196,14 @@ export function buildBarTable(bucket: MergeBucket, rng: Rng, books: BookCollecto
   stackBooks(at(trs(-w * 0.25, h, 0, 0, 0.2)), r, books, 2);
   const mug = new THREE.CylinderGeometry(0.038, 0.035, 0.09, 16);
   bucket.add('ceramic', mug, at(trs(w * 0.2, h + 0.045, 0)), 0xe8dfd0);
+
+  // 손님 쪽(+z, 방 안)에 높은 바 스툴 3개 — 좌석 bar-1..3과 맞춤
+  const stoolZ = 0.35;
+  const stoolXs = [-0.85, 0, 0.85];
+  stoolXs.forEach((sx, i) => {
+    const pos = new THREE.Vector3(sx, 0, stoolZ).applyMatrix4(base);
+    buildBarStool(bucket, r.fork(`stool-${i}`), trs(pos.x, 0, pos.z, 0, ry + Math.PI), 0.72);
+  });
 }
 
 export function buildCounter(bucket: MergeBucket, rng: Rng, books: BookCollector): void {

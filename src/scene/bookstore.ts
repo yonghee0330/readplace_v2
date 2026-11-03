@@ -18,6 +18,7 @@ import {
 } from './props/furniture';
 import { buildLamps } from './props/lamps';
 import { buildPlant } from './props/plants';
+import { buildEventBoard, type EventBoardProp } from './props/eventBoard';
 import { buildPortalGlow, buildPortals, type PortalGlow } from './props/portals';
 import { buildCeiling, buildFloor, buildWalls } from './props/room';
 import { buildShelves } from './props/shelf';
@@ -34,6 +35,7 @@ export interface SpaceView {
   group: THREE.Group;
   floor: THREE.Object3D;
   portalGlow: PortalGlow;
+  eventBoard: EventBoardProp | null;
 }
 
 export interface Bookstore {
@@ -44,6 +46,7 @@ export interface Bookstore {
   floor: THREE.Object3D;
   spaces: Record<SpaceId, SpaceView>;
   activeSpace: SpaceId;
+  eventBoard: EventBoardProp | null;
   setActiveSpace: (id: SpaceId) => void;
   updatePortals: (t: number, viewer?: { x: number; z: number; ry: number; space: SpaceId }) => void;
   stats: { books: number; planks: number };
@@ -63,6 +66,7 @@ function buildOneSpace(
   const group = new THREE.Group();
   group.name = `space:${id}`;
   const portalGlow = buildPortalGlow();
+  const eventBoard = id === 'hub' ? buildEventBoard(bucket) : null;
 
   const planks = buildFloor(bucket, rng.fork(`${id}-floor`));
   buildWalls(bucket, rng.fork(`${id}-walls`));
@@ -113,10 +117,11 @@ function buildOneSpace(
   group.add(bucket.build(mats, { castShadow: (n) => !NO_SHADOW.has(n) }));
   group.add(books.build(mats.bookCover as THREE.MeshStandardMaterial, mats.bookPages));
   group.add(portalGlow.group);
+  if (eventBoard) group.add(eventBoard.group);
   const floor = group.getObjectByName('merged:floor')!;
   floor.name = `merged:floor:${id}`;
   return {
-    view: { id, group, floor, portalGlow },
+    view: { id, group, floor, portalGlow, eventBoard },
     books: books.items.length,
     planks,
     lamps,
@@ -201,6 +206,7 @@ export async function buildBookstore(
     floor: spaces.hub.floor,
     spaces,
     activeSpace,
+    eventBoard: spaces.hub.eventBoard,
     setActiveSpace,
     updatePortals: (t: number, viewer?: { x: number; z: number; ry: number; space: SpaceId }) =>
       spaces[activeSpace]?.portalGlow.update(t, viewer),

@@ -57,6 +57,8 @@ export interface SpaceLayout {
   bench: (Placement & { w: number; d: number; h: number }) | null;
   /** 창가 바테이블(높은 테이블) */
   barTable: (Placement & { w: number; d: number; h: number }) | null;
+  /** 가오픈 포스트잇 이벤트 보드(허브 창가) */
+  eventBoard: { x: number; z: number; ry: number; w: number; h: number } | null;
   counter: (Placement & { w: number; d: number; h: number }) | null;
   floorLamps: Placement[];
   pendants: { x: number; z: number; drop: number }[];
@@ -110,7 +112,7 @@ function emptyBase(id: SpaceId, label: string, room: RoomBounds): Omit<SpaceLayo
     seminarTable: null, seminarChairs: [], whiteboard: null, seminarMonitor: null,
     soloDesk: null, soloChair: null,
     sofa: null, coffeeTable: null, rug: null, screen: null,
-    theater: null, stage: null, bench: null, barTable: null, counter: null,
+    theater: null, stage: null, bench: null, barTable: null, eventBoard: null, counter: null,
   };
 }
 
@@ -165,6 +167,8 @@ function makeHub(): SpaceLayout {
     readingTable: { x: 0, z: 0, ry: 0, w: tableW, d: tableD, h: 0.74 },
     chairs,
     barTable: { x: 0.15, z: -3.05, ry: 0, w: 2.4, d: 0.42, h: 1.05 },
+    // 창가 바 왼쪽 벽 — 가오픈 포스트잇 코르크 보드
+    eventBoard: { x: -1.15, z: -3.42, ry: 0, w: 1.55, h: 1.4 },
     counter: { x: -2.55, z: 2.55, ry: 0.15, w: 1.35, d: 0.52, h: 0.98 },
     sofa,
     coffeeTable: { x: 1.85, z: 2.05, ry: Math.PI / 2, w: 0.75, d: 0.42, h: 0.4 },
@@ -418,6 +422,7 @@ export function applyLayout(id: SpaceId): SpaceLayout {
   assignOrClear(STAGE, L.stage);
   assignOrClear(BENCH, L.bench);
   assignOrClear(BAR_TABLE, L.barTable);
+  assignOrClear(EVENT_BOARD, L.eventBoard);
   assignOrClear(COUNTER, L.counter);
   PORTALS.splice(0, PORTALS.length, ...L.portals);
   return L;
@@ -471,6 +476,9 @@ export const THEATER: NonNullable<SpaceLayout['theater']> = {
 export const STAGE: { x: number; z: number; w: number; d: number; h: number } = { x: 0, z: 0, w: 0, d: 0, h: 0, _empty: true } as never;
 export const BENCH: Placement & { w: number; d: number; h: number } = { x: 0, z: 0, ry: 0, w: 0, d: 0, h: 0, _empty: true } as never;
 export const BAR_TABLE: Placement & { w: number; d: number; h: number } = { ...(HUB.barTable!) };
+export const EVENT_BOARD: { x: number; z: number; ry: number; w: number; h: number } = {
+  ...(HUB.eventBoard!),
+};
 export const COUNTER: Placement & { w: number; d: number; h: number } = { ...(HUB.counter!) };
 export const FLOOR_LAMPS: Placement[] = [...HUB.floorLamps];
 export const PENDANTS: { x: number; z: number; drop: number }[] = [...HUB.pendants];
@@ -534,8 +542,14 @@ export function colliders(): Collider[] {
     rect(BENCH.x, BENCH.z, BENCH.w, BENCH.d, 0, BENCH.h + 0.06, ids);
   }
   if (isPresent(BAR_TABLE)) {
-    const ids = SEATS.filter((s) => s.id.startsWith('bar-')).map((s) => s.id);
-    rect(BAR_TABLE.x, BAR_TABLE.z, BAR_TABLE.w, BAR_TABLE.d, 0, BAR_TABLE.h, ids);
+    rect(BAR_TABLE.x, BAR_TABLE.z, BAR_TABLE.w, BAR_TABLE.d, 0, BAR_TABLE.h);
+    // 바 스툴은 따로(앉기 히트)
+    for (const s of SEATS.filter((seat) => seat.id.startsWith('bar-'))) {
+      rect(s.x, s.z, 0.4, 0.4, 0, 0.95, [s.id]);
+    }
+  }
+  if (isPresent(EVENT_BOARD)) {
+    rect(EVENT_BOARD.x, EVENT_BOARD.z, EVENT_BOARD.w, 0.12, EVENT_BOARD.ry, EVENT_BOARD.h + 1.0);
   }
   if (isPresent(COFFEE_TABLE)) rect(COFFEE_TABLE.x, COFFEE_TABLE.z, COFFEE_TABLE.w, COFFEE_TABLE.d, COFFEE_TABLE.ry, COFFEE_TABLE.h);
   if (isPresent(SCREEN)) rect(SCREEN.x, SCREEN.z, 0.08, SCREEN.w, SCREEN.ry, SCREEN.h + 0.6);

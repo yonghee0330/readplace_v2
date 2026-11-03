@@ -30,9 +30,26 @@
 
         <div class="start-words">
           <p class="start-kicker">부천 원미동 비북스</p>
-          <h1 id="start-title" class="start-title">비북스-M</h1>
+          <h1 id="start-title" class="start-title">비북스-<button type="button" id="start-manager" class="start-m-secret" aria-label="매니저 입장">M</button></h1>
           <p class="start-copy">가오픈 중입니다.<br />오셔서 이용해보시고 의견 주시면<br />앞으로 차차 반영하겠습니다.</p>
           <button id="start-enter" class="start-enter" type="button" aria-label="책방 입장하기">책방 입장하기</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="manager-gate" class="screen manager-gate" hidden aria-labelledby="manager-gate-title">
+      <div class="manager-gate-card">
+        <p class="manager-gate-kicker">비북스-M</p>
+        <h2 id="manager-gate-title" class="manager-gate-title">매니저 입장</h2>
+        <p class="manager-gate-copy">입장 코드를 입력해 주세요.</p>
+        <label class="manager-gate-label">
+          <span class="visually-hidden">입장 코드</span>
+          <input id="manager-code" class="manager-gate-input" type="password" autocomplete="off" spellcheck="false" maxlength="40" placeholder="코드" />
+        </label>
+        <p id="manager-gate-error" class="manager-gate-error" role="alert" hidden>코드가 맞지 않아요</p>
+        <div class="manager-gate-actions">
+          <button type="button" class="btn" id="manager-cancel">돌아가기</button>
+          <button type="button" class="btn btn-primary" id="manager-enter">들어가기</button>
         </div>
       </div>
     </section>

@@ -1,5 +1,5 @@
 // 설정 시트: 그래픽 품질, 닉네임 다시 뽑기, 아바타 색·머리 모양, 모션 줄이기, NPC 독자, 키보드 이동, 소리.
-// 바꾸는 즉시 localStorage에 저장하고 앱에 알린다.
+// 바꾸는 즉시 localStorage에 저장하고 앱에 알린다. 매니저는 외형·닉을 잠근다.
 import type { QualityLevel } from '../core/params';
 import {
   HAIR_STYLES, OUTFIT_COLORS, saveProfile, saveSettings,
@@ -10,7 +10,7 @@ import { randomNickname } from '../net/nickname';
 import { Sheet } from './sheet';
 
 const QUALITY_LABEL: Record<Settings['quality'], string> = { auto: '자동', low: '낮음', medium: '보통', high: '높음' };
-const HAIR_LABEL: Record<HairStyle, string> = { bangs: '앞머리', bob: '단발', short: '짧은 머리' };
+const HAIR_LABEL: Record<HairStyle, string> = { bangs: '앞머리', bob: '단발', short: '짧은 머리', curtain: '가르마' };
 const NATURE_LABEL: Record<NatureLevel, string> = { off: '끔', low: '약하게', mid: '보통', high: '크게' };
 
 export interface SettingsHandlers {
@@ -25,8 +25,16 @@ export interface SettingsHandlers {
 
 export class SettingsSheet {
   readonly sheet = new Sheet('설정', 'settings');
+  private manager: boolean;
 
-  constructor(private settings: Settings, private profile: Profile, private h: SettingsHandlers, autoLevel: QualityLevel) {
+  constructor(
+    private settings: Settings,
+    private profile: Profile,
+    private h: SettingsHandlers,
+    autoLevel: QualityLevel,
+    opts: { manager?: boolean } = {},
+  ) {
+    this.manager = !!opts.manager;
     const b = this.sheet.body;
     b.innerHTML = `
       <fieldset class="field">
@@ -35,6 +43,12 @@ export class SettingsSheet {
           ${(['auto', 'low', 'medium', 'high'] as const).map((k) => `<button type="button" role="radio" data-q="${k}" aria-checked="false">${QUALITY_LABEL[k]}${k === 'auto' ? `<small>(${QUALITY_LABEL[autoLevel]})</small>` : ''}</button>`).join('')}
         </div>
       </fieldset>
+      ${this.manager ? `
+      <div class="field">
+        <div class="field-label">매니저 계정</div>
+        <div class="nick" aria-live="polite"></div>
+        <p class="field-note">서든리 매니저(대표) 전용 아바타예요. 닉네임·외형은 고정입니다.</p>
+      </div>` : `
       <div class="field field-row">
         <div><div class="field-label">닉네임</div><div class="nick" aria-live="polite"></div></div>
         <button type="button" class="btn" data-act="reroll" aria-label="닉네임 다시 뽑기">다시 뽑기</button>
@@ -50,7 +64,7 @@ export class SettingsSheet {
         <div class="seg" role="radiogroup" aria-label="머리 모양">
           ${HAIR_STYLES.map((hs) => `<button type="button" role="radio" data-hair="${hs}" aria-checked="false">${HAIR_LABEL[hs]}</button>`).join('')}
         </div>
-      </fieldset>
+      </fieldset>`}
       <fieldset class="field">
         <legend>서점 음악</legend>
         <label class="field-row toggle"><span>잔잔한 배경음악</span><input type="checkbox" data-set="music" /></label>
@@ -75,18 +89,21 @@ export class SettingsSheet {
         this.h.quality(this.settings.quality);
       }),
     );
-    b.querySelector('[data-act="reroll"]')!.addEventListener('click', () => {
+    b.querySelector('[data-act="reroll"]')?.addEventListener('click', () => {
+      if (this.manager) return;
       this.profile.nickname = randomNickname();
       this.commitProfile();
     });
     b.querySelectorAll<HTMLButtonElement>('[data-color]').forEach((btn) =>
       btn.addEventListener('click', () => {
+        if (this.manager) return;
         this.profile.color = btn.dataset.color!;
         this.commitProfile();
       }),
     );
     b.querySelectorAll<HTMLButtonElement>('[data-hair]').forEach((btn) =>
       btn.addEventListener('click', () => {
+        if (this.manager) return;
         this.profile.hair = btn.dataset.hair as HairStyle;
         this.commitProfile();
       }),
@@ -136,7 +153,8 @@ export class SettingsSheet {
     b.querySelectorAll<HTMLButtonElement>('[data-color]').forEach((btn) => btn.setAttribute('aria-checked', String(btn.dataset.color === this.profile.color)));
     b.querySelectorAll<HTMLButtonElement>('[data-hair]').forEach((btn) => btn.setAttribute('aria-checked', String(btn.dataset.hair === this.profile.hair)));
     b.querySelectorAll<HTMLButtonElement>('[data-nature]').forEach((btn) => btn.setAttribute('aria-checked', String(btn.dataset.nature === this.settings.nature)));
-    b.querySelector('.nick')!.textContent = this.profile.nickname;
+    const nick = b.querySelector('.nick');
+    if (nick) nick.textContent = this.manager ? `${this.profile.nickname} (대표)` : this.profile.nickname;
     b.querySelectorAll<HTMLInputElement>('[data-set]').forEach((i) => {
       const key = i.dataset.set as 'reducedMotion' | 'npc' | 'keyboardMove' | 'music';
       i.checked = Boolean(this.settings[key]);

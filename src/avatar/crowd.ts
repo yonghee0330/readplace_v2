@@ -1,8 +1,9 @@
 // 장면 속 모든 아바타(나, 다른 방문객, NPC)를 관리한다.
 // 이름표·책 배지·책 아이콘 빌보드, 발밑 그림자(InstancedMesh 1콜), 다른 방문객의 위치 보간(100ms 지연).
 import * as THREE from 'three';
-import type { AvatarState, HairStyle, PlayerState, SharedBook } from '../net/presence';
-import { Avatar } from './avatar';
+import { MANAGER_TITLE } from '../core/manager';
+import type { AvatarState, PlayerState, SharedBook } from '../net/presence';
+import { Avatar, type AvatarLook } from './avatar';
 import { blurbForTitle } from './bestsellers';
 import { BookBadge } from './bookBadge';
 import { Nameplate, OVERLAY_LAYER, bookIconTexture } from './nameplate';
@@ -19,6 +20,8 @@ export class Actor {
   nickname: string;
   /** 이름표 점 색(옷 색) */
   accent: string;
+  /** 매니저(서든리 매니저) */
+  isManager = false;
   /** 읽기 중이면 이름표(나) 또는 배지(타인)에 보이는 책 제목 */
   bookTitle: string | null = null;
   /** 지금 읽는 책 메타(표지·저자 등). 읽기 중이 아니면 null */
@@ -32,9 +35,10 @@ export class Actor {
   snapshots: Snapshot[] = [];
   private lastPos = new THREE.Vector3();
 
-  constructor(readonly id: string, readonly kind: ActorKind, nickname: string, look: { color: string; hair: HairStyle }) {
+  constructor(readonly id: string, readonly kind: ActorKind, nickname: string, look: AvatarLook) {
     this.nickname = nickname;
     this.accent = look.color;
+    this.isManager = !!look.manager;
     this.avatar = new Avatar(look);
     this.avatar.root.userData.actorId = id;
   }
@@ -68,8 +72,10 @@ export class Actor {
 
   private refreshLabels(): void {
     const reading = this.avatar.state === 'read' && !!this.bookTitle;
-    // 나는 이름표 부제로, 타인·NPC는 클릭용 배지로 책을 보여 준다
-    const sub = this.kind === 'me' && reading ? this.bookTitle! : '';
+    // 나는 읽기 중 책 제목, 매니저는 (대표), 그 외 부제 없음
+    let sub = '';
+    if (this.kind === 'me' && reading) sub = this.bookTitle!;
+    else if (this.isManager) sub = MANAGER_TITLE;
     this.nameplate?.set(this.nickname, this.accent, sub);
     if (this.bookBadge) {
       const show = this.kind !== 'me' && reading;
@@ -84,8 +90,13 @@ export class Actor {
     if (this.snapshots.length > 30) this.snapshots.shift();
     this.nickname = s.nickname;
     this.accent = s.color;
+    this.isManager = s.role === 'manager';
     this.setState(s.state, s.seatId);
-    this.avatar.setLook({ color: s.color, hair: s.hair });
+    this.avatar.setLook({
+      color: s.color,
+      hair: s.role === 'manager' ? 'curtain' : s.hair,
+      manager: s.role === 'manager',
+    });
     if (s.state === 'read' && s.book?.title) {
       this.setReadingBook(s.book, blurbForTitle(s.book.title));
     } else {
@@ -174,11 +185,12 @@ export class Crowd {
     this.overlay.add(this.icons);
   }
 
-  add(id: string, kind: ActorKind, nickname: string, look: { color: string; hair: HairStyle }, withNameplate: boolean): Actor {
+  add(id: string, kind: ActorKind, nickname: string, look: AvatarLook, withNameplate: boolean): Actor {
     this.remove(id);
     const a = new Actor(id, kind, nickname, look);
     if (withNameplate) {
       a.nameplate = new Nameplate(nickname, look.color);
+      if (look.manager) a.nameplate.set(nickname, look.color, MANAGER_TITLE);
       this.overlay.add(a.nameplate.mesh);
     }
     if (kind === 'peer' || kind === 'npc') {

@@ -2,7 +2,9 @@
 // 구현: LocalPresence(BroadcastChannel), WsPresence(중계 서버), SupabasePresence(Realtime).
 
 export type AvatarState = 'stand' | 'walk' | 'sit' | 'read';
-export type HairStyle = 'bangs' | 'bob' | 'short';
+export type HairStyle = 'bangs' | 'bob' | 'short' | 'curtain';
+/** 매니저(어드민). 없으면 일반 방문객. */
+export type PlayerRole = 'manager';
 
 /** 다른 사람에게 보이는 "지금 읽는 책"(본문 없음). coverUrl은 https만, data:는 보내지 않는다. */
 export interface SharedBook {
@@ -24,6 +26,8 @@ export interface PlayerState {
   seatId: string | null;
   /** 읽기 중일 때만 채운다. 아니면 null. */
   book: SharedBook | null;
+  /** 매니저면 'manager'. 옛 클라이언트는 필드 없음. */
+  role?: PlayerRole | null;
   t: number;
 }
 
@@ -100,7 +104,8 @@ export function sanitizeSharedBook(v: unknown): SharedBook | null {
 /** 받은 상태의 book 필드를 정리한다(옛 클라이언트는 book이 없을 수 있다). */
 export function sanitizePlayerState(s: PlayerState): PlayerState {
   const book = s.state === 'read' ? sanitizeSharedBook(s.book) : null;
-  return { ...s, book };
+  const role = s.role === 'manager' ? 'manager' : null;
+  return { ...s, book, role };
 }
 
 /** 받은 데이터가 PlayerState 모양인지 확인한다(다른 탭·서버에서 온 값은 믿지 않는다). */
@@ -109,7 +114,8 @@ export function isPlayerState(v: unknown): v is PlayerState {
   if (!s || typeof s.id !== 'string' || typeof s.nickname !== 'string' || typeof s.color !== 'string') return false;
   if (!Array.isArray(s.position) || s.position.length !== 3 || !s.position.every(Number.isFinite)) return false;
   if (!Number.isFinite(s.rotationY) || !['stand', 'walk', 'sit', 'read'].includes(s.state)) return false;
-  if (!['bangs', 'bob', 'short'].includes(s.hair) || s.nickname.length > 40) return false;
+  if (!['bangs', 'bob', 'short', 'curtain'].includes(s.hair) || s.nickname.length > 40) return false;
+  if (s.role != null && s.role !== 'manager') return false;
   // book은 없거나 null이거나 객체. 내용은 sanitizeSharedBook에서 다시 검사한다.
   if (s.book != null && typeof s.book !== 'object') return false;
   return true;

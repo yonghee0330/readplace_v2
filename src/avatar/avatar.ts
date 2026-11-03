@@ -7,9 +7,14 @@ import { AvatarAnimator } from './animations';
 
 const SKIN = new THREE.Color('#f3d2b5');
 const HAIR = new THREE.Color('#3b2a20');
+const HAIR_GRAY = new THREE.Color('#9a9590');
+const BEARD = new THREE.Color('#4a433c');
+const BEARD_GRAY = new THREE.Color('#a8a29a');
 const BLUSH = new THREE.Color('#f09a8c');
 const PANTS = new THREE.Color('#3d3833');
 const SHOE = new THREE.Color('#2a211c');
+const GOLD = new THREE.Color('#c4a46a');
+const MOLE = new THREE.Color('#5a3a28');
 
 /** 모든 아바타가 같이 쓰는 재질(색은 정점 색). */
 const SHARED = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0 });
@@ -71,6 +76,26 @@ function headGeometry(hair: HairStyle): THREE.BufferGeometry {
     parts.push(paint(hairShell(0.236, Math.PI * 0.62, Math.PI * 0.7), HAIR));
     const fringe = new THREE.SphereGeometry(0.234, 24, 6, Math.PI * 0.1, Math.PI * 0.8, Math.PI * 0.18, Math.PI * 0.12);
     parts.push(paint(fringe, HAIR));
+  } else if (hair === 'curtain') {
+    // 서든리 매니저: 가르마·커튼 헤어 + 회색 줄기
+    parts.push(top(Math.PI * 0.48, 0.12, 0.232));
+    parts.push(paint(hairShell(0.234, Math.PI * 0.55, Math.PI * 0.68), HAIR));
+    // 좌우 커튼 앞머리
+    for (const sx of [-1, 1]) {
+      const fringe = new THREE.SphereGeometry(0.1, 12, 10, 0, Math.PI, 0, Math.PI);
+      fringe.scale(0.55, 0.85, 0.7);
+      fringe.rotateZ(sx * -0.55);
+      fringe.rotateX(0.55);
+      fringe.translate(sx * 0.09, 0.12, 0.16);
+      parts.push(paint(fringe, (y) => (y > 0.08 ? HAIR_GRAY.clone().lerp(HAIR, 0.45) : HAIR)));
+    }
+    // 관자놀이 회색
+    for (const sx of [-1, 1]) {
+      const temple = new THREE.SphereGeometry(0.05, 10, 8);
+      temple.scale(0.55, 0.9, 0.7);
+      temple.translate(sx * 0.18, 0.02, 0.02);
+      parts.push(paint(temple, HAIR_GRAY));
+    }
   } else {
     parts.push(top(Math.PI * 0.4, 0.32, 0.224));
     // 정수리 삐침
@@ -81,6 +106,57 @@ function headGeometry(hair: HairStyle): THREE.BufferGeometry {
   }
   const g = merge(parts);
   return g;
+}
+
+/** 수염·콧수염(소금후추) + 오른쪽 볼 점. */
+function faceExtrasGeometry(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  // 콧수염
+  const mustache = new THREE.TorusGeometry(0.055, 0.016, 8, 16, Math.PI);
+  mustache.rotateX(Math.PI / 2);
+  mustache.rotateZ(Math.PI);
+  mustache.translate(0, -0.055, 0.195);
+  parts.push(paint(mustache, BEARD));
+  // 턱수염(타원)
+  const goatee = new THREE.SphereGeometry(0.07, 14, 12);
+  goatee.scale(0.75, 0.95, 0.55);
+  goatee.translate(0, -0.145, 0.175);
+  parts.push(paint(goatee, (y) => (y < -0.02 ? BEARD_GRAY : BEARD)));
+  // 턱 끝 회색
+  const tip = new THREE.SphereGeometry(0.028, 10, 8);
+  tip.scale(0.9, 1.1, 0.7);
+  tip.translate(0, -0.195, 0.185);
+  parts.push(paint(tip, BEARD_GRAY));
+  // 볼 점(사진 기준 오른쪽 볼 = 아바타 -x)
+  const mole = new THREE.SphereGeometry(0.008, 8, 6);
+  mole.translate(-0.12, -0.04, 0.185);
+  parts.push(paint(mole, MOLE));
+  return merge(parts);
+}
+
+/** 둥근 금테 안경. */
+function glassesGeometry(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  const rim = (sx: number) => {
+    const t = new THREE.TorusGeometry(0.042, 0.005, 8, 24);
+    t.rotateY(Math.PI / 2);
+    t.translate(sx * 0.07, 0.01, 0.205);
+    return paint(t, GOLD);
+  };
+  parts.push(rim(-1), rim(1));
+  // 코받침·브릿지
+  const bridge = new THREE.CylinderGeometry(0.004, 0.004, 0.03, 6);
+  bridge.rotateZ(Math.PI / 2);
+  bridge.translate(0, 0.012, 0.208);
+  parts.push(paint(bridge, GOLD));
+  // 다리
+  for (const sx of [-1, 1]) {
+    const arm = new THREE.CylinderGeometry(0.0035, 0.0035, 0.1, 6);
+    arm.rotateX(Math.PI / 2);
+    arm.translate(sx * 0.11, 0.015, 0.155);
+    parts.push(paint(arm, GOLD));
+  }
+  return merge(parts);
 }
 
 function eyesGeometry(): THREE.BufferGeometry {
@@ -138,7 +214,12 @@ function heldBookGeometry(cover: THREE.Color): THREE.BufferGeometry {
   return merge(parts);
 }
 
-export interface AvatarLook { color: string; hair: HairStyle }
+export interface AvatarLook {
+  color: string;
+  hair: HairStyle;
+  /** 서든리 매니저 전용 외형(안경·수염 등) */
+  manager?: boolean;
+}
 
 export class Avatar {
   readonly root = new THREE.Group();
@@ -185,7 +266,12 @@ export class Avatar {
     add(this.body, bodyGeometry(outfit)).position.y = -0.01;
     this.body.add(this.head);
     this.head.position.y = HEAD_Y - HIP_Y;
-    add(this.head, headGeometry(this.look.hair));
+    const hair = this.look.manager ? 'curtain' : this.look.hair;
+    add(this.head, headGeometry(hair));
+    if (this.look.manager) {
+      add(this.head, faceExtrasGeometry());
+      add(this.head, glassesGeometry());
+    }
     this.head.add(this.eyes);
     for (const [arm, sx] of [[this.armL, 1], [this.armR, -1]] as const) {
       this.body.add(arm);
@@ -203,7 +289,11 @@ export class Avatar {
   }
 
   setLook(look: AvatarLook): void {
-    if (look.color === this.look.color && look.hair === this.look.hair) return;
+    if (
+      look.color === this.look.color
+      && look.hair === this.look.hair
+      && !!look.manager === !!this.look.manager
+    ) return;
     this.look = { ...look };
     this.build();
   }
