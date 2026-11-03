@@ -318,7 +318,11 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   position: sticky; bottom: 0; margin: 8px -4px 0; padding: 12px 4px 4px;
   background: linear-gradient(to bottom, transparent, var(--paper) 28%);
 }
-.btn { min-height: 40px; padding: 0 16px; border: 1px solid rgba(36, 37, 31, 0.18); border-radius: 999px; background: #fff; color: var(--green); font: 500 14px/1 var(--sans); cursor: pointer; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 40px; padding: 0 16px; border: 1px solid rgba(36, 37, 31, 0.18); border-radius: 999px;
+  background: #fff; color: var(--green); font: 500 14px/1 var(--sans); cursor: pointer;
+}
 .btn:hover { background: #f1eadc; }
 .btn-primary { background: var(--green); color: var(--paper); border-color: var(--green); }
 .btn-primary:hover { background: #33352c; }
@@ -356,8 +360,10 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
 .toggle input:checked::after { transform: translateX(20px); }
 .field-note { margin: 4px 0 0; font-size: 12px; color: #8a7a65; }
 .field-input {
-  width: 100%; min-height: 42px; padding: 0 14px; border: 1px solid rgba(36, 37, 31, 0.18);
-  border-radius: 12px; background: #fff; color: var(--green); font: 500 15px/1.4 var(--sans);
+  /* 16px 미만이면 iOS가 포커스 시 확대한다 */
+  width: 100%; min-height: 44px; padding: 0 14px; border: 1px solid rgba(36, 37, 31, 0.18);
+  border-radius: 12px; background: #fff; color: var(--green); font: 500 16px/1.4 var(--sans);
+  box-sizing: border-box;
 }
 .field-input:focus { outline: 2px solid #8a5a22; outline-offset: 1px; border-color: transparent; }
 .book-preview {
@@ -372,6 +378,57 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
 .book-preview-cover.is-empty { letter-spacing: 0.06em; }
 .book-preview-title { font: 700 15px/1.35 var(--serif); }
 .book-preview-sub { margin-top: 4px; font-size: 13px; color: #7a6a55; }
+
+/* 책 제목 검색 → 결과에서 고르기 */
+.book-search-form { margin: 0 0 12px; }
+.book-search-form .field-label { display: block; margin-bottom: 8px; }
+.book-search-row { display: flex; gap: 8px; align-items: stretch; }
+.book-search-row .field-input { flex: 1; min-width: 0; }
+.book-search-btn {
+  flex: none; min-width: 72px; min-height: 44px; padding: 0 16px; white-space: nowrap;
+  touch-action: manipulation;
+}
+.book-results {
+  display: flex; flex-direction: column; gap: 8px;
+  margin: 0 0 10px;
+  /* 데스크톱만 내부 스크롤. 모바일은 시트 본문 스크롤 하나로 */
+  max-height: min(42dvh, 320px);
+  overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+}
+@supports not (height: 1dvh) {
+  .book-results { max-height: min(42vh, 320px); }
+}
+.book-result {
+  display: flex; gap: 12px; align-items: center; width: 100%;
+  min-height: 76px; padding: 12px; border-radius: 14px; text-align: left;
+  border: 1px solid rgba(36, 37, 31, 0.12); background: #fff; color: var(--green);
+  font: inherit; cursor: pointer; touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.book-result:hover { background: #f7f1e4; }
+.book-result:active { background: #efe6d4; }
+.book-result.is-selected {
+  border-color: var(--green); background: #f1eadc;
+  box-shadow: 0 0 0 1px var(--green);
+}
+.book-result-cover {
+  width: 48px; height: 68px; flex: none; border-radius: 3px; overflow: hidden;
+  background: #d9d0c0; display: grid; place-items: center;
+  font: 600 10px/1 var(--serif); color: #7a6a55; pointer-events: none;
+}
+.book-result-cover img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.book-result-cover.is-empty { letter-spacing: 0.04em; }
+.book-result-meta { min-width: 0; flex: 1; pointer-events: none; }
+.book-result-title {
+  font: 700 15px/1.35 var(--serif);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.book-result-sub {
+  margin-top: 4px; font-size: 13px; color: #7a6a55; line-height: 1.35;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.btn { touch-action: manipulation; }
+.btn:disabled, .btn-primary:disabled { opacity: 0.45; cursor: default; }
 
 /* ---------- 타인·NPC 책 미리보기 ---------- */
 .book-peek-who { margin: 0 0 14px; font-size: 14px; color: #7a6a55; }
@@ -537,6 +594,15 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   }
   .sheet-text { margin-bottom: 14px; font-size: 14px; }
   .field { margin-bottom: 14px; }
+  /* 책 검색: 중첩 스크롤 제거, 탭 크게, 확정 버튼 풀폭 */
+  .book-results {
+    max-height: none; overflow: visible;
+  }
+  .book-search-btn { min-width: 78px; }
+  .book-sheet .sheet-actions {
+    display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px;
+  }
+  .book-sheet .sheet-actions .btn { width: 100%; min-height: 48px; justify-content: center; }
   .focus-clock { font-size: 34px; }
   .book-card { max-width: min(240px, calc(100vw - 24px)); padding: 8px 12px 8px 8px; }
   .book-card-cover { width: 40px; height: 58px; }
