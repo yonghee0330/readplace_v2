@@ -692,6 +692,13 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   position: absolute; inset: 0; z-index: 6;
   opacity: 0; transition: opacity 0.4s ease;
   display: grid; place-items: center;
+  /* 키보드·작은 화면에서도 작성란이 잘리지 않게 */
+  padding:
+    max(8px, env(safe-area-inset-top))
+    max(8px, env(safe-area-inset-right))
+    max(8px, env(safe-area-inset-bottom))
+    max(8px, env(safe-area-inset-left));
+  box-sizing: border-box;
 }
 .postit-wall.is-in { opacity: 1; }
 .postit-wall-dim {
@@ -702,11 +709,17 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
 .postit-wall-stage {
   position: relative; z-index: 1;
   width: min(720px, calc(100vw - 20px));
-  max-height: min(92vh, 900px);
+  max-height: min(92dvh, 900px);
+  min-height: 0;
   display: flex; flex-direction: column; gap: 12px;
   pointer-events: none;
+  overflow: hidden;
+}
+@supports not (height: 1dvh) {
+  .postit-wall-stage { max-height: min(92vh, 900px); }
 }
 .postit-wall-head {
+  flex: none;
   display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
   color: #f3ead8;
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.4);
@@ -761,6 +774,8 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
 .postit-board {
   position: relative;
   width: 100%;
+  flex: 1 1 auto;
+  min-height: 140px;
   aspect-ratio: 512 / 460;
   max-height: min(52vh, 480px);
   border-radius: 6px;
@@ -834,6 +849,7 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   opacity: 0.55;
 }
 .postit-composer {
+  flex: none;
   pointer-events: auto;
   background: rgba(247, 241, 229, 0.96);
   border-radius: 14px;
@@ -842,6 +858,7 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
   display: grid;
   gap: 10px;
+  min-height: 0;
 }
 .postit-composer.is-placing {
   box-shadow: 0 0 0 2px #c08a4e, 0 12px 36px rgba(0, 0, 0, 0.28);
@@ -950,14 +967,60 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   .book-card-cover { width: 40px; height: 58px; }
   .book-card.is-focus .book-card-cover { width: 52px; height: 76px; }
   .book-card-title { font-size: 13px; }
-  .postit-wall-stage { width: calc(100vw - 12px); gap: 8px; }
-  .postit-wall-title { font-size: 20px; }
-  .postit-board { max-height: 42vh; }
+  /* 모바일: 작성란(붙이기)이 항상 보이도록 세로로 꽉 채우고 보드만 줄임 */
+  .postit-wall {
+    place-items: stretch;
+    padding:
+      max(6px, env(safe-area-inset-top))
+      6px
+      max(6px, env(safe-area-inset-bottom))
+      6px;
+  }
+  .postit-wall-stage {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    gap: 8px;
+  }
+  .postit-wall-title { font-size: 18px; }
+  .postit-wall-lead {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    font-size: 12px;
+    margin-top: 4px;
+  }
+  .postit-day-nav { margin-top: 6px; gap: 6px; }
+  .postit-day-label { font-size: 12px; }
+  .postit-day-btn { min-width: 32px; min-height: 32px; padding: 0 8px; }
+  .postit-board {
+    flex: 1 1 0;
+    min-height: 110px;
+    max-height: none;
+    aspect-ratio: auto; /* 비율 고정이면 작성란을 화면 밖으로 밀어냄 */
+    height: auto;
+  }
+  .postit-wall.is-archive .postit-board { max-height: none; }
   .postit-note { width: 78px; min-height: 72px; padding: 12px 8px 14px; }
   .postit-note-text { font-size: 11px; }
-  .postit-composer { padding: 10px 12px 12px; border-radius: 12px 12px 0 0; }
+  .postit-composer {
+    padding: 10px 12px max(12px, env(safe-area-inset-bottom));
+    border-radius: 12px;
+    gap: 8px;
+    /* 키보드가 올라와도 스크롤로 버튼까지 닿게 */
+    max-height: min(48dvh, 360px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  @supports not (height: 1dvh) {
+    .postit-composer { max-height: min(48vh, 360px); }
+  }
   .postit-composer-actions { flex-direction: column; align-items: stretch; }
   .postit-composer-actions .btn { width: 100%; min-height: 46px; }
+  .postit-swatch { width: 28px; height: 28px; }
+  .postit-shape { min-height: 30px; padding: 0 10px; font-size: 12px; }
+  .postit-input { font-size: 16px; /* iOS 줌 방지 */ padding: 10px 12px 22px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .hud, .toast, .sheet-backdrop, .focus, .action, .pill, .postit-wall { transition: none; }
