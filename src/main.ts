@@ -4,10 +4,10 @@ import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 import './style.css';
 
 import { startApp } from './app';
-import { ROOM_CAPACITY, readParams, roomLabel } from './core/params';
+import { readParams } from './core/params';
 import { registerServiceWorker } from './pwa/register';
 import { LoadingScreen } from './ui/loading';
-import { fetchBucheonWeather, weatherAria, weatherCopy } from './weather/bucheon';
+import { fetchBucheonWeather, weatherAria } from './weather/bucheon';
 
 declare global {
   interface Window {
@@ -21,13 +21,9 @@ const params = readParams();
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 const startEl = document.getElementById('start')!;
-document.getElementById('start-room')!.textContent = roomLabel();
-document.getElementById('start-note')!.textContent = `한 번에 ${ROOM_CAPACITY}명까지`;
 
-// 시작 화면 문구를 부천 날씨에 맞춘다(실패해도 비 문구)
+// 캔버스 설명만 부천 날씨에 맞춘다(시작 문구는 고정)
 void fetchBucheonWeather(params.weather).then((w) => {
-  const copy = document.querySelector('.start-copy');
-  if (copy) copy.innerHTML = weatherCopy(w.kind);
   canvas.setAttribute('aria-label', weatherAria(w.kind));
 });
 
@@ -36,6 +32,11 @@ let entered = false;
 async function enter(): Promise<void> {
   if (entered) return;
   entered = true;
+  const openMs = reducedMotion ? 0 : 950;
+  if (openMs) {
+    startEl.classList.add('is-opening');
+    await new Promise((r) => setTimeout(r, openMs));
+  }
   startEl.hidden = true;
   const loading = new LoadingScreen();
   loading.show();

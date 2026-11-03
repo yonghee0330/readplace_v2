@@ -78,19 +78,22 @@ function chairSeat(id: string, p: Placement, y = 0.46, approach: 1 | -1 = 1): Se
   return { id, x: p.x, z: p.z, ry: p.ry, y, approach };
 }
 
+/** 계단 좌석: 뒤(벽·localZ≈0)가 높고 앞(무대)이 낮음. 관객은 무대를 봄. 열마다 cols석. */
 function theaterSeats(t: NonNullable<SpaceLayout['theater']>): Seat[] {
   const out: Seat[] = [];
   const { x, z, ry, rows, cols, rowDepth, seatW, rise, firstY } = t;
   const cos = Math.cos(ry), sin = Math.sin(ry);
-  for (let row = 0; row < Math.min(rows, 2); row++) {
+  for (let i = 0; i < rows; i++) {
+    // i=0 맨 뒤(높음), i=rows-1 맨 앞(낮음)
+    const localZ = i * rowDepth + rowDepth * 0.45;
+    const y = firstY + (rows - 1 - i) * rise + 0.07;
     for (let col = 0; col < cols; col++) {
       const localX = (col - (cols - 1) / 2) * seatW;
-      const localZ = row * rowDepth;
       out.push({
-        id: `theater-${row + 1}-${col + 1}`,
+        id: `theater-${i + 1}-${col + 1}`,
         x: x + localX * cos - localZ * sin,
         z: z + localX * sin + localZ * cos,
-        ry, y: firstY + 0.28 + row * rise, approach: 1,
+        ry, y, approach: 1,
       });
     }
   }
@@ -194,13 +197,14 @@ function makeHub(): SpaceLayout {
 function makeSeminar(): SpaceLayout {
   const room = roomOf(6.5, 5.5);
   const table = { x: 0, z: -0.15, ry: 0, w: 2.4, d: 0.95, h: 0.74 };
+  // 의자는 테이블을 바라봄(+z 로컬). 뒤쪽(z 작은 쪽) ry=0, 앞쪽 ry=π.
   const chairs: Placement[] = [
-    { x: -0.75, z: -0.75, ry: Math.PI },
-    { x: 0, z: -0.75, ry: Math.PI },
-    { x: 0.75, z: -0.75, ry: Math.PI },
-    { x: -0.75, z: 0.45, ry: 0 },
-    { x: 0, z: 0.45, ry: 0 },
-    { x: 0.75, z: 0.45, ry: 0 },
+    { x: -0.75, z: -0.75, ry: 0 },
+    { x: 0, z: -0.75, ry: 0 },
+    { x: 0.75, z: -0.75, ry: 0 },
+    { x: -0.75, z: 0.45, ry: Math.PI },
+    { x: 0, z: 0.45, ry: Math.PI },
+    { x: 0.75, z: 0.45, ry: Math.PI },
     { x: -1.25, z: -0.15, ry: Math.PI / 2 },
     { x: 1.25, z: -0.15, ry: -Math.PI / 2 },
   ];
@@ -216,12 +220,13 @@ function makeSeminar(): SpaceLayout {
     chairs: [],
     seminarTable: table,
     seminarChairs: chairs,
-    whiteboard: { x: 0, z: -2.5, ry: 0, w: 2.0, h: 1.15 },
-    seminarMonitor: { x: 1.35, z: -2.35, ry: -0.2 },
+    // 문 맞은편(+z) 벽을 넓게 채움. 문 쪽 벽은 비움. 스탠드 TV 없음.
+    whiteboard: { x: 0, z: 2.58, ry: Math.PI, w: 5.9, h: 1.65 },
+    seminarMonitor: null,
     floorLamps: [],
     pendants: [{ x: 0, z: -0.15, drop: 1.0 }],
     floorPlants: [{ x: -2.6, z: 2.1, scale: 0.9 }],
-    seats: chairs.map((p, i) => chairSeat(`seminar-${i + 1}`, p)),
+    seats: chairs.map((p, i) => chairSeat(`seminar-${i + 1}`, p, 0.48)),
     spawn,
     spawns: [spawn, { x: -0.7, z: 1.7, ry: Math.PI }, { x: 0.7, z: 1.7, ry: Math.PI }],
     // 출입문은 뒤벽(창·문 개구) — 포털도 같은 쪽
@@ -231,92 +236,114 @@ function makeSeminar(): SpaceLayout {
 
 function makeCinema(): SpaceLayout {
   const room = roomOf(6, 5);
-  const sofa = { x: 1.35, z: 0.1, ry: -Math.PI / 2, w: 2.0, d: 0.88 };
-  const spawn = { x: 0.2, z: 1.7, ry: Math.PI };
+  // 소파(+z 방향) ↔ 맞은편 스크린. 문은 -z.
+  const sofa = { x: 0, z: -0.85, ry: 0, w: 2.15, d: 0.9 };
+  const spawn = { x: 1.8, z: -1.5, ry: -0.4 };
   return {
     ...emptyBase('cinema', '영화감상실', room),
     openings: [{ cx: 0, w: 0.95, y0: 0, y1: 2.15, kind: 'door' }],
-    shelves: [{ x: -2.75, z: -1.5, ry: Math.PI / 2, w: 1.15, wing: 'A' }],
+    shelves: [
+      { x: -2.75, z: -0.3, ry: Math.PI / 2, w: 1.0, wing: 'A' },
+      { x: 2.75, z: -0.3, ry: -Math.PI / 2, w: 1.0, wing: 'C' },
+    ],
     islands: [],
     chairs: [],
     sofa,
-    coffeeTable: { x: 0.35, z: 0.1, ry: Math.PI / 2, w: 0.9, d: 0.48, h: 0.4 },
-    rug: { x: 0.8, z: 0.1, w: 2.2, d: 2.3 },
-    screen: { x: -1.55, z: 0.1, ry: Math.PI / 2, w: 1.7, h: 1.0 },
-    floorLamps: [{ x: 2.2, z: 1.4, ry: 0 }, { x: 2.2, z: -1.2, ry: 0 }],
-    pendants: [{ x: 0.6, z: 0.1, drop: 1.05 }],
-    floorPlants: [{ x: -2.3, z: 1.8, scale: 0.85 }],
+    coffeeTable: { x: 0, z: 0.35, ry: 0, w: 1.0, d: 0.5, h: 0.38 },
+    rug: { x: 0, z: -0.15, w: 2.6, d: 2.4 },
+    // 스크린 면(+로컬 x)이 방 안(-z)을 향함
+    screen: { x: 0, z: 2.28, ry: Math.PI / 2, w: 2.6, h: 1.45 },
+    floorLamps: [{ x: -1.55, z: -1.35, ry: 0.3 }, { x: 1.55, z: -1.35, ry: -0.3 }],
+    pendants: [],
+    floorPlants: [{ x: -2.4, z: 1.6, scale: 0.8 }],
     seats: [
-      { id: 'sofa-1', x: sofa.x - 0.1, z: sofa.z - 0.58, ry: sofa.ry, y: 0.44, approach: 1 },
-      { id: 'sofa-2', x: sofa.x - 0.1, z: sofa.z, ry: sofa.ry, y: 0.44, approach: 1 },
-      { id: 'sofa-3', x: sofa.x - 0.1, z: sofa.z + 0.58, ry: sofa.ry, y: 0.44, approach: 1 },
+      { id: 'sofa-1', x: sofa.x - 0.58, z: sofa.z + 0.1, ry: sofa.ry, y: 0.44, approach: 1 },
+      { id: 'sofa-2', x: sofa.x, z: sofa.z + 0.1, ry: sofa.ry, y: 0.44, approach: 1 },
+      { id: 'sofa-3', x: sofa.x + 0.58, z: sofa.z + 0.1, ry: sofa.ry, y: 0.44, approach: 1 },
     ],
     spawn,
-    spawns: [spawn, { x: 0.5, z: 1.4, ry: Math.PI }],
+    spawns: [spawn, { x: -1.6, z: -1.4, ry: 0.5 }],
     portals: [{ to: 'hub', x: 0, z: -2.2, ry: Math.PI, label: '원미서가', w: 0.95, d: 0.35 }],
   };
 }
 
 function makeLecture(): SpaceLayout {
   const room = roomOf(7, 6);
+  // (-x,+z) 구석에 붙인 3단. 뒤 높·앞 낮. 관객은 무대 쪽을 봄(ry=π → -z).
   const theater = {
-    x: -0.6, z: 0.55, ry: Math.PI,
-    rows: 3, cols: 4, rowDepth: 0.72, seatW: 0.52, rise: 0.22, firstY: 0.18,
+    x: -2.15, z: 2.55, ry: Math.PI,
+    rows: 3, cols: 3, rowDepth: 0.72, seatW: 0.58, rise: 0.22, firstY: 0.14,
   };
-  const stage = { x: -0.6, z: -2.15, w: 2.4, d: 1.1, h: 0.18 };
-  const spawn = { x: 2.35, z: 1.85, ry: -2.4 };
+  // 무대: 좌석 데크 폭에 맞추고, 맨 앞단 바로 앞에 붙임
+  const deckW = theater.cols * theater.seatW + 0.45;
+  const seatingDepth = theater.rows * theater.rowDepth;
+  const frontZ = theater.z + Math.cos(theater.ry) * seatingDepth;
+  const stageD = 1.15;
+  const gap = 0.16;
+  const stage = {
+    x: theater.x,
+    z: frontZ + Math.cos(theater.ry) * (gap + stageD / 2),
+    w: deckW + 0.12,
+    d: stageD,
+    h: 0.22,
+  };
+  const spawn = { x: 2.35, z: 0.2, ry: -2.0 };
+  // 작가 자리: 무대 위, 관객(+z)을 봄
+  const author = { x: stage.x - 0.12, z: stage.z - 0.05, ry: 0 };
+  const seats = [
+    ...theaterSeats(theater),
+    { id: 'stage-1', x: author.x, z: author.z, ry: author.ry, y: stage.h + 0.46, approach: 1 as const },
+  ];
   return {
     ...emptyBase('lecture', '계단식 강연', room),
     openings: [{ cx: 2.5, w: 0.95, y0: 0, y1: 2.15, kind: 'door' }],
-    shelves: [],
+    shelves: [
+      // 코너 뒤·옆 (계단 위·옆)
+      { x: -2.35, z: 2.82, ry: Math.PI, w: 1.7, wing: 'A' },
+      { x: -3.28, z: 1.85, ry: Math.PI / 2, w: 1.55, wing: 'A' },
+      // 빈 +x 벽
+      { x: 3.28, z: 1.2, ry: -Math.PI / 2, w: 1.35, wing: 'C' },
+      { x: 3.28, z: -0.6, ry: -Math.PI / 2, w: 1.25, wing: 'C' },
+      // 문 왼쪽 -z 벽
+      { x: -1.2, z: -2.82, ry: 0, w: 1.6, wing: 'A' },
+    ],
     islands: [],
     chairs: [],
     theater,
     stage,
-    floorLamps: [],
-    pendants: [{ x: -0.6, z: -1.4, drop: 1.1 }],
-    floorPlants: [{ x: 2.8, z: 2.2, scale: 0.9 }],
-    seats: theaterSeats(theater),
+    floorLamps: [{ x: 1.6, z: 2.1, ry: -0.5 }],
+    pendants: [{ x: stage.x, z: stage.z, drop: 1.05 }],
+    floorPlants: [{ x: 2.85, z: 2.35, scale: 0.85 }],
+    seats,
     spawn,
-    spawns: [spawn, { x: 2.2, z: 1.4, ry: -2.0 }],
+    spawns: [spawn, { x: 2.0, z: -1.6, ry: -1.0 }],
     portals: [{ to: 'hub', x: 2.5, z: -2.7, ry: Math.PI, label: '원미서가', w: 0.95, d: 0.35 }],
   };
 }
 
 function makeSolo(): SpaceLayout {
-  const room = roomOf(5, 4.5);
-  const desks = [
-    { x: -1.35, z: -1.2, ry: 0, w: 1.15, d: 0.48, h: 0.74 },
-    { x: 1.15, z: -1.2, ry: 0, w: 1.15, d: 0.48, h: 0.74 },
-  ];
-  const chairs: Placement[] = [
-    { x: -1.35, z: -0.55, ry: Math.PI },
-    { x: 1.15, z: -0.55, ry: Math.PI },
-  ];
-  const spawn = { x: 0, z: 1.4, ry: Math.PI };
+  // 아주 좁은 1인 노크: 책상 폭 정도, 문 앞 한 발짝만
+  const room = roomOf(2.2, 2.75, 2.6);
+  // 문(-z) 맞은편(+z)에 벽면 붙박이 책상. 의자는 책상을 봄(ry=0).
+  const desk = { x: 0, z: 1.02, ry: 0, w: 2.05, d: 0.46, h: 0.72 };
+  const chair = { x: 0, z: 0.32, ry: 0 };
+  const spawn = { x: 0, z: -0.75, ry: 0 };
   return {
     ...emptyBase('solo', '1인 작업실', room),
-    openings: [{ cx: 0, w: 0.9, y0: 0, y1: 2.1, kind: 'door' }],
-    shelves: [
-      { x: -2.25, z: 0.3, ry: Math.PI / 2, w: 1.1, wing: 'A' },
-      { x: 2.25, z: 0.3, ry: -Math.PI / 2, w: 1.1, wing: 'C' },
-    ],
+    openings: [{ cx: 0, w: 0.82, y0: 0, y1: 2.05, kind: 'door' }],
+    shelves: [],
     islands: [],
     chairs: [],
-    soloDesk: desks[0],
-    soloChair: chairs[0],
-    readingTable: desks[1],
-    storeChairs: [chairs[1]],
-    floorLamps: [{ x: -1.9, z: 1.4, ry: 0 }],
-    pendants: [{ x: -1.35, z: -1.0, drop: 1.0 }, { x: 1.15, z: -1.0, drop: 1.0 }],
-    floorPlants: [{ x: 1.9, z: 1.5, scale: 0.8 }],
-    seats: [
-      chairSeat('solo-1', chairs[0], 0.46, -1),
-      chairSeat('solo-2', chairs[1], 0.46, -1),
-    ],
+    soloDesk: desk,
+    soloChair: chair,
+    rug: { x: 0, z: 0.35, w: 1.35, d: 1.15 },
+    floorLamps: [],
+    pendants: [],
+    floorPlants: [],
+    seats: [chairSeat('solo-1', chair, 0.42, -1)],
     spawn,
-    spawns: [spawn, { x: -0.7, z: 1.2, ry: Math.PI }],
-    portals: [{ to: 'hub', x: 0, z: -1.95, ry: Math.PI, label: '원미서가', w: 0.9, d: 0.35 }],
+    spawns: [spawn],
+    portals: [{ to: 'hub', x: 0, z: -1.18, ry: Math.PI, label: '원미서가', w: 0.82, d: 0.32 }],
   };
 }
 
@@ -481,13 +508,9 @@ export function colliders(): Collider[] {
   if (isPresent(SEMINAR_TABLE)) rect(SEMINAR_TABLE.x, SEMINAR_TABLE.z, SEMINAR_TABLE.w, SEMINAR_TABLE.d, 0, SEMINAR_TABLE.h);
   SEMINAR_CHAIRS.forEach((c, i) => rect(c.x, c.z, 0.36, 0.36, 0, 0.84, [`seminar-${i + 1}`]));
   if (isPresent(SOLO_DESK)) rect(SOLO_DESK.x, SOLO_DESK.z, SOLO_DESK.w, SOLO_DESK.d, 0, SOLO_DESK.h);
-  if (isPresent(SOLO_CHAIR)) rect(SOLO_CHAIR.x, SOLO_CHAIR.z, 0.4, 0.4, 0, 0.9, ['solo-1']);
+  if (isPresent(SOLO_CHAIR)) rect(SOLO_CHAIR.x, SOLO_CHAIR.z, 0.52, 0.55, 0, 0.9, ['solo-1']);
   if (isPresent(READING_TABLE)) {
     rect(READING_TABLE.x, READING_TABLE.z, READING_TABLE.w, READING_TABLE.d, 0, READING_TABLE.h);
-    // 솔로 2번 책상 좌석
-    if (currentSpaceId() === 'solo') {
-      STORE_CHAIRS.forEach((c, i) => rect(c.x, c.z, 0.4, 0.4, 0, 0.9, [`solo-${i + 2}`]));
-    }
   }
   CHAIRS.forEach((c, i) => rect(c.x, c.z, 0.36, 0.36, 0, 0.84, [`chair-${i + 1}`]));
   if (isPresent(SOFA)) {
@@ -505,12 +528,25 @@ export function colliders(): Collider[] {
   }
   if (isPresent(COFFEE_TABLE)) rect(COFFEE_TABLE.x, COFFEE_TABLE.z, COFFEE_TABLE.w, COFFEE_TABLE.d, COFFEE_TABLE.ry, COFFEE_TABLE.h);
   if (isPresent(SCREEN)) rect(SCREEN.x, SCREEN.z, 0.08, SCREEN.w, SCREEN.ry, SCREEN.h + 0.6);
-  if (isPresent(STAGE)) rect(STAGE.x, STAGE.z, STAGE.w, STAGE.d, 0, STAGE.h + 0.05);
+  if (isPresent(STAGE)) {
+    const stageIds = SEATS.filter((s) => s.id.startsWith('stage-')).map((s) => s.id);
+    rect(STAGE.x, STAGE.z, STAGE.w, STAGE.d, 0, STAGE.h + 0.05, stageIds.length ? stageIds : undefined);
+  }
   if (isPresent(THEATER) && THEATER.rows > 0) {
-    const tw = THEATER.cols * THEATER.seatW + 0.2;
-    const td = THEATER.rows * THEATER.rowDepth + 0.15;
+    const tw = THEATER.cols * THEATER.seatW + 0.55;
+    const td = THEATER.rows * THEATER.rowDepth + 0.2;
     const theaterIds = SEATS.filter((s) => s.id.startsWith('theater-')).map((s) => s.id);
-    rect(THEATER.x, THEATER.z + (THEATER.rows - 1) * THEATER.rowDepth * 0.35, tw, td, THEATER.ry, 1.1, theaterIds);
+    // 벽쪽 원점 기준, 무대 방향으로 단이 내려감(ry=π면 -z)
+    const midZ = THEATER.z + Math.cos(THEATER.ry) * (td * 0.45);
+    const midX = THEATER.x + Math.sin(THEATER.ry) * (td * 0.45);
+    rect(midX, midZ, tw, td, THEATER.ry, 1.2, theaterIds);
+    // 열린 쪽 오름 계단(로컬 -x)
+    const stairLocalX = -(tw / 2 + 0.35);
+    rect(
+      THEATER.x + Math.cos(THEATER.ry) * stairLocalX,
+      THEATER.z + Math.sin(THEATER.ry) * stairLocalX,
+      0.7, td, THEATER.ry, 1.0,
+    );
   }
   for (const l of FLOOR_LAMPS) rect(l.x, l.z, 0.34, 0.34, 0, 1.5);
   for (const p of FLOOR_PLANTS) rect(p.x, p.z, 0.45 * p.scale, 0.45 * p.scale, 0, 1.0 * p.scale);

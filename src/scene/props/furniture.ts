@@ -18,6 +18,11 @@ export function buildChairAt(bucket: MergeBucket, r: Rng, m: THREE.Matrix4): voi
   buildChair(bucket, r, m);
 }
 
+/** 등받이 없는 스툴. m은 바닥 중앙, 앉은 사람은 +z. */
+export function buildStoolAt(bucket: MergeBucket, r: Rng, m: THREE.Matrix4): void {
+  buildStool(bucket, r, m);
+}
+
 export function buildIslands(bucket: MergeBucket, rng: Rng, books: BookCollector): void {
   ISLANDS.forEach((isl, idx) => {
     const r = rng.fork(`island-${idx}`);
@@ -128,6 +133,27 @@ function buildChair(bucket: MergeBucket, r: Rng, m: THREE.Matrix4): void {
   }
   // 방석
   bucket.add('cushion', projectUV(bevelBox(sw - 0.05, 0.035, sd - 0.05, 0.015, 3), 'x', { along: 0.25, across: 0.25 }), at(trs(0, seatH + 0.017, 0.01)));
+}
+
+/** 스툴: 둥근 좌판 + 네 다리 + 가로대. 등받이 없음. */
+function buildStool(bucket: MergeBucket, r: Rng, m: THREE.Matrix4): void {
+  const at = (mm: THREE.Matrix4) => m.clone().multiply(mm);
+  const seatH = 0.46;
+  const top = new THREE.CylinderGeometry(0.19, 0.2, 0.035, 20);
+  projectUV(top, 'y', { offset: [r.float(), r.float()] });
+  bucket.add('honey', top, at(trs(0, seatH - 0.017, 0)), new THREE.Color(1, 1, 1).multiplyScalar(0.94 + r.range(0, 0.06)));
+  const cush = new THREE.CylinderGeometry(0.175, 0.175, 0.028, 18);
+  projectUV(cush, 'y', { along: 0.3, across: 0.3 });
+  bucket.add('cushion', cush, at(trs(0, seatH + 0.012, 0)));
+  const legR = 0.155;
+  for (const a of [0.6, 2.2, 3.8, 5.4]) {
+    const lx = Math.cos(a) * legR;
+    const lz = Math.sin(a) * legR;
+    woodPart(bucket, r, 'honey', taperLeg(seatH - 0.03, 0.032, 0.022), 'y', at(trs(lx, 0, lz)));
+  }
+  // 다리 사이 가로대(낮게)
+  woodPart(bucket, r, 'honey', bevelBox(legR * 2 - 0.04, 0.016, 0.016, 0.003), 'x', at(trs(0, 0.14, 0)));
+  woodPart(bucket, r, 'honey', bevelBox(0.016, 0.016, legR * 2 - 0.04, 0.003), 'z', at(trs(0, 0.14, 0)));
 }
 
 /** 창가 바테이블(높은 상판 + 다리). */

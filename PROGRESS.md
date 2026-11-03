@@ -40,6 +40,10 @@
 - 확인 방법: `.env`에 URL·키 → `?presence=supabase`로 탭/기기 2개. Edge 배포 후 책 펼치기 표지. `npm run typecheck && npm run build`.
 - 새 패키지: `@supabase/supabase-js` 2.118.0 — Pages에서 다른 기기 함께 있기·표지 프록시용.
 
+### 운영자 수정 (2026-11-03) — 시작 화면 빈티지 서점 문
+- 한 일: 시작 화면을 일러스트 서점 문(`src/assets/start-door.jpg`)으로. 문구는 「부천 원미동 비북스」「서점 한 켠에서 각자의 책을 함께 읽어요」「책방 입장하기」만. 입장 시 문 좌우 열림 후 로딩.
+- 확인 방법: `npm run typecheck && npm run build`. `npm run dev`에서 문·문구·열림 애니메이션 확인.
+
 ---
 
 ## 단계 1 — 스캐폴딩, 시드 난수, 품질 설정, 로딩 화면, 빈 장면

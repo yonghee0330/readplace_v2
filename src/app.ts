@@ -22,12 +22,14 @@ import { WsPresence } from './net/wsPresence';
 import { loadBook, setCoverApiBase, type ReadingBook } from './reader/book';
 import { FocusMode, type FocusReader } from './reader/focus';
 import { buildBookstore, type Bookstore } from './scene/bookstore';
+import { facingPortal } from './scene/props/portals';
 import { BookCard } from './ui/bookCard';
 import { BookBadgeHits } from './ui/bookBadgeHits';
 import { BookPeekSheet } from './ui/bookPeek';
 import { BookSheet } from './ui/bookSheet';
+import { CinemaWatch } from './ui/cinemaWatch';
 import {
-  PORTALS, SEATS, SPAWN, SPAWNS, applyLayout, colliders, currentSpaceId, spaceLabel,
+  PORTALS, SCREEN, SEATS, SPAWN, SPAWNS, applyLayout, colliders, currentSpaceId, isPresent, spaceLabel,
   type PortalDef, type SpaceId,
 } from './scene/layout';
 import { buildPostFx, type PostFx } from './scene/postfx';
@@ -110,6 +112,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   const ui = document.getElementById('ui')!;
   const toasts = new Toasts(ui);
   const focus = new FocusMode(ui, () => setFocus(false));
+  const cinemaWatch = new CinemaWatch(ui, () => setCinemaWatch(false));
   const bookCard = new BookCard(ui);
   const bookSheet = new BookSheet();
   const bookPeek = new BookPeekSheet();
@@ -166,6 +169,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       sfx.play('tap');
       spaceSheet.open((id) => askEnterPortal({ to: id, x: 0, z: 0, ry: 0, label: spaceLabel(id), w: 1, d: 1 }));
     },
+    sit: () => sitDown(),
     nod: () => nod(),
     book: () => toggleBook(),
     focus: () => setFocus(!focus.active),
@@ -342,6 +346,17 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
 
   // ---------- 액션 ----------
   let lastNod = -Infinity;
+  function sitDown(): void {
+    if (focus.active) return;
+    sfx.play('tap');
+    const seat = movement.sitPreferred();
+    if (!seat) {
+      toasts.show('지금은 빈자리가 없어요');
+      return;
+    }
+    toasts.show('빈자리를 찾아 앉으러 가요');
+  }
+
   function nod(): void {
     if (!connected) return;
     const now = performance.now();
@@ -421,6 +436,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     if (on === focus.active) return;
     if (on) {
       if (!connected) return;
+      if (cinemaWatch.active) setCinemaWatch(false);
       // 이미 책을 펼친 상태면 같은 책으로 바로 집중 모드
       if (movement.reading && currentBook) {
         enterFocusWith(currentBook);
@@ -437,6 +453,22 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     bookCard.hide();
     pushState(true);
     syncPeers();
+  }
+
+  function setCinemaWatch(on: boolean): void {
+    if (on === cinemaWatch.active) return;
+    if (on) {
+      if (focus.active) setFocus(false);
+      cinemaWatch.enter();
+      store.lighting.setCinemaPlaying(true);
+      hud.setHidden(true);
+      me.hideLabel = true;
+      return;
+    }
+    cinemaWatch.exit();
+    store.lighting.setCinemaPlaying(false);
+    hud.setHidden(false);
+    me.hideLabel = false;
   }
 
   /** 읽기 모드 구도: 책 읽는 내 아바타를 앞쪽 비스듬한 위에서 본다(머리가 큰 아바타라 어깨 너머로는 책이 가려짐). */
@@ -493,9 +525,17 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     portalPromptFor = null;
   };
 
+  function portalUsable(portal: PortalDef): boolean {
+    // 1인실: 책상 쪽을 볼 때는 등 뒤 출구 포털 비활성
+    if (currentSpaceId() !== 'solo') return true;
+    const p = me.root.position;
+    return facingPortal(portal, { x: p.x, z: p.z, ry: me.root.rotation.y });
+  }
+
   function askEnterPortal(portal: PortalDef): void {
-    if (switchingSpace || focus.active || anySheetOpen()) return;
+    if (switchingSpace || focus.active || cinemaWatch.active || anySheetOpen()) return;
     if (portal.to === currentSpaceId()) return;
+    if (!portalUsable(portal)) return;
     const name = spaceLabel(portal.to);
     portalPending = portal;
     portalPromptFor = portal.to;
@@ -519,6 +559,17 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       box.userData.portal = p;
       hitGroup.add(box);
     }
+    if (isPresent(SCREEN) && SCREEN.w > 0.1) {
+      const y = 0.55 + SCREEN.h / 2;
+      const box = new THREE.Mesh(
+        new THREE.BoxGeometry(0.2, SCREEN.h + 0.12, SCREEN.w + 0.12),
+        new THREE.MeshBasicMaterial({ visible: false }),
+      );
+      box.position.set(SCREEN.x, y, SCREEN.z);
+      box.rotation.y = SCREEN.ry;
+      box.userData.screen = true;
+      hitGroup.add(box);
+    }
     hitGroup.updateMatrixWorld(true);
   }
   rebuildHits();
@@ -526,6 +577,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   let switchingSpace = false;
   async function enterSpace(to: SpaceId, via?: PortalDef): Promise<void> {
     if (switchingSpace || to === currentSpaceId() || focus.active) return;
+    if (cinemaWatch.active) setCinemaWatch(false);
     switchingSpace = true;
     if (movement.reading) {
       movement.setReading(false);
@@ -544,6 +596,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     setNpcsVisible(npcs, to === 'hub' && params.npc && settings.npc);
     hud.setRoomName(spaceLabel(to));
     toasts.show(to === 'hub' ? '원미서가로 돌아왔어요' : `${spaceLabel(to)}에 들어왔어요`);
+    if (to === 'cinema') toasts.show('스크린을 누르면 영화가 시작돼요');
     portalPromptIgnoreUntil = performance.now() + 2000;
     portalPromptFor = null;
     // 공간마다 presence 채널을 나눠 다른 방 사람과 겹치지 않게
@@ -593,7 +646,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   });
 
   function clickAt(clientX: number, clientY: number): void {
-    if (focus.active || anySheetOpen()) return;
+    if (focus.active || cinemaWatch.active || anySheetOpen()) return;
     const rect = canvas.getBoundingClientRect();
     // 머리 위 책 배지: 화면 좌표 히트(오버레이 레이어·빌보드 뒷면 문제 없음)
     const badgeActor = crowd.pickBookBadge(clientX, clientY, camera, rect);
@@ -607,6 +660,10 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     const hits = ray.intersectObjects([...hitGroup.children, store.floor], false);
     const hit = hits[0];
     if (!hit) return;
+    if (hit.object.userData.screen) {
+      setCinemaWatch(true);
+      return;
+    }
     const portal = hit.object.userData.portal as PortalDef | undefined;
     if (portal) {
       askEnterPortal(portal);
@@ -636,12 +693,28 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
 
   // 책 배지 위에 올리면 포인터로 클릭 가능함을 알린다
   canvas.addEventListener('pointermove', (e) => {
-    if (focus.active || anySheetOpen()) {
+    if (focus.active || cinemaWatch.active || anySheetOpen()) {
       canvas.style.cursor = '';
       return;
     }
     const rect = canvas.getBoundingClientRect();
-    canvas.style.cursor = crowd.pickBookBadge(e.clientX, e.clientY, camera, rect) ? 'pointer' : '';
+    if (crowd.pickBookBadge(e.clientX, e.clientY, camera, rect)) {
+      canvas.style.cursor = 'pointer';
+      return;
+    }
+    if (isPresent(SCREEN) && SCREEN.w > 0.1) {
+      const ndc = new THREE.Vector2(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      ray.setFromCamera(ndc, camera);
+      const hits = ray.intersectObjects(hitGroup.children, false);
+      if (hits[0]?.object.userData.screen) {
+        canvas.style.cursor = 'pointer';
+        return;
+      }
+    }
+    canvas.style.cursor = '';
   });
   canvas.addEventListener('pointerleave', () => {
     canvas.style.cursor = '';
@@ -652,13 +725,15 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     if (e.key === 'Escape') {
       // 시트가 열려 있으면 시트를 먼저 닫는다(포커스가 시트 밖에 있어도)
       if (anySheetOpen()) closeOpenSheet();
+      else if (cinemaWatch.active) setCinemaWatch(false);
       else if (focus.active) setFocus(false);
       return;
     }
-    if (anySheetOpen()) return;
+    if (anySheetOpen() || cinemaWatch.active) return;
     if (e.key === '1') nod();
     else if (e.key === '2') toggleBook();
     else if (e.key === '3') setFocus(!focus.active);
+    else if (e.key === '4') sitDown();
   });
 
   // ---------- 품질 ----------
@@ -729,13 +804,17 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       follow.update(dt);
     }
     crowd.update(dt, t, camera);
-    badgeHits.sync(crowd, camera, canvas, !focus.active && !anySheetOpen());
+    badgeHits.sync(crowd, camera, canvas, !focus.active && !cinemaWatch.active && !anySheetOpen());
     ring.update(dt);
-    store.updatePortals(t);
+    {
+      const p = me.root.position;
+      store.updatePortals(t, { x: p.x, z: p.z, ry: me.root.rotation.y, space: currentSpaceId() });
+    }
     // 빛나는 문 앞에 서면 확인만 띄움(자동 전환 없음). 포털끼리 직접 연결하지 않음.
     if (!focus.active && !anySheetOpen() && performance.now() > portalPromptIgnoreUntil) {
       const p = me.root.position;
       for (const portal of PORTALS) {
+        if (!portalUsable(portal)) continue;
         if (Math.hypot(p.x - portal.x, p.z - portal.z) < 0.7) {
           if (portalPromptFor !== portal.to) askEnterPortal(portal);
           break;

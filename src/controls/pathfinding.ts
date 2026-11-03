@@ -21,6 +21,8 @@ export class NavGrid {
         let b = x < ROOM.x0 + WALL_MARGIN || x > ROOM.x1 - WALL_MARGIN || z < ROOM.z0 + WALL_MARGIN || z > ROOM.z1 - WALL_MARGIN;
         if (!b) {
           for (const c of list) {
+            // 앉을 수 있는 가구(계단석·무대·소파 등)는 접근·착석을 위해 통과 허용
+            if (c.seatable) continue;
             if (x > c.x0 - MARGIN && x < c.x1 + MARGIN && z > c.z0 - MARGIN && z < c.z1 + MARGIN) {
               b = true;
               break;

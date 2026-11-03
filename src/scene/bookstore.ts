@@ -45,7 +45,7 @@ export interface Bookstore {
   spaces: Record<SpaceId, SpaceView>;
   activeSpace: SpaceId;
   setActiveSpace: (id: SpaceId) => void;
-  updatePortals: (t: number) => void;
+  updatePortals: (t: number, viewer?: { x: number; z: number; ry: number; space: SpaceId }) => void;
   stats: { books: number; planks: number };
 }
 
@@ -189,6 +189,7 @@ export async function buildBookstore(
     // 창밖·비는 허브에만 의미 있음 — 서브룸에서는 꺼 둠
     exterior.group.visible = id === 'hub';
     windowRain.mesh.visible = id === 'hub' && q.windowRainShader;
+    lighting.setSpaceMood(id);
     renderer.shadowMap.needsUpdate = true;
   };
 
@@ -201,7 +202,8 @@ export async function buildBookstore(
     spaces,
     activeSpace,
     setActiveSpace,
-    updatePortals: (t: number) => spaces[activeSpace]?.portalGlow.update(t),
+    updatePortals: (t: number, viewer?: { x: number; z: number; ry: number; space: SpaceId }) =>
+      spaces[activeSpace]?.portalGlow.update(t, viewer),
     stats: { books: totalBooks, planks: totalPlanks },
   };
 }

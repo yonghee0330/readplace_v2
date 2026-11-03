@@ -28,7 +28,7 @@ npm install
 npm run dev
 ```
 
-브라우저에서 `http://localhost:5173`을 열고 "들어가기"를 누릅니다.
+브라우저에서 `http://localhost:5173`을 열고 "책방 입장하기"를 누릅니다.
 
 | 명령 | 하는 일 |
 |---|---|

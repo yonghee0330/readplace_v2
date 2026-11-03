@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#24251f" />
-    <meta name="description" content="부천 원미동 동네 서점 비북스의 3D 공간. 아바타로 들어와 함께 앉아 각자의 책을 읽습니다." />
-    <title>비북스 · 원미서가</title>
+    <meta name="theme-color" content="#1a1612" />
+    <meta name="description" content="부천 원미동 동네책방 비북스의 3D 공간. 서점 한 켠에서 각자의 책을 함께 읽어요." />
+    <title>비북스 · 부천 원미동</title>
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
@@ -14,17 +14,25 @@
   </head>
   <body>
     <div id="stage">
-      <canvas id="scene" role="img" aria-label="비 오는 오후의 작은 동네 서점 비북스 실내. 벽마다 책이 꽂힌 나무 서가, 창가 독서 테이블, 소파와 스탠드 조명이 있다."></canvas>
+      <canvas id="scene" role="img" aria-label="부천 원미동 동네책방 비북스 실내. 벽마다 책이 꽂힌 나무 서가와 독서 테이블이 있다."></canvas>
     </div>
 
     <section id="start" class="screen start" aria-labelledby="start-title">
-      <div class="start-inner">
-        <p class="start-kicker">부천 원미동 동네 서점</p>
-        <h1 id="start-title" class="start-title">비북스</h1>
-        <p class="start-room" id="start-room">원미서가</p>
-        <p class="start-note" id="start-note">한 번에 20명까지</p>
-        <p class="start-copy">비 오는 오후, 서점 한쪽에 앉아<br />각자의 책을 함께 읽어요.</p>
-        <button id="start-enter" class="start-enter" type="button" aria-label="서점에 들어가기">들어가기</button>
+      <div class="start-wall" aria-hidden="true"></div>
+      <div class="start-stage">
+        <div class="start-doorway" aria-hidden="true">
+          <div class="start-glow"></div>
+          <div class="start-door-art">
+            <div class="start-leaf start-leaf-l"></div>
+            <div class="start-leaf start-leaf-r"></div>
+          </div>
+        </div>
+
+        <div class="start-words">
+          <h1 id="start-title" class="start-title">부천 원미동 비북스</h1>
+          <p class="start-copy">서점 한 켠에서 각자의 책을 함께 읽어요</p>
+          <button id="start-enter" class="start-enter" type="button" aria-label="책방 입장하기">책방 입장하기</button>
+        </div>
       </div>
     </section>
 
@@ -38,11 +46,11 @@
       </div>
     </section>
 
-    <section id="full" class="screen" hidden aria-labelledby="full-title">
-      <div class="start-inner">
-        <p class="start-kicker">비북스</p>
-        <h1 id="full-title" class="start-title">자리가 가득 찼어요</h1>
-        <p class="start-copy" id="full-copy">지금은 20명이 모두 모였어요.<br />누군가 나가면 다시 들어올 수 있어요.</p>
+    <section id="full" class="screen full" hidden aria-labelledby="full-title">
+      <div class="full-inner">
+        <p class="full-kicker">비북스</p>
+        <h1 id="full-title" class="full-title">자리가 가득 찼어요</h1>
+        <p class="full-copy" id="full-copy">지금은 20명이 모두 모였어요.<br />누군가 나가면 다시 들어올 수 있어요.</p>
         <button id="full-back" class="start-enter" type="button">첫 화면으로</button>
       </div>
     </section>

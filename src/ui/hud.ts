@@ -1,5 +1,6 @@
-// HUD: 상단 좌측(나가기·서점 이름), 상단 우측(접속자 수·소리·설정), 하단 액션 3개(눈인사·책 펼치기·읽기 모드),
-// 연결 상태 필. 모든 버튼에 aria-label, 하단 액션은 연결 전 비활성 + "연결 중" 툴팁.
+// HUD: 상단 좌측(나가기·서점 이름), 상단 우측(접속자 수·소리·설정),
+// 하단 액션(앉기·눈인사·책 펼치기·읽기 모드), 연결 상태 필.
+// 모든 버튼에 aria-label, 하단 액션은 연결 전 비활성 + "연결 중" 툴팁.
 import { ROOM_CAPACITY, roomLabel } from '../core/params';
 
 const ICON = {
@@ -9,6 +10,7 @@ const ICON = {
   soundOff: '<path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4L18 18M6 18l1.6-1.6M16.4 7.6L18 6"/>',
   door: '<path d="M6 4.5h9.5A1.5 1.5 0 0117 6v14H6z"/><path d="M6 20.5H4.5V4.8A1.3 1.3 0 015.8 3.5H6"/><circle cx="14.2" cy="12" r="0.9"/>',
+  sit: '<path d="M5 20v-7.5A2.5 2.5 0 017.5 10H16"/><path d="M7 20h12"/><path d="M16 10V7.5A2.5 2.5 0 0118.5 5H20"/><path d="M5 14.5h11.5A2.5 2.5 0 0120 17"/>',
   nod: '<circle cx="12" cy="8.5" r="4"/><path d="M5.5 20c.8-3.6 3.4-5.6 6.5-5.6s5.7 2 6.5 5.6"/><path d="M9.6 8.6c.7.6 1.6.6 2.4 0M12.6 8.6c.7.6 1.6.6 2.4 0" />',
   book: '<path d="M12 6.5c-2-1.4-4.6-1.8-7.5-1.3v12.5c2.9-.5 5.5-.1 7.5 1.3 2-1.4 4.6-1.8 7.5-1.3V5.2c-2.9-.5-5.5-.1-7.5 1.3z"/><path d="M12 6.5V19"/>',
   focus: '<path d="M4 8V5.5A1.5 1.5 0 015.5 4H8M16 4h2.5A1.5 1.5 0 0120 5.5V8M20 16v2.5a1.5 1.5 0 01-1.5 1.5H16M8 20H5.5A1.5 1.5 0 014 18.5V16"/><path d="M12 9c-1.2-.8-2.6-1-4-.7v6.4c1.4-.3 2.8-.1 4 .7 1.2-.8 2.6-1 4-.7V8.3c-1.4-.3-2.8-.1-4 .7z"/>',
@@ -23,6 +25,7 @@ export interface HudHandlers {
   settings(): void;
   /** 공간 이동 메뉴 */
   spaces(): void;
+  sit(): void;
   nod(): void;
   book(): void;
   focus(): void;
@@ -55,6 +58,7 @@ export class Hud {
       </div>
       <div class="hud-status" hidden><span class="dot"></span><span class="status-text">다시 연결하고 있어요</span></div>
       <nav class="hud-actions" aria-label="동작">
+        <button type="button" class="action" data-act="sit" aria-label="앉기 (단축키 4)" data-tip="연결 중">${icon('sit')}<span>앉기</span></button>
         <button type="button" class="action" data-act="nod" aria-label="눈인사 (단축키 1)" data-tip="연결 중">${icon('nod')}<span>눈인사</span></button>
         <button type="button" class="action" data-act="book" aria-label="책 펼치기 (단축키 2)" aria-pressed="false" data-tip="연결 중">${icon('book')}<span>책 펼치기</span></button>
         <button type="button" class="action" data-act="focus" aria-label="읽기 모드 (단축키 3)" data-tip="연결 중">${icon('focus')}<span>읽기 모드</span></button>
@@ -77,6 +81,7 @@ export class Hud {
       if ((e.currentTarget as HTMLElement).getAttribute('aria-disabled') === 'true') return;
       fn();
     };
+    q('[data-act="sit"]').addEventListener('click', guard(h.sit));
     q('[data-act="nod"]').addEventListener('click', guard(h.nod));
     this.bookBtn.addEventListener('click', guard(h.book));
     q('[data-act="focus"]').addEventListener('click', guard(h.focus));

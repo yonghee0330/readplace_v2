@@ -80,6 +80,33 @@ export class Movement {
     return this.goSit(seat) ? seat : null;
   }
 
+  /**
+   * 빈 자리 중 마음에 드는 곳으로 알아서 가서 앉는다.
+   * 가까운 자리·소파·세미나·계단석을 조금 더 선호하고, 약간의 무작위로 고른다.
+   */
+  sitPreferred(): Seat | null {
+    const taken = this.takenSeats();
+    const me = { x: this.me.root.position.x, z: this.me.root.position.z };
+    const free = this.seats.filter((s) => !taken.has(s.id) && s.id !== this.seat?.id);
+    if (!free.length) return null;
+    const prefer = (id: string) => {
+      if (id.startsWith('sofa-') || id.startsWith('seminar-') || id.startsWith('theater-') || id.startsWith('solo-')) return 0;
+      if (id.startsWith('chair-') || id.startsWith('bench-')) return 0.4;
+      if (id.startsWith('stage-')) return 2.2;
+      return 0.8;
+    };
+    const ranked = free
+      .map((s) => {
+        const d = Math.hypot(s.x - me.x, s.z - me.z);
+        return { s, score: d * 0.55 + prefer(s.id) + Math.random() * 1.8 };
+      })
+      .sort((a, b) => a.score - b.score);
+    for (const { s } of ranked) {
+      if (this.goSit(s)) return s;
+    }
+    return null;
+  }
+
   goSit(seat: Seat): boolean {
     this.reading = false;
     const ap = seatApproach(seat);

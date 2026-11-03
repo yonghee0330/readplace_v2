@@ -1,10 +1,10 @@
 // 조명: 창 방향 키라이트(그림자), 실내 전구, 반구광, 바닥의 창빛 패치, 약한 환경 반사.
-// 부천 날씨(비·눈·맑음)에 따라 창빛 색·세기를 살짝 바꾼다.
+// 부천 날씨(비·눈·맑음)에 따라 창빛 색·세기를 살짝 바꾼다. 영화감상실은 어둡게.
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { QualityProfile } from '../core/quality';
 import type { WeatherKind } from '../weather/bucheon';
-import { BACK_OPENINGS, ROOM } from './layout';
+import { BACK_OPENINGS, ROOM, type SpaceId } from './layout';
 import type { LampAnchor } from './props/lamps';
 import { windowLightTexture } from './textures';
 
@@ -15,6 +15,9 @@ export interface Lighting {
   group: THREE.Group;
   applyQuality(q: QualityProfile): void;
   setWeather(kind: WeatherKind): void;
+  setSpaceMood(space: SpaceId): void;
+  /** 영화 재생 중: 감상실을 거의 암전해 화면만 남긴다. */
+  setCinemaPlaying(on: boolean): void;
 }
 
 export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene, lamps: LampAnchor[], q: QualityProfile): Lighting {
@@ -61,6 +64,22 @@ export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
   const hemi = new THREE.HemisphereLight(0xf2e1c4, 0x4f3622, 0.65);
   group.add(hemi);
 
+  // 영화감상실용: 은은한 노란 필·백라이트
+  const cinemaFill = new THREE.PointLight(0xffd089, 0, 8, 2);
+  cinemaFill.position.set(0, 1.55, 1.4);
+  const cinemaBack = new THREE.PointLight(0xffb86a, 0, 6, 2);
+  cinemaBack.position.set(0, 1.15, -1.3);
+  const cinemaAmb = new THREE.PointLight(0xffe2b0, 0, 10, 2);
+  cinemaAmb.position.set(0, 2.1, 0);
+  group.add(cinemaFill, cinemaBack, cinemaAmb);
+
+  // 1인실: 뱅커스 램프 위치의 따뜻한 포인트 + 약한 앰비언트
+  const soloLamp = new THREE.PointLight(0xffc070, 0, 4.5, 2);
+  soloLamp.position.set(-0.55, 1.12, 1.02);
+  const soloAmb = new THREE.PointLight(0xffe0b8, 0, 5.5, 2);
+  soloAmb.position.set(0.15, 1.85, 0.2);
+  group.add(soloLamp, soloAmb);
+
   // 바닥의 창 모양 밝은 영역: 창 네 모서리를 빛 방향으로 바닥에 투영한 평행사변형
   const patchTex = windowLightTexture(3, 2);
   const patchMat = new THREE.MeshBasicMaterial({
@@ -97,6 +116,8 @@ export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
 
   let lastQ = q;
   let weather: WeatherKind = 'rain';
+  let mood: SpaceId = 'hub';
+  let cinemaPlaying = false;
 
   const tintForWeather = () => {
     if (weather === 'clear') {
@@ -126,6 +147,53 @@ export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
     }
   };
 
+  const applyMood = () => {
+    const cinema = mood === 'cinema';
+    const solo = mood === 'solo';
+    const playing = cinema && cinemaPlaying;
+    const hush = cinema || solo;
+    lamps.forEach((l, i) => {
+      if (points[i]) points[i].intensity = hush ? 0 : (l.kind === 'floor' ? 1.4 : 1.5);
+    });
+    spot.intensity = hush ? 0 : 9;
+    cinemaFill.intensity = playing ? 0.05 : cinema ? 0.85 : 0;
+    cinemaBack.intensity = playing ? 0.02 : cinema ? 0.45 : 0;
+    cinemaAmb.intensity = playing ? 0.04 : cinema ? 0.55 : 0;
+    soloLamp.intensity = solo ? 2.4 : 0;
+    soloAmb.intensity = solo ? 0.55 : 0;
+    if (playing) {
+      key.intensity = 0.02;
+      hemi.intensity = 0.06;
+      hemi.color.setHex(0x1a1410);
+      hemi.groundColor.setHex(0x080604);
+      patchMat.opacity = 0;
+      for (const m of patches) m.visible = false;
+      scene.environmentIntensity = 0.02;
+      key.color.setHex(0x332820);
+    } else if (cinema) {
+      key.intensity = 0.12;
+      hemi.intensity = 0.28;
+      hemi.color.setHex(0xffe6c4);
+      hemi.groundColor.setHex(0x4a3220);
+      patchMat.opacity = 0;
+      for (const m of patches) m.visible = false;
+      scene.environmentIntensity = 0.08;
+      key.color.setHex(0xffe0b0);
+    } else if (solo) {
+      key.intensity = 0.18;
+      hemi.intensity = 0.38;
+      hemi.color.setHex(0xffefd4);
+      hemi.groundColor.setHex(0x4a3424);
+      patchMat.opacity = 0;
+      for (const m of patches) m.visible = false;
+      scene.environmentIntensity = 0.12;
+      key.color.setHex(0xffe2b8);
+    } else {
+      for (const m of patches) m.visible = true;
+      scene.environmentIntensity = 0.18;
+    }
+  };
+
   const applyQuality = (qq: QualityProfile) => {
     lastQ = qq;
     renderer.shadowMap.enabled = qq.shadows;
@@ -139,6 +207,7 @@ export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
     hemi.intensity = qq.shadows ? 0.65 : 0.85;
     tintForWeather();
     applyWeatherBoost();
+    applyMood();
     key.shadow.map?.dispose();
     key.shadow.map = null;
     spot.shadow.map?.dispose();
@@ -152,5 +221,16 @@ export function buildLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
     applyQuality(lastQ);
   };
 
-  return { group, applyQuality, setWeather };
+  const setSpaceMood = (space: SpaceId) => {
+    mood = space;
+    if (space !== 'cinema') cinemaPlaying = false;
+    applyQuality(lastQ);
+  };
+
+  const setCinemaPlaying = (on: boolean) => {
+    cinemaPlaying = on;
+    applyQuality(lastQ);
+  };
+
+  return { group, applyQuality, setWeather, setSpaceMood, setCinemaPlaying };
 }

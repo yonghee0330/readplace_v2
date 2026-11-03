@@ -1,11 +1,29 @@
 // 포털: 나무 문틀 + 바닥 문턱(경계) + 빛나는 문 패널(펄스) + 공간 이름 간판.
 import * as THREE from 'three';
 import { MergeBucket, bevelBox, projectUV, trs } from '../geom';
-import { PORTALS, spaceLabel, type PortalDef } from '../layout';
+import { PORTALS, spaceLabel, type PortalDef, type SpaceId } from '../layout';
+
+export interface PortalViewer {
+  x: number;
+  z: number;
+  ry: number;
+  space: SpaceId;
+}
 
 export interface PortalGlow {
   group: THREE.Group;
-  update: (t: number) => void;
+  update: (t: number, viewer?: PortalViewer) => void;
+}
+
+/** 아바타가 포털 쪽을 보고 있는지(앞으로 나갈 때). 1인실은 등 뒤면 숨김. */
+export function facingPortal(portal: PortalDef, viewer: { x: number; z: number; ry: number }, minDot = 0.35): boolean {
+  const dx = portal.x - viewer.x;
+  const dz = portal.z - viewer.z;
+  const len = Math.hypot(dx, dz);
+  if (len < 1e-3) return true;
+  const fx = Math.sin(viewer.ry);
+  const fz = Math.cos(viewer.ry);
+  return (fx * dx + fz * dz) / len >= minDot;
 }
 
 function makeNameTexture(label: string): THREE.CanvasTexture {
@@ -140,11 +158,21 @@ export function buildPortalGlow(portals: readonly PortalDef[] = PORTALS): Portal
 
   return {
     group,
-    update: (t: number) => {
+    update: (t: number, viewer?: PortalViewer) => {
       const pulse = 1.35 + Math.sin(t * 2.2) * 0.45;
       const a = 0.55 + Math.sin(t * 2.2) * 0.18;
       for (const m of mats) m.emissiveIntensity = pulse;
       for (const m of rimMats) m.opacity = a;
+      // 1인실: 책상 볼 때는 등 뒤 빛나는 문 숨김, 돌아서 나갈 때만 표시
+      for (const root of group.children) {
+        const portal = root.userData.portal as PortalDef | undefined;
+        if (!portal) continue;
+        if (viewer?.space === 'solo') {
+          root.visible = facingPortal(portal, viewer);
+        } else {
+          root.visible = true;
+        }
+      }
     },
   };
 }
