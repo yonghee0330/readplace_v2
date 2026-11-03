@@ -173,8 +173,8 @@ function makeHub(): SpaceLayout {
     readingTable: { x: 0, z: 0, ry: 0, w: tableW, d: tableD, h: 0.74 },
     chairs,
     barTable: { x: 0.15, z: -3.05, ry: 0, w: 2.4, d: 0.42, h: 1.05 },
-    // 창가 바 왼쪽 벽 — 가오픈 포스트잇 코르크 보드
-    eventBoard: { x: -1.15, z: -3.42, ry: 0, w: 1.55, h: 1.4 },
+    // 창가 바테이블 중심 뒤 벽 — 포스트잇 코르크 보드
+    eventBoard: { x: 0.15, z: -3.42, ry: 0, w: 1.55, h: 1.4 },
     counter: { x: -2.55, z: 2.55, ry: 0.15, w: 1.35, d: 0.52, h: 0.98 },
     sofa,
     coffeeTable: { x: 1.85, z: 2.05, ry: Math.PI / 2, w: 0.75, d: 0.42, h: 0.4 },
