@@ -6,9 +6,13 @@ import './style.css';
 import { startApp } from './app';
 import { checkManagerCode, loadManagerSession, saveManagerSession } from './core/manager';
 import { readParams } from './core/params';
+import { warmHometownDong } from './net/nickname';
 import { registerServiceWorker } from './pwa/register';
 import { LoadingScreen } from './ui/loading';
 import { fetchBucheonWeather, weatherAria } from './weather/bucheon';
+
+// 닉네임용 동네(동) — IP로 대략 추정(실패 시 경인 랜덤). 시작 화면에 미리 워밍.
+void warmHometownDong();
 
 declare global {
   interface Window {

@@ -71,6 +71,10 @@
 ### 운영자 수정 (2026-11-03) — 포스트잇 Supabase 반영
 - 한 일: `bbooks-meta`에 `bbooks_postits` 테이블·RLS·Realtime publication 적용. 클라이언트에 postgres_changes 구독 추가(폴링 보조).
 - 확인 방법: 기기/탭 2개에서 보드에 붙이면 상대에게도 나타남. `npm run typecheck && npm run build`.
+
+### 운영자 수정 (2026-11-03) — 닉네임: 동네 + 고전 인물
+- 한 일: `망원동 안나` 형식. 동네는 IP(ipwho.is)로 서울·부천·인천·경기 풀 매핑, 실패 시 경인 동 랜덤. 등장인물은 세계문학 고전 짧은 이름.
+- 확인 방법: 설정에서 다시 뽑기 → `○○동 ○○`. `npm run typecheck && npm run build`.
 - SPEC과 달라진 점: NPC는 앉기→서가 앞 서서 읽기(운영자 요청). 서점 음악은 Web Audio 패드 대신 YouTube 임베드(운영자 지정 곡).
 
 ---

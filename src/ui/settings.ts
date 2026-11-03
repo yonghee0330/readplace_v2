@@ -6,7 +6,7 @@ import {
   type Profile, type Settings,
 } from '../core/storage';
 import type { HairStyle } from '../net/presence';
-import { randomNickname } from '../net/nickname';
+import { randomNickname, warmHometownDong } from '../net/nickname';
 import { Sheet } from './sheet';
 
 const QUALITY_LABEL: Record<Settings['quality'], string> = { auto: '자동', low: '낮음', medium: '보통', high: '높음' };
@@ -48,9 +48,12 @@ export class SettingsSheet {
         <div class="nick" aria-live="polite"></div>
         <p class="field-note">서든리 매니저(대표) 전용 아바타예요. 닉네임·외형은 고정입니다.</p>
       </div>` : `
-      <div class="field field-row">
-        <div><div class="field-label">닉네임</div><div class="nick" aria-live="polite"></div></div>
-        <button type="button" class="btn" data-act="reroll" aria-label="닉네임 다시 뽑기">다시 뽑기</button>
+      <div class="field">
+        <div class="field-row">
+          <div><div class="field-label">닉네임</div><div class="nick" aria-live="polite"></div></div>
+          <button type="button" class="btn" data-act="reroll" aria-label="닉네임 다시 뽑기">다시 뽑기</button>
+        </div>
+        <p class="field-note">동네 이름 + 세계문학 등장인물이에요. 동네는 접속 지역을 대략 맞춰 고릅니다.</p>
       </div>
       <fieldset class="field">
         <legend>아바타 색</legend>
@@ -89,8 +92,13 @@ export class SettingsSheet {
     );
     b.querySelector('[data-act="reroll"]')?.addEventListener('click', () => {
       if (this.manager) return;
-      this.profile.nickname = randomNickname();
-      this.commitProfile();
+      const btn = b.querySelector<HTMLButtonElement>('[data-act="reroll"]');
+      if (btn) btn.disabled = true;
+      void warmHometownDong().then((dong) => {
+        this.profile.nickname = randomNickname(Math.random, dong);
+        this.commitProfile();
+        if (btn) btn.disabled = false;
+      });
     });
     b.querySelectorAll<HTMLButtonElement>('[data-color]').forEach((btn) =>
       btn.addEventListener('click', () => {
