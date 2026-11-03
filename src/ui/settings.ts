@@ -1,4 +1,4 @@
-// 설정 시트: 그래픽 품질, 닉네임 다시 뽑기, 아바타 색·머리 모양, 모션 줄이기, NPC 독자, 키보드 이동, 소리.
+// 설정 시트: 그래픽 품질, 닉네임 고르기, 아바타 색·머리 모양, 모션 줄이기, NPC 독자, 키보드 이동, 소리.
 // 바꾸는 즉시 localStorage에 저장하고 앱에 알린다. 매니저는 외형·닉을 잠근다.
 import type { QualityLevel } from '../core/params';
 import {
@@ -6,7 +6,7 @@ import {
   type Profile, type Settings,
 } from '../core/storage';
 import type { HairStyle } from '../net/presence';
-import { randomNickname, warmHometownDong } from '../net/nickname';
+import { nicknameChoices, warmHometownDong } from '../net/nickname';
 import { Sheet } from './sheet';
 
 const QUALITY_LABEL: Record<Settings['quality'], string> = { auto: '자동', low: '낮음', medium: '보통', high: '높음' };
@@ -25,6 +25,7 @@ export interface SettingsHandlers {
 export class SettingsSheet {
   readonly sheet = new Sheet('설정', 'settings');
   private manager: boolean;
+  private nickPicks: string[] = [];
 
   constructor(
     private settings: Settings,
@@ -49,11 +50,11 @@ export class SettingsSheet {
         <p class="field-note">서든리 매니저(대표) 전용 아바타예요. 닉네임·외형은 고정입니다.</p>
       </div>` : `
       <div class="field">
-        <div class="field-row">
-          <div><div class="field-label">닉네임</div><div class="nick" aria-live="polite"></div></div>
-          <button type="button" class="btn" data-act="reroll" aria-label="닉네임 다시 뽑기">다시 뽑기</button>
-        </div>
-        <p class="field-note">동네 이름 + 세계문학 등장인물이에요. 동네는 접속 지역을 대략 맞춰 고릅니다.</p>
+        <div class="field-label">닉네임</div>
+        <div class="nick" aria-live="polite"></div>
+        <p class="field-note">이 브라우저에 저장돼요. 동네는 접속 지역을 대략 맞춘 힌트이고, 아래에서 원하는 이름을 고르면 바뀝니다.</p>
+        <div class="nick-picks" role="listbox" aria-label="닉네임 고르기" data-nick-picks></div>
+        <button type="button" class="btn" data-act="reshuffle" aria-label="다른 닉네임 보기">다른 이름 보기</button>
       </div>
       <fieldset class="field">
         <legend>아바타 색</legend>
@@ -90,15 +91,21 @@ export class SettingsSheet {
         this.h.quality(this.settings.quality);
       }),
     );
-    b.querySelector('[data-act="reroll"]')?.addEventListener('click', () => {
+    b.querySelector('[data-act="reshuffle"]')?.addEventListener('click', () => {
       if (this.manager) return;
-      const btn = b.querySelector<HTMLButtonElement>('[data-act="reroll"]');
+      const btn = b.querySelector<HTMLButtonElement>('[data-act="reshuffle"]');
       if (btn) btn.disabled = true;
-      void warmHometownDong().then((dong) => {
-        this.profile.nickname = randomNickname(Math.random, dong);
-        this.commitProfile();
+      void this.refreshNickPicks().finally(() => {
         if (btn) btn.disabled = false;
       });
+    });
+    b.querySelector('[data-nick-picks]')?.addEventListener('click', (e) => {
+      if (this.manager) return;
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-nick]');
+      if (!btn?.dataset.nick) return;
+      this.profile.nickname = btn.dataset.nick;
+      this.commitProfile();
+      this.renderNickPicks();
     });
     b.querySelectorAll<HTMLButtonElement>('[data-color]').forEach((btn) =>
       btn.addEventListener('click', () => {
@@ -134,6 +141,7 @@ export class SettingsSheet {
         else this.h.keyboardMove(input.checked);
       }),
     );
+    if (!this.manager) void this.refreshNickPicks();
     this.render();
   }
 
@@ -141,11 +149,28 @@ export class SettingsSheet {
   setProfile(p: Profile): void {
     this.profile = p;
     this.render();
+    this.renderNickPicks();
   }
 
   open(): void {
     this.render();
+    if (!this.manager) void this.refreshNickPicks();
     this.sheet.open();
+  }
+
+  private async refreshNickPicks(): Promise<void> {
+    const dong = await warmHometownDong();
+    this.nickPicks = nicknameChoices(6, { dong, exclude: this.profile.nickname });
+    this.renderNickPicks();
+  }
+
+  private renderNickPicks(): void {
+    const box = this.sheet.body.querySelector('[data-nick-picks]');
+    if (!box) return;
+    box.innerHTML = this.nickPicks.map((n) => {
+      const on = n === this.profile.nickname;
+      return `<button type="button" class="nick-pick" role="option" data-nick="${escapeAttr(n)}" aria-selected="${on}">${escapeHtml(n)}</button>`;
+    }).join('');
   }
 
   private commitProfile(): void {
@@ -170,4 +195,12 @@ export class SettingsSheet {
     const volVal = b.querySelector('[data-vol-val]');
     if (volVal) volVal.textContent = String(this.settings.musicVolume);
   }
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function escapeAttr(s: string): string {
+  return escapeHtml(s).replace(/'/g, '&#39;');
 }

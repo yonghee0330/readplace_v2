@@ -449,7 +449,30 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
 .field { border: 0; margin: 0 0 18px; padding: 0; }
 .field legend, .field-label { font-size: 13px; color: #7a6a55; margin-bottom: 8px; padding: 0; }
 .field-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.nick { font: 600 16px/1.4 var(--serif); }
+.nick { font: 600 16px/1.4 var(--serif); margin-bottom: 6px; }
+.nick-picks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 10px 0 10px;
+}
+.nick-pick {
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid rgba(36, 37, 31, 0.16);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--green);
+  font: 500 13px/1.25 var(--serif);
+  cursor: pointer;
+  text-align: left;
+}
+.nick-pick:hover { background: #f7f1e5; border-color: rgba(36, 37, 31, 0.28); }
+.nick-pick[aria-selected='true'] {
+  background: var(--green);
+  color: var(--paper);
+  border-color: var(--green);
+}
 .seg { display: flex; gap: 6px; flex-wrap: wrap; }
 .seg button { min-height: 36px; padding: 0 12px; border: 1px solid rgba(36, 37, 31, 0.18); border-radius: 999px; background: #fff; color: var(--green); font: 500 13px/1 var(--sans); cursor: pointer; }
 .seg button small { margin-left: 3px; color: #8a7a65; }
@@ -771,6 +794,36 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   box-shadow: 2px 3px 0 rgba(40, 25, 10, 0.18);
   color: #2a241c;
   pointer-events: none;
+}
+.postit-note.is-mine {
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 3;
+}
+.postit-note.is-mine:hover,
+.postit-note.is-editing {
+  box-shadow: 2px 3px 0 rgba(40, 25, 10, 0.22), 0 0 0 2px rgba(36, 37, 31, 0.35);
+  z-index: 4;
+}
+.postit-note-acts {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.postit-note-act {
+  min-height: 22px;
+  padding: 0 6px;
+  border: 1px solid rgba(36, 37, 31, 0.22);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.75);
+  color: #2a241c;
+  font: 600 10px/1 var(--sans);
+  cursor: pointer;
+}
+.postit-note-act:hover { background: #fff; }
+.postit-composer.is-editing {
+  box-shadow: 0 0 0 2px #5b8a5a, 0 12px 36px rgba(0, 0, 0, 0.28);
 }
 .postit-pin {
   position: absolute;

@@ -10,13 +10,19 @@ create table if not exists public.bbooks_postits (
   y double precision not null,
   rot double precision not null default 0,
   nickname text,
+  author_id text,
   created_at timestamptz not null default now()
 );
+
+-- 기존 테이블에 author_id 추가
+alter table public.bbooks_postits add column if not exists author_id text;
 
 alter table public.bbooks_postits enable row level security;
 
 drop policy if exists "bbooks_postits_select" on public.bbooks_postits;
 drop policy if exists "bbooks_postits_insert" on public.bbooks_postits;
+drop policy if exists "bbooks_postits_update" on public.bbooks_postits;
+drop policy if exists "bbooks_postits_delete" on public.bbooks_postits;
 
 create policy "bbooks_postits_select"
   on public.bbooks_postits for select
@@ -28,13 +34,16 @@ create policy "bbooks_postits_insert"
   to anon, authenticated
   with check (true);
 
--- upsert용 (같은 id 재전송)
-drop policy if exists "bbooks_postits_update" on public.bbooks_postits;
 create policy "bbooks_postits_update"
   on public.bbooks_postits for update
   to anon, authenticated
   using (true)
   with check (true);
+
+create policy "bbooks_postits_delete"
+  on public.bbooks_postits for delete
+  to anon, authenticated
+  using (true);
 
 -- 다른 탭·기기에서 바로 보이도록 Realtime
 do $$

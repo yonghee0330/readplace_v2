@@ -135,3 +135,26 @@ export function randomNickname(rand: () => number = Math.random, dong?: string):
   const who = pick(LITERARY_NAMES, rand);
   return `${place} ${who}`;
 }
+
+/**
+ * 고를 수 있는 닉네임 후보. 같은 세션의 동네(IP 추정)를 쓰되 인물은 다양하게.
+ * IP가 닉을 고정하진 않고, 동네 풀만 힌트로 쓴다. 실제 닉은 브라우저에 저장된다.
+ */
+export function nicknameChoices(
+  count = 6,
+  opts: { dong?: string; exclude?: string; rand?: () => number } = {},
+): string[] {
+  const rand = opts.rand ?? Math.random;
+  const dong = opts.dong ?? peekHometownDong() ?? undefined;
+  const out: string[] = [];
+  const seen = new Set<string>();
+  if (opts.exclude) seen.add(opts.exclude);
+  for (let i = 0; i < count * 8 && out.length < count; i++) {
+    const n = randomNickname(rand, dong);
+    if (seen.has(n)) continue;
+    seen.add(n);
+    out.push(n);
+  }
+  while (out.length < count) out.push(randomNickname(rand));
+  return out;
+}

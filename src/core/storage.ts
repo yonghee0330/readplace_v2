@@ -55,6 +55,24 @@ export function saveProfile(p: Profile): void {
   write(PROFILE_KEY, p);
 }
 
+const AUTHOR_KEY = 'bbooks.authorId';
+
+/** 이 브라우저의 작성자 id(포스트잇 수정·삭제 판별). 로그인 없이 기기 단위로만 유지. */
+export function loadAuthorId(): string {
+  try {
+    let id = localStorage.getItem(AUTHOR_KEY);
+    if (!id || id.length < 8 || id.length > 40) {
+      const a = new Uint8Array(8);
+      crypto.getRandomValues(a);
+      id = Array.from(a, (b) => b.toString(16).padStart(2, '0')).join('');
+      localStorage.setItem(AUTHOR_KEY, id);
+    }
+    return id;
+  } catch {
+    return `tmp-${Math.random().toString(16).slice(2, 10)}`;
+  }
+}
+
 export function loadSettings(): Settings {
   const s = read<Settings>(SETTINGS_KEY, {
     quality: 'auto',

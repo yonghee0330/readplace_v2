@@ -16,6 +16,8 @@ export interface PostitNote {
   y: number;
   rot: number;
   nickname: string;
+  /** 작성 브라우저 id. 없으면 예전 노트(닉네임으로만 판별). */
+  authorId?: string;
   createdAt: number;
 }
 
@@ -59,6 +61,9 @@ function clampNote(n: Partial<PostitNote> & { text?: string }): PostitNote | nul
   if (!text) return null;
   const color = POSTIT_COLORS.some((c) => c.id === n.color) ? (n.color as PostitColor) : 'yellow';
   const shape = POSTIT_SHAPES.some((s) => s.id === n.shape) ? (n.shape as PostitShape) : 'square';
+  const authorId = typeof n.authorId === 'string' && n.authorId.length >= 8
+    ? n.authorId.slice(0, 40)
+    : undefined;
   return {
     id: typeof n.id === 'string' && n.id ? n.id : newId(),
     text,
@@ -67,9 +72,16 @@ function clampNote(n: Partial<PostitNote> & { text?: string }): PostitNote | nul
     x: Math.min(0.92, Math.max(0.08, Number(n.x) || 0.5)),
     y: Math.min(0.92, Math.max(0.08, Number(n.y) || 0.5)),
     rot: Math.max(-12, Math.min(12, Number(n.rot) || 0)),
-    nickname: String(n.nickname ?? '손님').slice(0, 20) || '손님',
+    nickname: String(n.nickname ?? '손님').slice(0, 40) || '손님',
+    authorId,
     createdAt: Number(n.createdAt) || Date.now(),
   };
+}
+
+/** 이 브라우저가 쓴 노트인지. authorId가 있으면 그걸 우선, 없으면 닉네임. */
+export function isPostitMine(n: PostitNote, authorId: string, nickname: string): boolean {
+  if (n.authorId) return n.authorId === authorId;
+  return n.nickname === nickname;
 }
 
 function readLocal(): PostitNote[] {
@@ -94,6 +106,11 @@ function writeLocal(notes: PostitNote[]): void {
 
 export type PostitListener = (notes: PostitNote[]) => void;
 
+type BcPayload =
+  | { op: 'upsert'; note: PostitNote }
+  | { op: 'delete'; id: string }
+  | PostitNote;
+
 export class PostitStore {
   private notes: PostitNote[] = [];
   private listeners = new Set<PostitListener>();
@@ -116,7 +133,6 @@ export class PostitStore {
           remote.filter((n) => !(n.nickname === '비북스' && LEGACY_SAMPLES.has(n.text))),
         );
         writeLocal(notes);
-        // 원격이 비어 있고 로컬만 있으면 한 번 올린다
         if (remote.length === 0 && notes.length) {
           for (const n of notes.slice(0, 8)) void this.pushRemote(n);
         }
@@ -127,7 +143,19 @@ export class PostitStore {
     if (typeof BroadcastChannel !== 'undefined') {
       this.ch = new BroadcastChannel(CHANNEL);
       this.ch.onmessage = (e) => {
-        const n = clampNote(e.data as PostitNote);
+        const data = e.data as BcPayload;
+        if (data && typeof data === 'object' && 'op' in data) {
+          if (data.op === 'delete') {
+            this.removeLocal(data.id, false);
+            return;
+          }
+          if (data.op === 'upsert') {
+            const n = clampNote(data.note);
+            if (n) this.upsertLocal(n, false);
+            return;
+          }
+        }
+        const n = clampNote(data as PostitNote);
         if (!n) return;
         this.upsertLocal(n, false);
       };
@@ -161,11 +189,7 @@ export class PostitStore {
           if (payload.eventType === 'DELETE') {
             const id = (payload.old as { id?: string } | null)?.id;
             if (!id) return;
-            const next = this.notes.filter((n) => n.id !== id);
-            if (next.length === this.notes.length) return;
-            this.notes = next;
-            writeLocal(this.notes);
-            this.emit();
+            this.removeLocal(id, false);
             return;
           }
           const row = payload.new as Record<string, unknown> | null;
@@ -179,6 +203,7 @@ export class PostitStore {
             y: Number(row.y),
             rot: Number(row.rot),
             nickname: String(row.nickname ?? '손님'),
+            authorId: row.author_id ? String(row.author_id) : undefined,
             createdAt: row.created_at ? Date.parse(String(row.created_at)) : Date.now(),
           });
           if (n) this.upsertLocal(n, false);
@@ -189,6 +214,10 @@ export class PostitStore {
 
   list(): PostitNote[] {
     return [...this.notes];
+  }
+
+  get(id: string): PostitNote | undefined {
+    return this.notes.find((n) => n.id === id);
   }
 
   onChange(cb: PostitListener): () => void {
@@ -203,6 +232,7 @@ export class PostitStore {
     x: number;
     y: number;
     nickname: string;
+    authorId: string;
   }): Promise<PostitNote | null> {
     if (this.notes.length >= POSTIT_MAX_COUNT) return null;
     const note = clampNote({
@@ -217,6 +247,50 @@ export class PostitStore {
     return note;
   }
 
+  async update(
+    id: string,
+    patch: { text?: string; color?: PostitColor; shape?: PostitShape },
+    who: { authorId: string; nickname: string },
+  ): Promise<PostitNote | null> {
+    const cur = this.notes.find((n) => n.id === id);
+    if (!cur || !isPostitMine(cur, who.authorId, who.nickname)) return null;
+    const note = clampNote({
+      ...cur,
+      text: patch.text ?? cur.text,
+      color: patch.color ?? cur.color,
+      shape: patch.shape ?? cur.shape,
+      authorId: cur.authorId ?? who.authorId,
+      nickname: cur.nickname,
+    });
+    if (!note) return null;
+    this.upsertLocal(note, true);
+    void this.pushRemote(note);
+    return note;
+  }
+
+  async remove(id: string, who: { authorId: string; nickname: string }): Promise<boolean> {
+    const cur = this.notes.find((n) => n.id === id);
+    if (!cur || !isPostitMine(cur, who.authorId, who.nickname)) return false;
+    this.removeLocal(id, true);
+    void this.deleteRemote(id);
+    return true;
+  }
+
+  private removeLocal(id: string, broadcast: boolean): void {
+    const next = this.notes.filter((n) => n.id !== id);
+    if (next.length === this.notes.length) return;
+    this.notes = next;
+    writeLocal(this.notes);
+    this.emit();
+    if (broadcast) {
+      try {
+        this.ch?.postMessage({ op: 'delete', id } satisfies BcPayload);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
   private upsertLocal(note: PostitNote, broadcast: boolean): void {
     const i = this.notes.findIndex((n) => n.id === note.id);
     if (i >= 0) this.notes[i] = note;
@@ -226,7 +300,7 @@ export class PostitStore {
     this.emit();
     if (broadcast) {
       try {
-        this.ch?.postMessage(note);
+        this.ch?.postMessage({ op: 'upsert', note } satisfies BcPayload);
       } catch {
         /* ignore */
       }
@@ -250,10 +324,36 @@ export class PostitStore {
     try {
       const { data, error } = await sb
         .from('bbooks_postits')
-        .select('id,text,color,shape,x,y,rot,nickname,created_at')
+        .select('id,text,color,shape,x,y,rot,nickname,author_id,created_at')
         .order('created_at', { ascending: true })
         .limit(POSTIT_MAX_COUNT);
-      if (error || !data) return null;
+      if (error || !data) {
+        // author_id 컬럼이 아직 없으면 예전 스키마로 재시도
+        if (error) {
+          const fallback = await sb
+            .from('bbooks_postits')
+            .select('id,text,color,shape,x,y,rot,nickname,created_at')
+            .order('created_at', { ascending: true })
+            .limit(POSTIT_MAX_COUNT);
+          if (fallback.error || !fallback.data) return null;
+          return fallback.data
+            .map((row) =>
+              clampNote({
+                id: row.id,
+                text: row.text,
+                color: row.color,
+                shape: row.shape,
+                x: row.x,
+                y: row.y,
+                rot: row.rot,
+                nickname: row.nickname,
+                createdAt: row.created_at ? Date.parse(row.created_at) : Date.now(),
+              }),
+            )
+            .filter(Boolean) as PostitNote[];
+        }
+        return null;
+      }
       return data
         .map((row) =>
           clampNote({
@@ -265,6 +365,7 @@ export class PostitStore {
             y: row.y,
             rot: row.rot,
             nickname: row.nickname,
+            authorId: (row as { author_id?: string }).author_id,
             createdAt: row.created_at ? Date.parse(row.created_at) : Date.now(),
           }),
         )
@@ -278,7 +379,7 @@ export class PostitStore {
     const sb = getSupabase();
     if (!sb || !this.remoteReady) return;
     try {
-      const { error } = await sb.from('bbooks_postits').upsert({
+      const row: Record<string, unknown> = {
         id: note.id,
         text: note.text,
         color: note.color,
@@ -288,10 +389,32 @@ export class PostitStore {
         rot: note.rot,
         nickname: note.nickname,
         created_at: new Date(note.createdAt).toISOString(),
-      });
-      if (error) console.warn('[bbooks] postit upsert', error.message);
+      };
+      if (note.authorId) row.author_id = note.authorId;
+      const { error } = await sb.from('bbooks_postits').upsert(row);
+      if (error) {
+        // author_id 미적용 DB면 컬럼 빼고 재시도
+        if (note.authorId) {
+          delete row.author_id;
+          const retry = await sb.from('bbooks_postits').upsert(row);
+          if (retry.error) console.warn('[bbooks] postit upsert', retry.error.message);
+        } else {
+          console.warn('[bbooks] postit upsert', error.message);
+        }
+      }
     } catch {
       /* 오프라인이면 로컬만 */
+    }
+  }
+
+  private async deleteRemote(id: string): Promise<void> {
+    const sb = getSupabase();
+    if (!sb || !this.remoteReady) return;
+    try {
+      const { error } = await sb.from('bbooks_postits').delete().eq('id', id);
+      if (error) console.warn('[bbooks] postit delete', error.message);
+    } catch {
+      /* ignore */
     }
   }
 

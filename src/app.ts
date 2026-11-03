@@ -14,7 +14,7 @@ import { ROOM_CAPACITY, apiBaseFromWs, resolvePresence, type Params, type Qualit
 import { detectQuality, profileFor, type QualityProfile } from './core/quality';
 import { Rng } from './core/rng';
 import { MANAGER_COLOR, MANAGER_NICKNAME } from './core/manager';
-import { loadProfile, loadSettings, saveSettings, type Profile, type Settings } from './core/storage';
+import { loadAuthorId, loadProfile, loadSettings, saveSettings, type Profile, type Settings } from './core/storage';
 import { LocalPresence } from './net/localPresence';
 import { randomNickname } from './net/nickname';
 import { newId, sanitizeSharedBook, type ActionEvent, type Presence, type PlayerState, type SharedBook } from './net/presence';
@@ -32,7 +32,7 @@ import { BookSheet } from './ui/bookSheet';
 import { CinemaWatch } from './ui/cinemaWatch';
 import { DrinkSheet } from './ui/drinkSheet';
 import { PostitWall } from './ui/postitWall';
-import { drinkToast, isDrinkKind, type DrinkKind } from './net/drink';
+import { drinkCooldownMs, drinkToast, isDrinkKind, type DrinkKind } from './net/drink';
 import { PostitStore } from './net/postit';
 import {
   EVENT_BOARD, PORTALS, SCREEN, SEATS, SPAWN, SPAWNS, applyLayout, colliders, currentSpaceId, isPresent, spaceLabel,
@@ -140,8 +140,9 @@ export async function startApp(
   const toasts = new Toasts(ui);
   const focus = new FocusMode(ui, () => setFocus(false));
   const cinemaWatch = new CinemaWatch(ui, () => setCinemaWatch(false));
+  const authorId = loadAuthorId();
   const postitStore = new PostitStore();
-  const postitWall = new PostitWall(ui, postitStore, () => sessionNick, () => setPostitWall(false));
+  const postitWall = new PostitWall(ui, postitStore, () => sessionNick, () => authorId, () => setPostitWall(false));
   void postitStore.init().then(() => {
     store.eventBoard?.setNotes(postitStore.list());
     postitStore.onChange((notes) => store.eventBoard?.setNotes(notes));
@@ -423,7 +424,7 @@ export async function startApp(
   // ---------- 액션 ----------
   let lastNod = -Infinity;
   let lastDrink = -Infinity;
-  const DRINK_COOLDOWN = 2500;
+  let lastDrinkCd = 2500;
   const drinkSheet = new DrinkSheet((kind) => sipDrink(kind));
 
   function sitDown(): void {
@@ -451,7 +452,7 @@ export async function startApp(
 
   function openDrink(): void {
     if (!connected || focus.active) return;
-    if (performance.now() - lastDrink < DRINK_COOLDOWN) return;
+    if (performance.now() - lastDrink < lastDrinkCd) return;
     sfx.play('tap');
     drinkSheet.open();
   }
@@ -459,13 +460,15 @@ export async function startApp(
   function sipDrink(kind: DrinkKind): void {
     if (!connected) return;
     const now = performance.now();
-    if (now - lastDrink < DRINK_COOLDOWN) return;
+    if (now - lastDrink < lastDrinkCd) return;
+    const cd = drinkCooldownMs(kind);
     lastDrink = now;
+    lastDrinkCd = cd;
     me.avatar.anim.sip(kind);
     sfx.play('tap');
     presence.sendAction({ type: 'drink', drink: kind, from: myId, nickname: sessionNick, t: Date.now() });
     toasts.show(drinkToast(kind));
-    hud.cooldown('drink', DRINK_COOLDOWN);
+    hud.cooldown('drink', cd);
   }
 
   function applyBook(book: ReadingBook, focusMode: boolean): void {
