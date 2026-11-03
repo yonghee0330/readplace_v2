@@ -1,10 +1,11 @@
 // 앱 조립: 장면 + 아바타 + 이동·카메라 + HUD + 함께 있기(presence) + 읽기 모드.
 import * as THREE from 'three';
 import { Ambience } from './audio/ambience';
+import { BookstoreBgm } from './audio/bgm';
 import { Sfx } from './audio/sfx';
 import { Crowd, type Actor } from './avatar/crowd';
 import { OVERLAY_LAYER } from './avatar/nameplate';
-import { placeAtSeat, setNpcsVisible, spawnNpcs } from './avatar/npc';
+import { placeAtSeat, spawnNpcs, syncNpcVisibility } from './avatar/npc';
 import { CAM_PRESETS, FollowCamera, applyPreset, createCamera } from './controls/camera';
 import { CanvasInput, isTyping } from './controls/input';
 import { Movement } from './controls/movement';
@@ -12,7 +13,7 @@ import { Loop } from './core/loop';
 import { ROOM_CAPACITY, apiBaseFromWs, resolvePresence, type Params, type QualityLevel } from './core/params';
 import { detectQuality, profileFor, type QualityProfile } from './core/quality';
 import { Rng } from './core/rng';
-import { loadProfile, loadSettings, saveSettings, type Profile, type Settings } from './core/storage';
+import { loadProfile, loadSettings, NATURE_GAIN, saveSettings, type Profile, type Settings } from './core/storage';
 import { LocalPresence } from './net/localPresence';
 import { randomNickname } from './net/nickname';
 import { newId, sanitizeSharedBook, type ActionEvent, type Presence, type PlayerState, type SharedBook } from './net/presence';
@@ -89,7 +90,8 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   let sessionNick = profile.nickname;
   const me: Actor = crowd.add(myId, 'me', sessionNick, profile, true);
   const npcs = spawnNpcs(crowd, rng);
-  setNpcsVisible(npcs, params.npc && settings.npc);
+  const refreshNpcs = () => syncNpcVisibility(npcs, currentSpaceId(), params.npc && settings.npc);
+  refreshNpcs();
 
   let lastSentAt = 0;
   // HUD·presence가 만들어지기 전에 이동 상태가 바뀌어도 보내지 않게 한다.
@@ -138,12 +140,21 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
   // ---------- 소리 ----------
   // AudioContext는 사용자가 처음 누른 뒤에만 만든다. 지난번에 켜 두었으면 첫 클릭·키 입력에서 다시 켠다.
   const amb = new Ambience();
+  const bgm = new BookstoreBgm();
   const sfx = new Sfx(amb);
+  amb.setMusicSynth(false);
+  amb.setNatureLevel(NATURE_GAIN[settings.nature]);
+  function applySoundLayers(): void {
+    const on = settings.sound;
+    amb.setEnabled(on);
+    amb.setNatureLevel(on ? NATURE_GAIN[settings.nature] : 0);
+    bgm.setEnabled(on && settings.music);
+  }
   if (settings.sound) {
     const resume = () => {
       removeEventListener('pointerdown', resume, true);
       removeEventListener('keydown', resume, true);
-      if (settings.sound) amb.setEnabled(true);
+      if (settings.sound) applySoundLayers();
     };
     addEventListener('pointerdown', resume, true);
     addEventListener('keydown', resume, true);
@@ -159,7 +170,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       settings.sound = !settings.sound;
       saveSettings(settings);
       hud.setSound(settings.sound);
-      amb.setEnabled(settings.sound);
+      applySoundLayers();
     },
     settings: () => {
       sfx.play('tap');
@@ -167,7 +178,11 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     },
     spaces: () => {
       sfx.play('tap');
-      spaceSheet.open((id) => askEnterPortal({ to: id, x: 0, z: 0, ry: 0, label: spaceLabel(id), w: 1, d: 1 }));
+      // 메뉴 이동은 시선·근접 제한 없이 확인만 (1인실 등에서도 항상 가능)
+      spaceSheet.open((id) => askEnterPortal(
+        { to: id, x: 0, z: 0, ry: 0, label: spaceLabel(id), w: 1, d: 1 },
+        { fromMenu: true },
+      ));
     },
     sit: () => sitDown(),
     nod: () => nod(),
@@ -213,14 +228,22 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       follow.reducedMotion = v;
       applyWeather();
     },
-    npc: (v) => setNpcsVisible(npcs, params.npc && v),
+    npc: () => refreshNpcs(),
     keyboardMove: () => {},
+    music: (v) => {
+      settings.music = v;
+      if (settings.sound) bgm.setEnabled(v);
+    },
+    nature: (v) => {
+      settings.nature = v;
+      amb.setNatureLevel(settings.sound ? NATURE_GAIN[v] : 0);
+    },
   }, autoLevel);
 
   // 첫 진입 안내
   if (!settings.introDismissed && !params.cam && !params.autoread) {
-    toasts.show('바닥을 눌러 걷기 · 벽의 포털로 다른 공간 입장', {
-      duration: 6000,
+    toasts.show('가오픈 중이에요. 편하게 둘러보시고 의견 남겨 주세요', {
+      duration: 7000,
       kind: 'guide',
       action: {
         label: '다시 보지 않기',
@@ -299,11 +322,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
         pushState(true);
       }
     }
-    // NPC가 앉은 자리에 다른 사람이 앉으면 NPC는 잠시 비켜 준다(겹침 방지)
-    const peerSeats = new Set([...peers.values()].map((s) => s.seatId).filter(Boolean));
-    if (movement.seat) peerSeats.add(movement.seat.id);
-    const inHub = currentSpaceId() === 'hub';
-    for (const n of npcs) n.root.visible = inHub && params.npc && settings.npc && !peerSeats.has(n.seatId);
+    refreshNpcs();
     const count = peers.size + 1;
     hud.setCount(count);
     const readers: FocusReader[] = [];
@@ -338,7 +357,12 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     return space === 'hub' ? params.room : `${params.room}-${space}`;
   }
 
+  function capacityForSpace(space: SpaceId): number {
+    return space === 'solo' ? 1 : params.cap;
+  }
+
   async function connect(): Promise<'ok' | 'full'> {
+    presence.setCapacity(capacityForSpace(currentSpaceId()));
     const result = await presence.connect(presenceRoom(), instance, myState());
     if (result === 'ok') syncPeers();
     return result;
@@ -459,6 +483,9 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     if (on === cinemaWatch.active) return;
     if (on) {
       if (focus.active) setFocus(false);
+      // 영화 소리와 겹치지 않게 서점 BGM·앰비언트 잠시 끔
+      amb.setEnabled(false);
+      bgm.setEnabled(false);
       cinemaWatch.enter();
       store.lighting.setCinemaPlaying(true);
       hud.setHidden(true);
@@ -469,6 +496,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     store.lighting.setCinemaPlaying(false);
     hud.setHidden(false);
     me.hideLabel = false;
+    if (settings.sound) applySoundLayers();
   }
 
   /** 읽기 모드 구도: 책 읽는 내 아바타를 앞쪽 비스듬한 위에서 본다(머리가 큰 아바타라 어깨 너머로는 책이 가려짐). */
@@ -525,17 +553,24 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     portalPromptFor = null;
   };
 
-  function portalUsable(portal: PortalDef): boolean {
-    // 1인실: 책상 쪽을 볼 때는 등 뒤 출구 포털 비활성
-    if (currentSpaceId() !== 'solo') return true;
-    const p = me.root.position;
-    return facingPortal(portal, { x: p.x, z: p.z, ry: me.root.rotation.y });
+  /** 3인칭 카메라가 아바타 너머로 바라보는 수평 방향(모바일 드래그 시선 포함). */
+  function lookYaw(): number {
+    return follow.viewYaw + Math.PI;
   }
 
-  function askEnterPortal(portal: PortalDef): void {
+  function portalUsable(portal: PortalDef): boolean {
+    // 1인실 출구 문: 가까이 있거나, 카메라/시선이 문 쪽일 때만
+    if (currentSpaceId() !== 'solo') return true;
+    const p = me.root.position;
+    const dist = Math.hypot(p.x - portal.x, p.z - portal.z);
+    if (dist < 0.85) return true;
+    return facingPortal(portal, { x: p.x, z: p.z, ry: lookYaw() }, 0.15);
+  }
+
+  function askEnterPortal(portal: PortalDef, opts?: { fromMenu?: boolean }): void {
     if (switchingSpace || focus.active || cinemaWatch.active || anySheetOpen()) return;
     if (portal.to === currentSpaceId()) return;
-    if (!portalUsable(portal)) return;
+    if (!opts?.fromMenu && !portalUsable(portal)) return;
     const name = spaceLabel(portal.to);
     portalPending = portal;
     portalPromptFor = portal.to;
@@ -553,7 +588,8 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
       hitGroup.add(box);
     }
     for (const p of PORTALS) {
-      const box = new THREE.Mesh(new THREE.BoxGeometry(p.w, 2.2, Math.max(0.55, p.d + 0.35)), new THREE.MeshBasicMaterial({ visible: false }));
+      // 모바일 탭이 쉬운 두꺼운 히트 박스
+      const box = new THREE.Mesh(new THREE.BoxGeometry(p.w + 0.15, 2.2, Math.max(0.75, p.d + 0.55)), new THREE.MeshBasicMaterial({ visible: false }));
       box.position.set(p.x, 1.1, p.z);
       box.rotation.y = p.ry;
       box.userData.portal = p;
@@ -594,10 +630,8 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     follow.yaw = spawn.ry + Math.PI;
     follow.fitToSpace(true);
     follow.follow(me.root.position, true);
-    setNpcsVisible(npcs, to === 'hub' && params.npc && settings.npc);
+    refreshNpcs();
     hud.setRoomName(spaceLabel(to));
-    toasts.show(to === 'hub' ? '원미서가로 돌아왔어요' : `${spaceLabel(to)}에 들어왔어요`);
-    if (to === 'cinema') toasts.show('스크린을 누르면 영화가 시작돼요');
     portalPromptIgnoreUntil = performance.now() + 2000;
     portalPromptFor = null;
     // 공간마다 presence 채널을 나눠 다른 방 사람과 겹치지 않게
@@ -608,11 +642,16 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     try {
       const admission = await connect();
       if (admission === 'full') {
-        toasts.show('이 공간은 자리가 가득 찼어요');
+        const occupied = to === 'solo'
+          ? '현재 이용 중입니다. 기다려주세요.'
+          : '이 공간은 자리가 가득 찼어요';
+        toasts.show(occupied);
         switchingSpace = false;
         if (to !== 'hub') await enterSpace('hub');
         return;
       }
+      toasts.show(to === 'hub' ? '비북스-M으로 돌아왔어요' : `${spaceLabel(to)}에 들어왔어요`);
+      if (to === 'cinema') toasts.show('스크린을 누르면 영화가 시작돼요');
       pushState(true);
       syncPeers();
     } finally {
@@ -809,14 +848,17 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     ring.update(dt);
     {
       const p = me.root.position;
-      store.updatePortals(t, { x: p.x, z: p.z, ry: me.root.rotation.y, space: currentSpaceId() });
+      // 1인실 빛나는 문은 카메라 시선 기준(모바일 드래그 대응)
+      store.updatePortals(t, { x: p.x, z: p.z, ry: lookYaw(), space: currentSpaceId() });
     }
     // 빛나는 문 앞에 서면 확인만 띄움(자동 전환 없음). 포털끼리 직접 연결하지 않음.
-    if (!focus.active && !anySheetOpen() && performance.now() > portalPromptIgnoreUntil) {
+    if (!focus.active && !cinemaWatch.active && !anySheetOpen() && performance.now() > portalPromptIgnoreUntil) {
       const p = me.root.position;
       for (const portal of PORTALS) {
         if (!portalUsable(portal)) continue;
-        if (Math.hypot(p.x - portal.x, p.z - portal.z) < 0.7) {
+        // 작은 방(1인실)은 문까지 발걸음이 짧아 탐지 거리를 조금 넓힘
+        const reach = currentSpaceId() === 'solo' ? 1.05 : 0.75;
+        if (Math.hypot(p.x - portal.x, p.z - portal.z) < reach) {
           if (portalPromptFor !== portal.to) askEnterPortal(portal);
           break;
         }
@@ -833,7 +875,7 @@ export async function startApp(params: Params, canvas: HTMLCanvasElement, loadin
     toasts: () => [...toasts.log],
     peers: () => [...peers.values()].map((p) => ({ id: p.id, nickname: p.nickname, state: p.state, seatId: p.seatId, book: p.book })),
     visiblePeerAvatars: () => crowd.list('peer').filter((a) => a.root.visible && a.root.parent).map((a) => ({ id: a.id, nickname: a.nickname, nameplate: !!a.nameplate?.mesh.visible })),
-    npcCount: () => npcs.filter((n) => n.root.visible).length,
+    npcCount: () => npcs.filter((n) => n.actor.root.visible).length,
     sound: () => amb.status(),
     weather: () => weather,
     /** 장면이 쓰는 텍스처 중 가장 큰 변의 길이(성능 예산: 1024px 이하) */

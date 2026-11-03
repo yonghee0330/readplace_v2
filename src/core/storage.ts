@@ -23,14 +23,27 @@ export const OUTFIT_COLORS = ['#c9583e', '#e0a53b', '#5b8a5a', '#3f6e8c', '#8a5a
 export const HAIR_STYLES: HairStyle[] = ['bangs', 'bob', 'short'];
 
 export interface Profile { nickname: string; color: string; hair: HairStyle }
+export type NatureLevel = 'off' | 'low' | 'mid' | 'high';
+
 export interface Settings {
   quality: QualityLevel | 'auto';
   reducedMotion: boolean;
   npc: boolean;
   sound: boolean;
+  /** 유튜브 서점 BGM(기본 켜짐) */
+  music: boolean;
+  /** 빗소리·새소리 자연 앰비언트 */
+  nature: NatureLevel;
   keyboardMove: boolean;
   introDismissed: boolean;
 }
+
+export const NATURE_GAIN: Record<NatureLevel, number> = {
+  off: 0,
+  low: 0.28,
+  mid: 0.55,
+  high: 0.85,
+};
 
 const PROFILE_KEY = 'bbooks.profile';
 const SETTINGS_KEY = 'bbooks.settings';
@@ -49,14 +62,19 @@ export function saveProfile(p: Profile): void {
 }
 
 export function loadSettings(): Settings {
-  return read<Settings>(SETTINGS_KEY, {
+  const s = read<Settings>(SETTINGS_KEY, {
     quality: 'auto',
     reducedMotion: false,
     npc: true,
     sound: false,
+    music: true,
+    nature: 'mid',
     keyboardMove: false,
     introDismissed: false,
   });
+  if (s.music === undefined) s.music = true;
+  if (!s.nature || !(s.nature in NATURE_GAIN)) s.nature = 'mid';
+  return s;
 }
 export function saveSettings(s: Settings): void {
   write(SETTINGS_KEY, s);

@@ -32,8 +32,14 @@ export class WsPresence extends PeerTracker implements Presence {
   /** 탭을 닫을 때 서버의 하트비트 정리(최대 20초)를 기다리지 않고 바로 나갔다고 알린다 */
   private onHide = () => this.disconnect();
 
+  private capacity = ROOM_CAPACITY;
+
   constructor(private url: string) {
     super();
+  }
+
+  setCapacity(n: number): void {
+    this.capacity = Math.max(1, Math.min(ROOM_CAPACITY, Math.round(n)));
   }
 
   connect(room: string, instance: number, me: PlayerState): Promise<'ok' | 'full'> {
@@ -68,7 +74,7 @@ export class WsPresence extends PeerTracker implements Presence {
       this.attempt = 0;
       // 다시 연결할 때 받은 목록은 조용히 반영(이미 알던 사람들)
       this.quietUntil = Date.now() + 1500;
-      this.send({ type: 'join', room: this.room, instance: this.instance, state: this.me });
+      this.send({ type: 'join', room: this.room, instance: this.instance, state: this.me, cap: this.capacity });
       clearInterval(this.heartbeat);
       this.heartbeat = window.setInterval(() => this.me && this.send({ type: 'state', state: { ...this.me, t: Date.now() } }), HEARTBEAT_MS);
     };
@@ -170,7 +176,7 @@ export class WsPresence extends PeerTracker implements Presence {
     } else if (m.type === 'welcome' && Array.isArray(m.peers)) {
       const peers = m.peers.filter(isPlayerState);
       // 서버가 이미 정원을 채운 목록을 주면 들어가지 않는다
-      if (peers.length >= ROOM_CAPACITY) {
+      if (peers.length >= this.capacity) {
         this.rejectFull();
         return;
       }

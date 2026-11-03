@@ -117,23 +117,33 @@ function emptyBase(id: SpaceId, label: string, room: RoomBounds): Omit<SpaceLayo
 /** 중앙 허브 — 테이블·서가·창가 바·매대·소파만 */
 function makeHub(): SpaceLayout {
   const room = roomOf(9, 7);
+  // 8인 중앙 테이블(긴 변 3석 + 양끝 1석)
+  const tableW = 2.45;
+  const tableD = 1.12;
+  const seatOff = 0.5;
+  const along = 0.78;
   const chairs: Placement[] = [
-    { x: -0.55, z: 0.55, ry: Math.PI },
-    { x: 0.55, z: 0.55, ry: Math.PI },
-    { x: -0.55, z: -0.55, ry: 0 },
-    { x: 0.55, z: -0.55, ry: 0 },
+    { x: -along, z: -(tableD / 2 + seatOff), ry: 0 },
+    { x: 0, z: -(tableD / 2 + seatOff), ry: 0 },
+    { x: along, z: -(tableD / 2 + seatOff), ry: 0 },
+    { x: -along, z: tableD / 2 + seatOff, ry: Math.PI },
+    { x: 0, z: tableD / 2 + seatOff, ry: Math.PI },
+    { x: along, z: tableD / 2 + seatOff, ry: Math.PI },
+    { x: -(tableW / 2 + seatOff), z: 0, ry: Math.PI / 2 },
+    { x: tableW / 2 + seatOff, z: 0, ry: -Math.PI / 2 },
   ];
   const sofa = { x: 3.05, z: 2.05, ry: -Math.PI / 2, w: 1.85, d: 0.85 };
   const spawn = { x: 0.2, z: 2.55, ry: Math.PI };
-  // 벽 서가와 겹치지 않게 통로 쪽 문틀
+  // 측벽(+서가가 비는 칸)에 붙인 문형 포털. 벽면 x≈±4.5
+  const doorX = 4.32;
   const portals: PortalDef[] = [
-    { to: 'seminar', x: -3.55, z: -2.35, ry: Math.PI / 2, label: '세미나실', w: 0.85, d: 0.35 },
-    { to: 'cinema', x: 3.55, z: -2.35, ry: -Math.PI / 2, label: '영화감상실', w: 0.85, d: 0.35 },
-    { to: 'lecture', x: -3.55, z: 2.15, ry: Math.PI / 2, label: '계단식 강연', w: 0.85, d: 0.35 },
-    { to: 'solo', x: 3.55, z: 2.15, ry: -Math.PI / 2, label: '1인 작업실', w: 0.85, d: 0.35 },
+    { to: 'seminar', x: -doorX, z: -2.45, ry: Math.PI / 2, label: '세미나실', w: 0.88, d: 0.28 },
+    { to: 'cinema', x: doorX, z: -2.45, ry: -Math.PI / 2, label: '영화감상실', w: 0.88, d: 0.28 },
+    { to: 'lecture', x: -doorX, z: 1.2, ry: Math.PI / 2, label: '계단식 강연', w: 0.88, d: 0.28 },
+    { to: 'solo', x: doorX, z: 1.2, ry: -Math.PI / 2, label: '1인 작업실', w: 0.88, d: 0.28 },
   ];
   return {
-    ...emptyBase('hub', '원미서가', room),
+    ...emptyBase('hub', '비북스-M', room),
     openings: [
       { cx: -2.2, w: 1.55, y0: 1.0, y1: 2.5, kind: 'window' },
       { cx: 0.15, w: 1.7, y0: 1.0, y1: 2.5, kind: 'window' },
@@ -143,16 +153,16 @@ function makeHub(): SpaceLayout {
     ],
     shelves: [
       { x: -4.28, z: -0.1, ry: Math.PI / 2, w: 1.35, wing: 'A' },
-      { x: -4.28, z: 2.4, ry: Math.PI / 2, w: 1.2, wing: 'A' },
+      { x: -4.28, z: 2.55, ry: Math.PI / 2, w: 1.0, wing: 'A' },
       { x: 4.28, z: -0.1, ry: -Math.PI / 2, w: 1.35, wing: 'C' },
-      { x: 4.28, z: 2.4, ry: -Math.PI / 2, w: 1.2, wing: 'C' },
+      { x: 4.28, z: 2.55, ry: -Math.PI / 2, w: 1.0, wing: 'C' },
       { x: -3.0, z: 3.28, ry: Math.PI, w: 1.2, wing: 'A' },
       { x: 3.0, z: 3.28, ry: Math.PI, w: 1.2, wing: 'C' },
     ],
     islands: [
-      { x: -2.15, z: 0.15, ry: 0.08, w: 1.15, d: 0.72, h: 0.78, kind: 'flat' },
+      { x: -2.35, z: 0.15, ry: 0.08, w: 1.05, d: 0.68, h: 0.78, kind: 'flat' },
     ],
-    readingTable: { x: 0, z: 0, ry: 0, w: 1.35, d: 0.78, h: 0.74 },
+    readingTable: { x: 0, z: 0, ry: 0, w: tableW, d: tableD, h: 0.74 },
     chairs,
     barTable: { x: 0.15, z: -3.05, ry: 0, w: 2.4, d: 0.42, h: 1.05 },
     counter: { x: -2.55, z: 2.55, ry: 0.15, w: 1.35, d: 0.52, h: 0.98 },
@@ -162,7 +172,7 @@ function makeHub(): SpaceLayout {
     floorLamps: [{ x: 3.65, z: 2.85, ry: 0 }],
     pendants: [
       { x: 0, z: 0, drop: 0.95 },
-      { x: -2.15, z: 0.15, drop: 0.9 },
+      { x: -2.35, z: 0.15, drop: 0.9 },
       { x: 2.45, z: 2.05, drop: 1.0 },
     ],
     floorPlants: [
@@ -171,7 +181,7 @@ function makeHub(): SpaceLayout {
       { x: 1.2, z: 3.0, scale: 0.85 },
     ],
     seats: [
-      ...chairs.map((p, i) => chairSeat(`chair-${i + 1}`, p, 0.46, p.ry === 0 ? 1 : -1)),
+      ...chairs.map((p, i) => chairSeat(`chair-${i + 1}`, p, 0.46, Math.abs(p.ry) < 0.1 ? 1 : -1)),
       { id: 'sofa-1', x: sofa.x - 0.08, z: sofa.z - 0.48, ry: sofa.ry, y: 0.44, approach: 1 },
       { id: 'sofa-2', x: sofa.x - 0.08, z: sofa.z, ry: sofa.ry, y: 0.44, approach: 1 },
       { id: 'sofa-3', x: sofa.x - 0.08, z: sofa.z + 0.48, ry: sofa.ry, y: 0.44, approach: 1 },
@@ -184,11 +194,11 @@ function makeHub(): SpaceLayout {
       spawn,
       { x: 0.8, z: 2.3, ry: Math.PI },
       { x: -0.6, z: 2.2, ry: Math.PI },
-      { x: 1.2, z: 1.4, ry: -2.4 },
-      { x: -1.3, z: 1.3, ry: 2.4 },
-      { x: 0.0, z: 1.5, ry: Math.PI },
-      { x: 1.6, z: 0.3, ry: -1.2 },
-      { x: -1.35, z: 1.1, ry: 1.2 },
+      { x: 2.0, z: 1.0, ry: -2.2 },
+      { x: -2.0, z: 1.0, ry: 2.2 },
+      { x: 0.0, z: 1.85, ry: Math.PI },
+      { x: 2.1, z: -0.4, ry: -1.2 },
+      { x: -2.1, z: -0.4, ry: 1.2 },
     ],
     portals,
   };
@@ -230,7 +240,7 @@ function makeSeminar(): SpaceLayout {
     spawn,
     spawns: [spawn, { x: -0.7, z: 1.7, ry: Math.PI }, { x: 0.7, z: 1.7, ry: Math.PI }],
     // 출입문은 뒤벽(창·문 개구) — 포털도 같은 쪽
-    portals: [{ to: 'hub', x: 0, z: -2.45, ry: Math.PI, label: '원미서가', w: 0.95, d: 0.35 }],
+    portals: [{ to: 'hub', x: 0, z: -2.45, ry: Math.PI, label: '비북스-M', w: 0.95, d: 0.35 }],
   };
 }
 
@@ -263,7 +273,7 @@ function makeCinema(): SpaceLayout {
     ],
     spawn,
     spawns: [spawn, { x: -1.6, z: -1.4, ry: 0.5 }],
-    portals: [{ to: 'hub', x: 0, z: -2.2, ry: Math.PI, label: '원미서가', w: 0.95, d: 0.35 }],
+    portals: [{ to: 'hub', x: 0, z: -2.2, ry: Math.PI, label: '비북스-M', w: 0.95, d: 0.35 }],
   };
 }
 
@@ -317,7 +327,7 @@ function makeLecture(): SpaceLayout {
     seats,
     spawn,
     spawns: [spawn, { x: 2.0, z: -1.6, ry: -1.0 }],
-    portals: [{ to: 'hub', x: 2.5, z: -2.7, ry: Math.PI, label: '원미서가', w: 0.95, d: 0.35 }],
+    portals: [{ to: 'hub', x: 2.5, z: -2.7, ry: Math.PI, label: '비북스-M', w: 0.95, d: 0.35 }],
   };
 }
 
@@ -343,7 +353,8 @@ function makeSolo(): SpaceLayout {
     seats: [chairSeat('solo-1', chair, 0.42, -1)],
     spawn,
     spawns: [spawn],
-    portals: [{ to: 'hub', x: 0, z: -1.18, ry: Math.PI, label: '원미서가', w: 0.82, d: 0.32 }],
+    // 문 안쪽으로 들여 내비·근접 탐지가 막히지 않게 (벽 여유 0.22 안쪽)
+    portals: [{ to: 'hub', x: 0, z: -0.95, ry: Math.PI, label: '비북스-M', w: 0.82, d: 0.32 }],
   };
 }
 

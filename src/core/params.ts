@@ -28,7 +28,7 @@ export interface Params {
 export const DEFAULT_SEED = 86;
 
 /** 입장 장소는 한 곳. 번호로 방을 나누지 않는다. */
-export const ROOM_NAME = '원미서가';
+export const ROOM_NAME = '비북스-M';
 
 /** 한 서점에 함께 있을 수 있는 사람 수. NPC는 세지 않는다. */
 export const ROOM_CAPACITY = 20;

@@ -36,11 +36,16 @@ export class Ambience {
   private snowGain: GainNode | null = null;
   private clearGain: GainNode | null = null;
   private musicBus: GainNode | null = null;
+  private natureBus: GainNode | null = null;
   private padTimer = 0;
   private nextBar = 0;
   private bar = 0;
   private suspendTimer = 0;
   private weather: WeatherKind = 'rain';
+  /** 합성 패드 음악(유튜브 BGM 쓸 때는 끔) */
+  musicSynth = false;
+  /** 자연 소리(비·새) 0~1. 날씨 버스와 별도로 항상 깔 수 있다. */
+  natureLevel = 0.55;
   enabled = false;
 
   /** 사용자 동작(클릭·키) 안에서만 부른다. 처음이면 AudioContext와 소리 그래프를 만든다. */
@@ -60,10 +65,13 @@ export class Ambience {
     this.sfxBus = ctx.createGain();
     this.sfxBus.gain.value = 0.9;
     this.sfxBus.connect(this.master);
-    // 날씨 버스는 작게, 음악은 또렷하게
+    // 날씨 버스(시각 연동) + 자연소리 버스(설정으로 항상 비·새 믹스)
     this.weatherBus = ctx.createGain();
-    this.weatherBus.gain.value = 0.32;
+    this.weatherBus.gain.value = 0.18;
     this.weatherBus.connect(this.master);
+    this.natureBus = ctx.createGain();
+    this.natureBus.gain.value = this.natureLevel * 0.45;
+    this.natureBus.connect(this.master);
     this.rainGain = ctx.createGain();
     this.snowGain = ctx.createGain();
     this.clearGain = ctx.createGain();
@@ -74,13 +82,42 @@ export class Ambience {
     this.snowGain.gain.value = this.weather === 'snow' ? 1 : 0;
     this.clearGain.gain.value = this.weather === 'clear' ? 1 : 0;
     this.musicBus = ctx.createGain();
-    this.musicBus.gain.value = 1;
+    this.musicBus.gain.value = this.musicSynth ? 1 : 0;
     this.musicBus.connect(this.master);
     this.buildRain(ctx, this.rainGain);
     this.buildSnow(ctx, this.snowGain);
     this.buildClear(ctx, this.clearGain);
+    this.buildNatureBed(ctx, this.natureBus);
     this.buildPad(ctx, this.musicBus);
+    this.applyNatureGain();
     return ctx;
+  }
+
+  /** 자연 소리(빗소리·새소리) 세기. 0이면 끔. */
+  setNatureLevel(level: number): void {
+    this.natureLevel = Math.max(0, Math.min(1, level));
+    this.applyNatureGain();
+  }
+
+  /** 합성 패드 켜기/끄기(유튜브 BGM과 동시 재생하지 않음). */
+  setMusicSynth(on: boolean): void {
+    this.musicSynth = on;
+    if (!this.ctx || !this.musicBus) return;
+    const now = this.ctx.currentTime;
+    this.musicBus.gain.cancelScheduledValues(now);
+    this.musicBus.gain.setValueAtTime(this.musicBus.gain.value, now);
+    this.musicBus.gain.linearRampToValueAtTime(on ? 1 : 0, now + 0.6);
+    if (on && this.enabled) this.startScheduler();
+    else if (!on) this.stopScheduler();
+  }
+
+  private applyNatureGain(): void {
+    if (!this.ctx || !this.natureBus) return;
+    const now = this.ctx.currentTime;
+    const g = this.natureBus.gain;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(this.natureLevel * 0.45, now + 0.4);
   }
 
   /** 부천 날씨에 맞춰 창밖 소리만 바꾼다(비 / 눈 / 맑음·새소리). */
@@ -115,7 +152,7 @@ export class Ambience {
     g.cancelScheduledValues(now);
     g.setValueAtTime(g.value, now);
     g.linearRampToValueAtTime(on ? LEVEL : 0, now + FADE);
-    if (on) this.startScheduler();
+    if (on && this.musicSynth) this.startScheduler();
     else {
       // 페이드가 끝나면 멈춰서 CPU를 쓰지 않게 한다
       this.suspendTimer = window.setTimeout(() => {
@@ -124,17 +161,71 @@ export class Ambience {
           void ctx.suspend();
         }
       }, FADE * 1000 + 200);
+      if (!this.musicSynth) this.stopScheduler();
     }
   }
 
   /** 테스트·디버그용 상태 */
-  status(): { enabled: boolean; state: string; gain: number; weather: WeatherKind } {
+  status(): { enabled: boolean; state: string; gain: number; weather: WeatherKind; nature: number } {
     return {
       enabled: this.enabled,
       state: this.ctx?.state ?? 'none',
       gain: this.master?.gain.value ?? 0,
       weather: this.weather,
+      nature: this.natureLevel,
     };
+  }
+
+  /** 설정용 자연소리 침대: 빗소리 + 새소리(날씨와 무관). */
+  private buildNatureBed(ctx: AudioContext, out: AudioNode): void {
+    const noise = loopSource(ctx, whiteNoise(ctx, 3));
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.value = 1300;
+    band.Q.value = 0.45;
+    const low = ctx.createBiquadFilter();
+    low.type = 'lowpass';
+    low.frequency.value = 4200;
+    const rain = ctx.createGain();
+    rain.gain.value = 0.055;
+    noise.connect(band).connect(low).connect(rain).connect(out);
+    const air = loopSource(ctx, pinkNoise(ctx, 4));
+    const airLp = ctx.createBiquadFilter();
+    airLp.type = 'lowpass';
+    airLp.frequency.value = 220;
+    const airG = ctx.createGain();
+    airG.gain.value = 0.04;
+    air.connect(airLp).connect(airG).connect(out);
+    noise.start();
+    air.start();
+
+    const chirp = () => {
+      if (this.enabled && this.natureLevel > 0.05) {
+        const t = ctx.currentTime + 0.02;
+        const pan = ctx.createStereoPanner();
+        pan.pan.value = Math.random() * 1.4 - 0.7;
+        const notes = 2 + Math.floor(Math.random() * 3);
+        let f0 = 1800 + Math.random() * 1400;
+        for (let i = 0; i < notes; i++) {
+          const o = ctx.createOscillator();
+          const eg = ctx.createGain();
+          const start = t + i * (0.07 + Math.random() * 0.05);
+          const f = f0 * (0.92 + Math.random() * 0.2);
+          o.type = 'sine';
+          o.frequency.setValueAtTime(f, start);
+          o.frequency.exponentialRampToValueAtTime(f * (1.15 + Math.random() * 0.2), start + 0.06);
+          eg.gain.setValueAtTime(0.0001, start);
+          eg.gain.exponentialRampToValueAtTime(0.014 + Math.random() * 0.01, start + 0.012);
+          eg.gain.exponentialRampToValueAtTime(0.0001, start + 0.09);
+          o.connect(eg).connect(pan).connect(out);
+          o.start(start);
+          o.stop(start + 0.12);
+          f0 = f;
+        }
+      }
+      window.setTimeout(chirp, 3200 + Math.random() * 7000);
+    };
+    window.setTimeout(chirp, 2000 + Math.random() * 2500);
   }
 
   // ---------- 빗소리(창밖, 작게) ----------

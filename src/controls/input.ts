@@ -7,7 +7,8 @@ export interface InputHandlers {
   zoom(factor: number): void;
 }
 
-const CLICK_SLOP = 6;
+/** 모바일 손가락 탭이 드래그로 오인되지 않게 여유를 둔다. */
+const CLICK_SLOP = 12;
 
 export class CanvasInput {
   private pointers = new Map<number, { x: number; y: number; sx: number; sy: number }>();

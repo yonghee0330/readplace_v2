@@ -121,7 +121,7 @@ wss.on('connection', (ws) => {
     // 아주 단순한 속도 제한: 초당 약 20개
     if (c.tokens <= 0) return;
     c.tokens--;
-    let m: { type?: string; room?: unknown; instance?: unknown; state?: unknown; action?: { type?: unknown; nickname?: unknown } };
+    let m: { type?: string; room?: unknown; instance?: unknown; state?: unknown; cap?: unknown; action?: { type?: unknown; nickname?: unknown } };
     try {
       m = JSON.parse(String(raw));
     } catch {
@@ -134,8 +134,13 @@ wss.on('connection', (ws) => {
       leave(c);
       const key = `${room}:${inst}`;
       const set = rooms.get(key) ?? new Set<Client>();
-      if (set.size >= ROOM_CAPACITY) {
-        send(c, { type: 'full', limit: ROOM_CAPACITY });
+      // 클라이언트 cap(1인실=1 등). 없으면 기본 20. 서버 상한은 ROOM_CAPACITY.
+      const rawCap = Number(m.cap);
+      const cap = Number.isFinite(rawCap)
+        ? Math.max(1, Math.min(ROOM_CAPACITY, Math.round(rawCap)))
+        : room.endsWith('-solo') ? 1 : ROOM_CAPACITY;
+      if (set.size >= cap) {
+        send(c, { type: 'full', limit: cap });
         return;
       }
       c.key = key;

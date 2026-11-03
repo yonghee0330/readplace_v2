@@ -163,12 +163,13 @@ export function buildPortalGlow(portals: readonly PortalDef[] = PORTALS): Portal
       const a = 0.55 + Math.sin(t * 2.2) * 0.18;
       for (const m of mats) m.emissiveIntensity = pulse;
       for (const m of rimMats) m.opacity = a;
-      // 1인실: 책상 볼 때는 등 뒤 빛나는 문 숨김, 돌아서 나갈 때만 표시
+      // 1인실: 시선이 문 쪽이거나 문 앞이면 표시(카메라 시선·모바일 드래그 대응)
       for (const root of group.children) {
         const portal = root.userData.portal as PortalDef | undefined;
         if (!portal) continue;
         if (viewer?.space === 'solo') {
-          root.visible = facingPortal(portal, viewer);
+          const near = Math.hypot(viewer.x - portal.x, viewer.z - portal.z) < 0.85;
+          root.visible = near || facingPortal(portal, viewer, 0.15);
         } else {
           root.visible = true;
         }

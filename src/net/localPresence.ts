@@ -32,6 +32,10 @@ export class LocalPresence extends PeerTracker implements Presence {
     super();
   }
 
+  setCapacity(n: number): void {
+    this.capacity = Math.max(1, Math.min(ROOM_CAPACITY, Math.round(n)));
+  }
+
   async connect(room: string, instance: number, me: PlayerState): Promise<'ok' | 'full'> {
     this.disconnect();
     const gen = this.generation;

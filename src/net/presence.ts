@@ -41,6 +41,8 @@ export interface Presence {
   /** 'full'이면 정원이 차서 들어오지 못한 것이다. 구현이 연결을 정리한 뒤 반환한다. */
   connect(room: string, instance: number, me: PlayerState): Promise<'ok' | 'full'>;
   disconnect(): void;
+  /** 공간별 정원(예: 1인실=1). 다음 connect에 적용. */
+  setCapacity(n: number): void;
   /** 10Hz 이하로 부른다(구현이 한 번 더 걸러 준다). */
   sendState(s: PlayerState): void;
   sendAction(a: ActionEvent): void;
