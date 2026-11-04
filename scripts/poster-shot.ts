@@ -13,6 +13,15 @@ async function main(): Promise<void> {
   const errors: string[] = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(e.message));
+  if (process.env.HEARTS) {
+    await page.addInitScript(() => {
+      const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+      const texts = ['원미동북클럽 다음 읽을 책은 <손절회> 기대된다! 정말정말 기다려져요 ㅎㅎ', '서귤 북토크 기대됩니다!!', '힐링공간 만들어주셔서 감사합니다! 자주 올게요 꼭이요', '가호 읽고 계신 분 있나요?'];
+      const pos = [[0.22, 0.4], [0.72, 0.4], [0.3, 0.75], [0.74, 0.76]];
+      const notes = texts.map((text, i) => ({ id: `h${i}`, text, color: 'pink', shape: 'heart', x: pos[i][0], y: pos[i][1], rot: i % 2 ? 4 : -3, nickname: '테스트', day, createdAt: Date.now() + i }));
+      localStorage.setItem('bbooks.postits', JSON.stringify(notes));
+    });
+  }
   await page.goto(`${base}/?cam=avatar&seed=1&npc=0&quality=medium&presence=local`);
   await page.waitForFunction(() => (window as unknown as { __BBOOKS_READY?: boolean }).__BBOOKS_READY === true, null, { timeout: 180_000 });
   await page.evaluate(() => (window as unknown as Win).__BBOOKS.enterSpace('hub'));

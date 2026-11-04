@@ -829,12 +829,12 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   padding-left: 16px;
 }
 .postit-note.shape-heart {
-  width: 92px;
-  min-height: 86px;
+  width: 116px;
+  min-height: 108px;
   border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
   display: grid;
   place-items: center;
-  padding: 22px 12px 16px;
+  padding: 26px 18px 22px;
 }
 .postit-note-text {
   margin: 0;

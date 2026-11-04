@@ -53,13 +53,14 @@ function drawShape(
     g.arc(x + 14, y + h / 2, 3.5, 0, Math.PI * 2);
     g.fill();
   } else if (shape === 'heart') {
+    // 박스(x,y,w,h)를 꽉 채우는 하트
     const cx = x + w / 2;
-    const cy = y + h * 0.38;
-    const s = Math.min(w, h) * 0.48;
     g.beginPath();
-    g.moveTo(cx, cy + s * 0.35);
-    g.bezierCurveTo(cx - s, cy - s * 0.2, cx - s * 0.85, cy - s, cx, cy - s * 0.45);
-    g.bezierCurveTo(cx + s * 0.85, cy - s, cx + s, cy - s * 0.2, cx, cy + s * 0.35);
+    g.moveTo(cx, y + h * 0.26);
+    g.bezierCurveTo(cx, y - h * 0.02, x, y - h * 0.02, x, y + h * 0.32);
+    g.bezierCurveTo(x, y + h * 0.62, cx - w * 0.14, y + h * 0.8, cx, y + h);
+    g.bezierCurveTo(cx + w * 0.14, y + h * 0.8, x + w, y + h * 0.62, x + w, y + h * 0.32);
+    g.bezierCurveTo(x + w, y - h * 0.02, cx, y - h * 0.02, cx, y + h * 0.26);
     g.closePath();
     g.fill();
     g.stroke();
@@ -105,8 +106,9 @@ function paintBoard(ctx: CanvasRenderingContext2D, notes: PostitNote[]): void {
   ctx.fillText('b.books-M 공간이 생겼어요!', w / 2, 36);
 
   for (const n of notes) {
-    const pw = 78;
-    const ph = n.shape === 'heart' ? 72 : 70;
+    const heart = n.shape === 'heart';
+    const pw = heart ? 124 : 78;
+    const ph = heart ? 116 : 70;
     const px = n.x * w - pw / 2;
     const py = n.y * h - ph / 2;
     ctx.save();
@@ -114,20 +116,44 @@ function paintBoard(ctx: CanvasRenderingContext2D, notes: PostitNote[]): void {
     ctx.rotate((n.rot * Math.PI) / 180);
     ctx.translate(-n.x * w, -n.y * h);
     // 그림자
-    ctx.fillStyle = 'rgba(40,25,10,0.18)';
     drawShape(ctx, n.shape, px + 3, py + 4, pw, ph, 'rgba(40,25,10,0.18)');
     drawShape(ctx, n.shape, px, py, pw, ph, colorHex(n.color));
-    // 압정
+    // 압정 (하트는 왼쪽 윗볼록 안쪽)
     ctx.fillStyle = '#c0392b';
     ctx.beginPath();
-    ctx.arc(n.x * w, py + 8, 3.2, 0, Math.PI * 2);
+    ctx.arc(heart ? px + pw * 0.27 : n.x * w, heart ? py + ph * 0.14 : py + 8, 3.2, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#2a241c';
-    ctx.font = '600 11px "Pretendard", system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    wrapText(ctx, n.text, n.x * w, py + 16, pw - 14, 13);
+    if (heart) fitText(ctx, n.text, n.x * w, py + ph * 0.27, 84, ph * 0.5);
+    else {
+      ctx.font = '600 11px "Pretendard", system-ui, sans-serif';
+      wrapText(ctx, n.text, n.x * w, py + 16, pw - 14, 13);
+    }
     ctx.restore();
+  }
+}
+
+/** 영역(maxW × maxH)에 들어갈 때까지 글자 크기를 줄여 가며 줄바꿈해 그린다. */
+function fitText(ctx: CanvasRenderingContext2D, text: string, cx: number, y: number, maxW: number, maxH: number): void {
+  for (const size of [11, 10, 9, 8]) {
+    ctx.font = `600 ${size}px "Pretendard", system-ui, sans-serif`;
+    const lh = size + 2;
+    const lines: string[] = [];
+    let line = '';
+    for (const ch of [...text]) {
+      if (ctx.measureText(line + ch).width > maxW && line) {
+        lines.push(line);
+        line = ch;
+      } else line += ch;
+    }
+    if (line) lines.push(line);
+    if (lines.length * lh <= maxH || size === 8) {
+      const top = y + Math.max(0, (maxH - lines.length * lh) / 2);
+      lines.forEach((l, i) => ctx.fillText(l, cx, top + i * lh));
+      return;
+    }
   }
 }
 

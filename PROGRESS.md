@@ -218,3 +218,4 @@
 - 포스터를 클릭하면 https://bbooks.co.kr/moim/ 을 새 탭으로 연다(`openMoimPage`, app.ts). 마우스 올리면 포인터 커서.
 - 다음 달 문구는 `moimPoster.ts`의 `paint()`에서 월·부제만 바꾸면 된다. 점검 캡처: `npx tsx scripts/poster-shot.ts out.png`.
 - 포스트잇 보드 양쪽 벽에 포스터 1장씩(왼쪽: 11월 비모임 → /moim/, 오른쪽: 서귤 《채달금전》 북토크 → /moim/m/btalk-seogyul-2611/). 표지 이미지는 `public/posters/chaedalgeumjeon.jpg`.
+- 포스트잇 하트: 3D 보드의 하트를 124×116으로 키우고 박스를 꽉 채우는 모양으로 다시 그림. 글자는 영역에 들어갈 때까지 크기를 줄여 가며 줄바꿈(`fitText`). 읽기용 DOM 하트도 약간 키움. 점검: `HEARTS=1 npx tsx scripts/poster-shot.ts out.png`.
