@@ -169,7 +169,7 @@ export function buildMoimPoster(): MoimPosterProp | null {
   if (!isPresent(EVENT_BOARD) || EVENT_BOARD.w < 0.2) return null;
   const { x, z, ry } = EVENT_BOARD;
   // 보드 양쪽 벽 틈(왼쪽 중심 x≈-1.13, 오른쪽 ≈1.36)의 중앙. 보드 기준 로컬 좌표.
-  const lxL = -1.28;
+  const lxL = -1.21;
   const lxR = 1.215;
   const pw = 0.5;
   const ph1 = pw * (TH / TW);

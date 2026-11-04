@@ -17,7 +17,7 @@ async function main(): Promise<void> {
   await page.waitForFunction(() => (window as unknown as { __BBOOKS_READY?: boolean }).__BBOOKS_READY === true, null, { timeout: 180_000 });
   await page.evaluate(() => (window as unknown as Win).__BBOOKS.enterSpace('hub'));
   await page.waitForTimeout(1500);
-  await page.evaluate(() => { const w = window as unknown as Win; w.__BBOOKS.teleport(1.2, 0.4, 0); w.__BBOOKS_LOOP.start(); });
+  await page.evaluate((tx) => { const w = window as unknown as Win; w.__BBOOKS.teleport(tx, 0.4, 0); w.__BBOOKS_LOOP.start(); }, Number(process.env.TX ?? 1.2));
   await page.waitForTimeout(800);
   const d = Number(process.env.DRAG ?? 524);
   await page.mouse.move(d < 0 ? 800 : 200, 300);
