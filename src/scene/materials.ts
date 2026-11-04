@@ -22,6 +22,7 @@ export function createMaterials(rng: Rng): Materials {
   const blanket = tex.fabricTexture(rng.fork('blanket'), '#d8c7a4');
   const chairCushion = tex.fabricTexture(rng.fork('cushion'), '#a4553a');
   const benchCushion = tex.fabricTexture(rng.fork('bench'), '#c7b38c');
+  const wingbackFabric = tex.fabricTexture(rng.fork('wingback'), '#8a8e93');
 
   return {
     honey: wood(honey, 0.95),
@@ -40,6 +41,7 @@ export function createMaterials(rng: Rng): Materials {
     soil: std({ color: 0x3a2a1c, roughness: 1 }),
     leaf: std({ color: 0xffffff, roughness: 0.6, side: THREE.DoubleSide }),
     sofa: new THREE.MeshStandardMaterial({ map: sofaFabric, roughness: 0.95, vertexColors: true }),
+    wingback: new THREE.MeshStandardMaterial({ map: wingbackFabric, roughness: 0.92, vertexColors: true }),
     blanket: new THREE.MeshStandardMaterial({ map: blanket, roughness: 0.95, vertexColors: true, side: THREE.DoubleSide }),
     cushion: new THREE.MeshStandardMaterial({ map: chairCushion, roughness: 0.95, vertexColors: true }),
     benchCushion: new THREE.MeshStandardMaterial({ map: benchCushion, roughness: 0.95, vertexColors: true }),

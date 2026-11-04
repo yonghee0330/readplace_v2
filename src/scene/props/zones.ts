@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { Rng } from '../../core/rng';
 import { MergeBucket, bevelBox, projectUV, taperLeg, trs } from '../geom';
 import {
-  PARTITIONS, RUG, SCREEN, SEMINAR_CHAIRS, SEMINAR_TABLE, SOLO_CHAIR, SOLO_DESK,
+  PARTITIONS, RUG, SCREEN, SEATS, SEMINAR_CHAIRS, SEMINAR_TABLE, SOLO_CHAIR, SOLO_DESK,
   STAGE, STORE_CHAIRS, STORE_TABLE, THEATERS, TheaterBlock, WHITEBOARD, isPresent,
 } from '../layout';
 import { BookCollector, stackBooks } from './books';
@@ -184,6 +184,55 @@ function buildSoloArmchair(bucket: MergeBucket, r: Rng, m: THREE.Matrix4): void 
   fabric(bevelBox(w - 0.18, 0.28, 0.1, 0.05, 5), at(trs(0, seatH + 0.2, -d / 2 + 0.2, -0.25)), 0x9a3838);
 }
 
+/**
+ * 회색 윙백 1인 소파(STRANDMON 느낌). 앉은 사람은 +z.
+ * 높은 등·날개·스크롤 팔걸이·버튼 터프팅·검정 테이퍼 다리.
+ */
+function buildWingbackArmchair(bucket: MergeBucket, r: Rng, m: THREE.Matrix4): void {
+  const at = (mm: THREE.Matrix4) => m.clone().multiply(mm);
+  const fabric = (g: THREE.BufferGeometry, mm: THREE.Matrix4, k = 1) => {
+    projectUV(g, 'x', { along: 0.28, across: 0.28, offset: [r.float(), r.float()] });
+    bucket.add('wingback', g, mm, new THREE.Color(k, k, k));
+  };
+  const legH = 0.12;
+  const seatH = 0.42;
+  const w = 0.72;
+  const d = 0.74;
+  const gray = 1.0;
+  const grayDeep = 0.9;
+
+  // 짧은 검정 테이퍼 다리
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const leg = taperLeg(legH, 0.028, 0.016);
+    projectUV(leg, 'y', { offset: [r.float(), r.float()] });
+    bucket.add('iron', leg, at(trs(sx * (w / 2 - 0.1), 0, sz * (d / 2 - 0.1))), 0x1a1a1a);
+  }
+
+  // 받침·좌석 쿠션
+  fabric(bevelBox(w - 0.04, 0.12, d - 0.1, 0.045, 4), at(trs(0, seatH - 0.08, 0.02)), gray);
+  fabric(bevelBox(w - 0.1, 0.1, d - 0.16, 0.05, 5), at(trs(0, seatH + 0.02, 0.04)), 1.05);
+
+  // 스크롤 팔걸이(위가 바깥으로 벌어짐)
+  for (const sx of [-1, 1]) {
+    fabric(bevelBox(0.11, 0.28, d - 0.14, 0.04, 4), at(trs(sx * (w / 2 - 0.07), seatH + 0.1, 0.02)), grayDeep);
+    fabric(bevelBox(0.14, 0.08, 0.22, 0.035, 4), at(trs(sx * (w / 2 - 0.02), seatH + 0.26, 0.06, 0, 0, sx * 0.35)), gray);
+  }
+
+  // 높은 등받이 + 양옆 윙
+  const backZ = -d / 2 + 0.12;
+  fabric(bevelBox(w - 0.12, 0.72, 0.11, 0.04, 4), at(trs(0, seatH + 0.38, backZ, -0.08)), grayDeep);
+  for (const sx of [-1, 1]) {
+    fabric(bevelBox(0.12, 0.42, 0.28, 0.04, 4), at(trs(sx * (w / 2 - 0.1), seatH + 0.48, backZ + 0.12, -0.05, 0, sx * 0.2)), gray);
+    fabric(bevelBox(0.1, 0.2, 0.18, 0.035, 4), at(trs(sx * (w / 2 - 0.12), seatH + 0.72, backZ + 0.06, 0.15)), grayDeep);
+  }
+  // 등 하단 가로 터프팅(버튼 4개)
+  fabric(bevelBox(w - 0.22, 0.2, 0.06, 0.03, 3), at(trs(0, seatH + 0.22, backZ + 0.06, -0.12)), 0.95);
+  for (let i = 0; i < 4; i++) {
+    const bx = (i - 1.5) * 0.12;
+    bucket.add('iron', new THREE.SphereGeometry(0.012, 8, 6), at(trs(bx, seatH + 0.22, backZ + 0.1)), 0x2c2c2c);
+  }
+}
+
 /** 계단식 객석 윙 하나(데크·계단·방석). */
 function buildTheaterWing(bucket: MergeBucket, rng: Rng, th: TheaterBlock, wingIdx: number): void {
   if (th.rows < 1) return;
@@ -278,17 +327,26 @@ export function buildTheater(bucket: MergeBucket, rng: Rng): void {
     return;
   }
 
-  // —— 원형 카페트 위 스툴 + 마이크(강연장)
+  // —— 원형 카페트 위 윙백 + 마이크(강연장)
   if (isPresent(RUG) && RUG.round) {
     const cx = RUG.x;
     const cz = RUG.z;
-    buildStoolAt(bucket, r.fork('performer'), trs(cx - 0.08, 0, cz + 0.05, 0, Math.PI * 0.65));
-    const mx = cx + 0.32;
-    const mz = cz + 0.18;
+    const seat = SEATS.find((s) => s.id === 'stage-1');
+    const ry = seat?.ry ?? Math.atan2(-1.2 - cx, 0.85 - cz);
+    buildWingbackArmchair(bucket, r.fork('performer'), trs(cx, 0, cz, 0, ry));
+    // 마이크는 소파 오른쪽 앞(로컬 +x,+z)
+    const c = Math.cos(ry);
+    const s = Math.sin(ry);
+    const lx = 0.42;
+    const lz = 0.28;
+    const mx = cx + lx * c + lz * s;
+    const mz = cz - lx * s + lz * c;
     bucket.add('iron', new THREE.CylinderGeometry(0.08, 0.1, 0.016, 16), trs(mx, 0.008, mz));
-    bucket.add('iron', new THREE.CylinderGeometry(0.012, 0.012, 1.05, 8), trs(mx, 0.53, mz));
-    bucket.add('iron', new THREE.CylinderGeometry(0.018, 0.014, 0.09, 8), trs(mx - 0.05, 1.08, mz + 0.02, 0, 0, 0.9));
-    bucket.add('iron', new THREE.SphereGeometry(0.028, 10, 8), trs(mx - 0.09, 1.11, mz + 0.03));
+    bucket.add('iron', new THREE.CylinderGeometry(0.012, 0.012, 1.12, 8), trs(mx, 0.56, mz));
+    bucket.add('iron', new THREE.CylinderGeometry(0.018, 0.014, 0.09, 8),
+      trs(mx - 0.04 * c, 1.14, mz + 0.04 * c, 0, 0, 0.85));
+    bucket.add('iron', new THREE.SphereGeometry(0.028, 10, 8),
+      trs(mx - 0.08 * c, 1.17, mz + 0.06 * c));
   }
 }
 

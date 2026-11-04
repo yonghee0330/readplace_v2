@@ -333,20 +333,20 @@ function makeLecture(): SpaceLayout {
     stairSide: 1, idPrefix: 'th-w',
   };
   const theaters = [north, west];
-  // 강사·연주자: 열린 바닥 쪽 동그란 카페트
-  const rug = { x: 1.2, z: 0.15, w: 1.85, d: 1.85, round: true };
+  // 강사·연주자: 열린 바닥 가운데 원형 카페트 + 윙백. 둘레 서가는 유지(카메라가 가구에 가리지 않음).
+  const rug = { x: 1.95, z: -0.15, w: 1.9, d: 1.9, round: true };
   // 객석(북·서)을 바라봄
-  const performerRy = Math.atan2(-1.45 - rug.x, 0.9 - rug.z);
-  const spawn = { x: 2.15, z: -1.55, ry: -2.2 };
+  const performerRy = Math.atan2(-1.2 - rug.x, 0.85 - rug.z);
+  const spawn = { x: 2.35, z: -1.85, ry: -2.0 };
   const seats = [
     ...theaters.flatMap(theaterSeats),
-    { id: 'stage-1', x: rug.x - 0.08, z: rug.z + 0.05, ry: performerRy, y: 0.46, approach: 1 as const },
+    { id: 'stage-1', x: rug.x, z: rug.z, ry: performerRy, y: 0.45, approach: 1 as const },
   ];
   return {
     ...emptyBase('lecture', '계단식 강연장', room),
     openings: [{ cx: 2.5, w: 0.95, y0: 0, y1: 2.15, kind: 'door' }],
     shelves: [
-      // 둘레 서가(+z / -x / +x / -z·문 왼쪽)
+      // 둘레 서가(문 개구만 비움)
       { x: -1.85, z: 2.82, ry: Math.PI, w: 2.5, wing: 'A' },
       { x: 1.35, z: 2.82, ry: Math.PI, w: 2.4, wing: 'B' },
       { x: -3.28, z: 1.35, ry: Math.PI / 2, w: 2.15, wing: 'A' },
@@ -362,12 +362,12 @@ function makeLecture(): SpaceLayout {
     theater: north,
     stage: null,
     rug,
-    floorLamps: [{ x: 2.55, z: 1.85, ry: -0.6 }],
+    floorLamps: [{ x: 2.55, z: 1.95, ry: -0.5 }],
     pendants: [{ x: rug.x, z: rug.z, drop: 1.0 }],
-    floorPlants: [{ x: 2.75, z: 2.4, scale: 0.8 }],
+    floorPlants: [{ x: 2.75, z: 2.35, scale: 0.8 }],
     seats,
     spawn,
-    spawns: [spawn, { x: 1.85, z: -2.0, ry: -1.2 }, { x: 2.4, z: 0.6, ry: -2.4 }],
+    spawns: [spawn, { x: 2.55, z: -1.35, ry: -1.8 }, { x: 1.35, z: -2.15, ry: -0.4 }],
     portals: [{ to: 'hub', x: 2.5, z: -2.7, ry: Math.PI, label: '서점 중앙', w: 0.95, d: 0.35 }],
   };
 }
@@ -625,7 +625,8 @@ export function colliders(): Collider[] {
     rect(STAGE.x, STAGE.z, STAGE.w, STAGE.d, 0, STAGE.h + 0.05, stageIds.length ? stageIds : undefined);
   } else {
     for (const s of SEATS.filter((seat) => seat.id.startsWith('stage-'))) {
-      rect(s.x, s.z, 0.48, 0.48, 0, 0.9, [s.id]);
+      // 윙백 1인 소파
+      rect(s.x, s.z, 0.78, 0.82, s.ry, 1.15, [s.id]);
     }
   }
   for (const th of THEATERS) {

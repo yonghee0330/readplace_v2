@@ -1,8 +1,8 @@
 // 카메라: 캡처용 고정 시점(?cam=overview|avatar|window)과 아바타를 따라가는 3인칭 오빗.
-// 시선·줌은 현재 방(ROOM) 안으로 묶어, 공간 너머 허공으로 무한히 나가지 않게 한다.
+// 시선·줌은 현재 방(ROOM) 안으로 묶고, 서가·가구에 가리면 거리를 줄여 등 뒤 장면이 시야를 막지 않게 한다.
 import * as THREE from 'three';
 import type { CamPreset } from '../core/params';
-import { ROOM } from '../scene/layout';
+import { ROOM, colliders } from '../scene/layout';
 
 export const CAM_PRESETS: Record<CamPreset, { pos: [number, number, number]; target: [number, number, number]; fov: number }> = {
   // 입구 쪽에서 허브 중앙을 내려다봄
@@ -59,7 +59,7 @@ export function idealOrbitDist(): number {
 
 /**
  * 3인칭 오빗 카메라. 아바타를 부드럽게 따라가고(댐핑), 드래그로 돌리고, 휠·핀치로 줌.
- * 거리는 방 크기에 묶고, 카메라는 벽·천장 밖으로 거의 나가지 않아 공간 너머 허공을 보지 않는다.
+ * 거리는 방 크기·가구(서가 등)에 묶고, 벽·천장 밖으로 거의 나가지 않는다.
  */
 export class FollowCamera {
   yaw: number;
@@ -131,9 +131,11 @@ export class FollowCamera {
       Math.sin(this.shown.pitch),
       Math.cos(this.shown.yaw) * Math.cos(this.shown.pitch),
     );
-    // 벽·천장 밖으로 거의 나가지 않음(끼임만 막는 아주 작은 여유)
+    // 벽·천장 + 높은 가구(서가 등). 등 뒤 서가가 시야를 가리면 카메라를 앞으로 당김
     const slack = 0.12;
-    const hit = roomExit(this.target, dir, slack) - 0.22;
+    const wallHit = roomExit(this.target, dir, slack) - 0.22;
+    const furnHit = furnitureExit(this.target, dir, this.shown.dist) - 0.28;
+    const hit = Math.min(wallHit, furnHit);
     const d = Math.min(this.shown.dist, Math.max(0.55, hit));
     const orbitPos = this.target.clone().addScaledVector(dir, d);
     // 방 안에 남도록 한 번 더 클램프
@@ -174,6 +176,55 @@ function roomExit(p: THREE.Vector3, dir: THREE.Vector3, slack = 0): number {
   axis(p.y, dir.y, 0.08, ROOM.h - 0.18 + slack * 0.4);
   axis(p.z, dir.z, ROOM.z0 - slack, ROOM.z1 + slack);
   return t;
+}
+
+/**
+ * 아바타→카메라 선이 높은 가구(서가·칸막이 등)에 닿는 거리.
+ * 지금 서 있는 좌석 콜라이더는 건너뛰어 의자에 카메라가 끼지 않게 한다.
+ */
+function furnitureExit(p: THREE.Vector3, dir: THREE.Vector3, maxDist: number): number {
+  let best = maxDist + 1;
+  const pad = 0.06;
+  for (const c of colliders()) {
+    if (c.h < 0.95) continue;
+    // 발밑·앉은 자리 박스는 무시
+    if (p.x >= c.x0 - pad && p.x <= c.x1 + pad && p.z >= c.z0 - pad && p.z <= c.z1 + pad) continue;
+    const t = rayAabb(
+      p.x, p.y, p.z,
+      dir.x, dir.y, dir.z,
+      c.x0 - pad, c.x1 + pad,
+      0, c.h + 0.05,
+      c.z0 - pad, c.z1 + pad,
+    );
+    if (t !== null && t > 0.12 && t < best) best = t;
+  }
+  return best;
+}
+
+/** 레이 ↔ AABB. 히트 거리 또는 null. */
+function rayAabb(
+  ox: number, oy: number, oz: number,
+  dx: number, dy: number, dz: number,
+  x0: number, x1: number, y0: number, y1: number, z0: number, z1: number,
+): number | null {
+  let tmin = 0;
+  let tmax = Infinity;
+  const slab = (o: number, d: number, lo: number, hi: number) => {
+    if (Math.abs(d) < 1e-8) {
+      if (o < lo || o > hi) tmax = -1;
+      return;
+    }
+    let t1 = (lo - o) / d;
+    let t2 = (hi - o) / d;
+    if (t1 > t2) [t1, t2] = [t2, t1];
+    tmin = Math.max(tmin, t1);
+    tmax = Math.min(tmax, t2);
+  };
+  slab(ox, dx, x0, x1);
+  slab(oy, dy, y0, y1);
+  slab(oz, dz, z0, z1);
+  if (tmax < tmin || tmax < 0) return null;
+  return tmin >= 0 ? tmin : tmax;
 }
 
 /** 카메라 위치를 방 안(약간 안쪽)으로 밀어 넣는다. */
