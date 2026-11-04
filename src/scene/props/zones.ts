@@ -3,8 +3,8 @@ import * as THREE from 'three';
 import { Rng } from '../../core/rng';
 import { MergeBucket, bevelBox, projectUV, taperLeg, trs } from '../geom';
 import {
-  PARTITIONS, SCREEN, SEMINAR_CHAIRS, SEMINAR_TABLE, SOLO_CHAIR, SOLO_DESK,
-  STAGE, STORE_CHAIRS, STORE_TABLE, THEATER, WHITEBOARD, isPresent,
+  PARTITIONS, RUG, SCREEN, SEMINAR_CHAIRS, SEMINAR_TABLE, SOLO_CHAIR, SOLO_DESK,
+  STAGE, STORE_CHAIRS, STORE_TABLE, THEATERS, TheaterBlock, WHITEBOARD, isPresent,
 } from '../layout';
 import { BookCollector, stackBooks } from './books';
 import { buildChairAt, buildStoolAt } from './furniture';
@@ -184,37 +184,36 @@ function buildSoloArmchair(bucket: MergeBucket, r: Rng, m: THREE.Matrix4): void 
   fabric(bevelBox(w - 0.18, 0.28, 0.1, 0.05, 5), at(trs(0, seatH + 0.2, -d / 2 + 0.2, -0.25)), 0x9a3838);
 }
 
-/** 코너 3단 나무 좌석 + 원형 방석 + 오른쪽 오름 계단 + 앞쪽 무대. */
-export function buildTheater(bucket: MergeBucket, rng: Rng): void {
-  if (!isPresent(THEATER) || THEATER.rows < 1) return;
-  const r = rng.fork('theater');
-  const { x, z, ry, rows, cols, rowDepth, seatW, rise, firstY } = THEATER;
+/** 계단식 객석 윙 하나(데크·계단·방석). */
+function buildTheaterWing(bucket: MergeBucket, rng: Rng, th: TheaterBlock, wingIdx: number): void {
+  if (th.rows < 1) return;
+  const r = rng.fork(`theater-${wingIdx}`);
+  const { x, z, ry, rows, cols, rowDepth, seatW, rise, firstY } = th;
   const base = trs(x, 0, z, 0, ry);
   const at = (m: THREE.Matrix4) => base.clone().multiply(m);
 
   const deckW = cols * seatW + 0.45;
   const faceT = 0.04;
+  const wallSide = -(th.stairSide ?? -1); // 계단 반대 = 벽쪽 옆판
 
-  // —— 3단 데크. localZ=0 벽쪽(뒤·높음) → localZ 클수록 앞·낮음.
+  // —— 단 데크. localZ=0 벽쪽(뒤·높음) → localZ 클수록 앞·낮음.
   for (let i = 0; i < rows; i++) {
     const yTop = firstY + (rows - 1 - i) * rise;
     const z0 = i * rowDepth;
     const z1 = (i + 1) * rowDepth;
     const depth = z1 - z0;
-    const w = deckW + i * 0.1; // 앞단이 조금 더 넓게
-    // 상판
+    const w = deckW + i * 0.08;
     wood(bucket, r, 'honey', bevelBox(w, 0.05, depth - 0.02, 0.008, 2), 'x',
       at(trs(0, yTop - 0.025, z0 + depth / 2)));
-    // 앞면 세로판
     wood(bucket, r, 'honey', bevelBox(w + 0.02, yTop, faceT, 0.006), 'y',
       at(trs(0, yTop / 2, z1 - faceT / 2 - 0.01)));
-    // 옆판(구석 벽 쪽 = 로컬 +x, ry=π면 월드 -x)
     wood(bucket, r, 'honey', bevelBox(faceT, yTop, depth, 0.006), 'y',
-      at(trs(w / 2 - faceT / 2, yTop / 2, z0 + depth / 2)));
+      at(trs(wallSide * (w / 2 - faceT / 2), yTop / 2, z0 + depth / 2)));
   }
 
-  // —— 열린 쪽(월드 +x) 오름 계단. ry=π이면 로컬 -x → 월드 +x
-  const stairX = -(deckW / 2 + 0.08);
+  // —— 오름 계단
+  const side = th.stairSide ?? -1;
+  const stairX = side * (deckW / 2 + 0.08);
   const stepN = rows * 2;
   const stairDepth = rows * rowDepth;
   const stepD = stairDepth / stepN;
@@ -224,62 +223,72 @@ export function buildTheater(bucket: MergeBucket, rng: Rng): void {
     const z1 = stairDepth - s * stepD;
     const z0 = z1 - stepD;
     wood(bucket, r, 'honey', bevelBox(0.55, 0.04, stepD - 0.02, 0.006), 'x',
-      at(trs(stairX - 0.28, yTop - 0.02, (z0 + z1) / 2)));
+      at(trs(stairX + side * 0.28, yTop - 0.02, (z0 + z1) / 2)));
     wood(bucket, r, 'honey', bevelBox(0.55, yTop, 0.035, 0.005), 'y',
-      at(trs(stairX - 0.28, yTop / 2, z0 + 0.02)));
+      at(trs(stairX + side * 0.28, yTop / 2, z0 + 0.02)));
   }
-  // 계단 옆 난간 기둥
   const railH = firstY + (rows - 1) * rise;
+  const railX = stairX + side * 0.55;
   wood(bucket, r, 'walnut', bevelBox(0.05, railH + 0.45, 0.05, 0.004), 'y',
-    at(trs(stairX - 0.55, (railH + 0.45) / 2, stairDepth * 0.15)));
+    at(trs(railX, (railH + 0.45) / 2, stairDepth * 0.15)));
   wood(bucket, r, 'walnut', bevelBox(0.05, railH + 0.35, 0.05, 0.004), 'y',
-    at(trs(stairX - 0.55, (railH + 0.35) / 2, stairDepth * 0.85)));
-  // 난간 손잡이
+    at(trs(railX, (railH + 0.35) / 2, stairDepth * 0.85)));
   wood(bucket, r, 'walnut', bevelBox(0.04, 0.04, stairDepth * 0.75, 0.004), 'z',
-    at(trs(stairX - 0.55, railH + 0.42, stairDepth * 0.5)));
+    at(trs(railX, railH + 0.42, stairDepth * 0.5)));
 
-  // —— 동그란 방석 (열마다 cols, 뒤 높·앞 낮)
+  // —— 동그란 방석
   const cushColors = [0x6b7a55, 0x8a8f86, 0xc4b49a, 0x7d6b58, 0x9aa890, 0xb7a78c];
-  let ci = 0;
+  let ci = wingIdx * 7;
   for (let i = 0; i < rows; i++) {
     const yTop = firstY + (rows - 1 - i) * rise;
     const localZ = i * rowDepth + rowDepth * 0.45;
     for (let col = 0; col < cols; col++) {
       const lx = (col - (cols - 1) / 2) * seatW + r.range(-0.03, 0.03);
-      const rad = 0.22 + r.range(-0.02, 0.02);
-      const cush = new THREE.CylinderGeometry(rad, rad * 1.02, 0.06, 20);
+      const rad = 0.2 + r.range(-0.015, 0.015);
+      const cush = new THREE.CylinderGeometry(rad, rad * 1.02, 0.055, 18);
       projectUV(cush, 'y', { along: 0.4, across: 0.4, offset: [r.float(), r.float()] });
       const hex = cushColors[ci++ % cushColors.length];
-      bucket.add('cushion', cush, at(trs(lx, yTop + 0.03, localZ + r.range(-0.04, 0.04))), new THREE.Color(hex));
+      bucket.add('cushion', cush, at(trs(lx, yTop + 0.028, localZ + r.range(-0.03, 0.03))), new THREE.Color(hex));
     }
   }
+}
 
-  // —— 무대 + 작가 의자 + 좌식 마이크
+/** ㄱ자·다단 객석 + (있으면) 사각 무대, 또는 원형 카페트 위 강사 자리. */
+export function buildTheater(bucket: MergeBucket, rng: Rng): void {
+  const r = rng.fork('theater');
+  THEATERS.forEach((th, i) => buildTheaterWing(bucket, r, th, i));
+
+  // —— 사각 무대 + 의자 + 마이크(레거시)
   if (isPresent(STAGE) && STAGE.w > 0.1) {
     const s = STAGE;
     const sm = trs(s.x, 0, s.z);
     const sat = (m: THREE.Matrix4) => sm.clone().multiply(m);
     wood(bucket, r, 'honey', bevelBox(s.w, s.h, s.d, 0.01, 2), 'x', sat(trs(0, s.h / 2, 0)));
-    // 앞·옆 띠장
     wood(bucket, r, 'walnut', bevelBox(s.w + 0.02, 0.04, 0.03, 0.004), 'x', sat(trs(0, s.h - 0.02, s.d / 2 - 0.01)));
     for (const sx of [-1, 1]) {
       wood(bucket, r, 'walnut', bevelBox(0.03, 0.04, s.d, 0.004), 'z', sat(trs(sx * (s.w / 2 - 0.01), s.h - 0.02, 0)));
     }
-    // 무대 앞 한 단 스텝
     wood(bucket, r, 'honey', bevelBox(s.w * 0.45, 0.1, 0.28, 0.008), 'x', sat(trs(0, 0.05, s.d / 2 + 0.12)));
-
-    // 작가 의자 (관객 쪽 +z). 무대 상판 위에 올림
-    const chairLocalX = -0.12;
-    const chairLocalZ = -0.05;
-    buildChairAt(bucket, r.fork('author'), trs(s.x + chairLocalX, s.h, s.z + chairLocalZ, 0, 0));
-
-    // 좌식 마이크: 짧은 스탠드 + 헤드 (의자 오른쪽 앞)
+    buildChairAt(bucket, r.fork('author'), trs(s.x - 0.12, s.h, s.z - 0.05, 0, 0));
     const mx = 0.28, mz = 0.18;
     bucket.add('iron', new THREE.CylinderGeometry(0.07, 0.09, 0.015, 14), sat(trs(mx, s.h + 0.008, mz)));
     bucket.add('iron', new THREE.CylinderGeometry(0.01, 0.01, 0.38, 8), sat(trs(mx, s.h + 0.2, mz)));
-    // 살짝 의자 쪽으로 기운 헤드
     bucket.add('iron', new THREE.CylinderGeometry(0.016, 0.012, 0.07, 8), sat(trs(mx - 0.04, s.h + 0.42, mz + 0.02, 0, 0, 0.85)));
     bucket.add('iron', new THREE.SphereGeometry(0.022, 10, 8), sat(trs(mx - 0.07, s.h + 0.44, mz + 0.03)));
+    return;
+  }
+
+  // —— 원형 카페트 위 스툴 + 마이크(강연장)
+  if (isPresent(RUG) && RUG.round) {
+    const cx = RUG.x;
+    const cz = RUG.z;
+    buildStoolAt(bucket, r.fork('performer'), trs(cx - 0.08, 0, cz + 0.05, 0, Math.PI * 0.65));
+    const mx = cx + 0.32;
+    const mz = cz + 0.18;
+    bucket.add('iron', new THREE.CylinderGeometry(0.08, 0.1, 0.016, 16), trs(mx, 0.008, mz));
+    bucket.add('iron', new THREE.CylinderGeometry(0.012, 0.012, 1.05, 8), trs(mx, 0.53, mz));
+    bucket.add('iron', new THREE.CylinderGeometry(0.018, 0.014, 0.09, 8), trs(mx - 0.05, 1.08, mz + 0.02, 0, 0, 0.9));
+    bucket.add('iron', new THREE.SphereGeometry(0.028, 10, 8), trs(mx - 0.09, 1.11, mz + 0.03));
   }
 }
 

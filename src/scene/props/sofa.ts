@@ -81,6 +81,21 @@ function blanket(r: Rng): THREE.BufferGeometry {
 
 export function buildRug(bucket: MergeBucket): void {
   if (!isPresent(RUG) || RUG.w < 0.1) return;
+  if (RUG.round) {
+    const rad = Math.min(RUG.w, RUG.d) / 2;
+    const top = new THREE.CircleGeometry(rad, 48);
+    top.rotateX(-Math.PI / 2);
+    bucket.add('rug', top, trs(RUG.x, 0.012, RUG.z));
+    // 테두리 링(살짝 두툼)
+    const rim = new THREE.RingGeometry(rad * 0.92, rad, 48);
+    rim.rotateX(-Math.PI / 2);
+    bucket.add('rug', rim, trs(RUG.x, 0.014, RUG.z));
+    const edge = new THREE.CylinderGeometry(rad, rad * 0.99, 0.012, 40, 1, true);
+    const uv = edge.getAttribute('uv');
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.005, 0.005);
+    bucket.add('rug', edge, trs(RUG.x, 0.006, RUG.z));
+    return;
+  }
   const top = new THREE.PlaneGeometry(RUG.d, RUG.w);
   top.rotateX(-Math.PI / 2);
   top.rotateY(Math.PI / 2);

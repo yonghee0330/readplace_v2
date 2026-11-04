@@ -4,7 +4,7 @@ import { MergeBucket, trs } from '../geom';
 import {
   BAR_TABLE, BENCH, CHAIRS, COFFEE_TABLE, COUNTER, FLOOR_LAMPS, FLOOR_PLANTS, ISLANDS,
   READING_TABLE, SEMINAR_CHAIRS, SEMINAR_TABLE, SHELF, SHELVES, SOFA, SOLO_CHAIR,
-  SOLO_DESK, STAGE, STORE_CHAIRS, STORE_TABLE, THEATER, isPresent,
+  SOLO_DESK, STAGE, STORE_CHAIRS, STORE_TABLE, THEATERS, isPresent,
 } from '../layout';
 
 export function buildContactShadows(bucket: MergeBucket): void {
@@ -27,8 +27,20 @@ export function buildContactShadows(bucket: MergeBucket): void {
   if (isPresent(BAR_TABLE)) add(BAR_TABLE.x, BAR_TABLE.z, BAR_TABLE.w + pad, BAR_TABLE.d + pad, 0, 0.85);
   if (isPresent(COFFEE_TABLE)) add(COFFEE_TABLE.x, COFFEE_TABLE.z, COFFEE_TABLE.w + pad, COFFEE_TABLE.d + pad, COFFEE_TABLE.ry, 0.75);
   if (isPresent(STAGE)) add(STAGE.x, STAGE.z, STAGE.w + pad, STAGE.d + pad, 0, 0.7);
-  if (isPresent(THEATER) && THEATER.rows > 0) {
-    add(THEATER.x, THEATER.z, THEATER.cols * THEATER.seatW + 0.4, THEATER.rows * THEATER.rowDepth + 0.3, THEATER.ry, 0.75);
+  for (const th of THEATERS) {
+    if (th.rows < 1) continue;
+    const depth = th.rows * th.rowDepth;
+    const c = Math.cos(th.ry);
+    const s = Math.sin(th.ry);
+    const lz = depth * 0.45;
+    add(
+      th.x + lz * s,
+      th.z + lz * c,
+      th.cols * th.seatW + 0.4,
+      depth + 0.3,
+      th.ry,
+      0.75,
+    );
   }
   for (const c of [...CHAIRS, ...STORE_CHAIRS, ...SEMINAR_CHAIRS, ...(isPresent(SOLO_CHAIR) ? [SOLO_CHAIR] : [])]) {
     add(c.x, c.z, 0.4, 0.4, 0, 0.7);

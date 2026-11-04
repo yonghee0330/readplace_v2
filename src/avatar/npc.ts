@@ -25,8 +25,8 @@ export const NPC_SPOTS: NpcSpot[] = [
   { id: 'npc-hub-b', space: 'hub', x: 3.55, z: 2.35, ry: Math.PI / 2 },
   // 세미나실 왼쪽 서가
   { id: 'npc-sem-a', space: 'seminar', x: -2.35, z: -1.35, ry: -Math.PI / 2 },
-  // 계단식 강연 — 좌석 옆 서가 앞
-  { id: 'npc-lec-a', space: 'lecture', x: -1.55, z: 2.55, ry: Math.PI },
+  // 계단식 강연 — 오른쪽 둘레 서가 앞(객석·카페트를 봄)
+  { id: 'npc-lec-a', space: 'lecture', x: 2.85, z: 1.15, ry: -Math.PI / 2 },
 ];
 
 export interface NpcReader {
