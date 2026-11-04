@@ -225,3 +225,4 @@
 - 포스트잇 보드 양쪽 벽에 포스터 1장씩(왼쪽: 11월 비모임 → /moim/, 오른쪽: 서귤 《채달금전》 북토크 → /moim/m/btalk-seogyul-2611/). 표지 이미지는 `public/posters/chaedalgeumjeon.jpg`.
 - 포스트잇 하트: 3D 보드의 하트를 124×116으로 키우고 박스를 꽉 채우는 모양으로 다시 그림. 글자는 영역에 들어갈 때까지 크기를 줄여 가며 줄바꿈(`fitText`). 읽기용 DOM 하트도 약간 키움. 점검: `HEARTS=1 npx tsx scripts/poster-shot.ts out.png`.
 - 읽고 있는 책 시트: 목차 제거, 표지 확대. 책 소개는 카카오 원문을 그대로 쓰지 않고 `src/reader/blurbSummary.ts`가 완결 문장만 골라 120자 안팎으로 요약(잘린 조각·판매/수상 홍보 문장 제외). 쓸 문장이 없으면 직접 쓴 소개(코스모스 등 `CURATED`) 또는 제목·저자 기반 기본 문구. 점검: `npx tsx scripts/peek-shot.ts out.png [제목] [저자] [출판사]`.
+- 카운터: 손님 쪽(방 안, -z)에 높은 바 스툴 1개(좌석 `counter-1`, 앉기 확인) + 카운터 앞면에 '카운터' 간판(`src/scene/props/counterSign.ts`).

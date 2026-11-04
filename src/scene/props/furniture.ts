@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { Rng } from '../../core/rng';
 import { MergeBucket, bevelBox, projectUV, taperLeg, trs } from '../geom';
 import {
-  BAR_TABLE, BENCH, CHAIRS, COFFEE_TABLE, COUNTER, ISLANDS, READING_TABLE, isPresent,
+  BAR_TABLE, BENCH, CHAIRS, COFFEE_TABLE, COUNTER, ISLANDS, READING_TABLE, SEATS, isPresent,
 } from '../layout';
 import { BookCollector, displayBook, stackBooks } from './books';
 
@@ -204,6 +204,14 @@ export function buildBarTable(bucket: MergeBucket, rng: Rng, books: BookCollecto
     const pos = new THREE.Vector3(sx, 0, stoolZ).applyMatrix4(base);
     buildBarStool(bucket, r.fork(`stool-${i}`), trs(pos.x, 0, pos.z, 0, ry + Math.PI), 0.72);
   });
+}
+
+/** 카운터 손님 쪽 높은 바 스툴(좌석 counter-*와 같은 자리). */
+export function buildCounterStool(bucket: MergeBucket, rng: Rng): void {
+  const r = rng.fork('counter-stool');
+  for (const seat of SEATS.filter((x) => x.id.startsWith('counter-'))) {
+    buildBarStool(bucket, r.fork(seat.id), trs(seat.x, 0, seat.z, 0, seat.ry), seat.y);
+  }
 }
 
 export function buildCounter(bucket: MergeBucket, rng: Rng, books: BookCollector): void {

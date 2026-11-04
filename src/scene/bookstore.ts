@@ -14,12 +14,13 @@ import { createMaterials } from './materials';
 import { BookCollector, fillCompartment, stackBooks } from './props/books';
 import { buildContactShadows } from './props/contactShadows';
 import {
-  buildBarTable, buildBench, buildChairAt, buildCoffeeTable, buildCounter, buildIslands, buildReadingTable,
+  buildBarTable, buildBench, buildChairAt, buildCoffeeTable, buildCounter, buildCounterStool, buildIslands, buildReadingTable,
 } from './props/furniture';
 import { buildLamps } from './props/lamps';
 import { buildPlant } from './props/plants';
 import { buildEventBoard, type EventBoardProp } from './props/eventBoard';
 import { buildMoimPoster, type MoimPosterProp } from './props/moimPoster';
+import { buildCounterSign } from './props/counterSign';
 import { buildPortalGlow, buildPortals, type PortalGlow } from './props/portals';
 import { buildCeiling, buildFloor, buildWalls } from './props/room';
 import { buildShelves } from './props/shelf';
@@ -97,6 +98,7 @@ function buildOneSpace(
   buildReadingTable(bucket, rng, books);
   buildBarTable(bucket, rng, books);
   if (!(id === 'hub' && hasModel('counter'))) buildCounter(bucket, rng, books);
+  if (id === 'hub') buildCounterStool(bucket, rng);
   buildSofa(bucket, rng);
   buildBench(bucket, rng, books);
   buildCoffeeTable(bucket, rng, books);
@@ -122,6 +124,8 @@ function buildOneSpace(
   if (eventBoard) group.add(eventBoard.group);
   const poster = id === 'hub' ? buildMoimPoster() : null;
   if (poster) group.add(poster.group);
+  const counterSign = id === 'hub' ? buildCounterSign() : null;
+  if (counterSign) group.add(counterSign);
   const floor = group.getObjectByName('merged:floor')!;
   floor.name = `merged:floor:${id}`;
   return {

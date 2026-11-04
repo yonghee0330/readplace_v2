@@ -200,6 +200,8 @@ function makeHub(): SpaceLayout {
       { id: 'bar-1', x: -0.7, z: -2.7, ry: Math.PI, y: 0.72, approach: 1 },
       { id: 'bar-2', x: 0.15, z: -2.7, ry: Math.PI, y: 0.72, approach: 1 },
       { id: 'bar-3', x: 1.0, z: -2.7, ry: Math.PI, y: 0.72, approach: 1 },
+      // 카운터 손님 쪽(방 안, -z) 높은 바 스툴 — 카운터를 바라보고 앉는다
+      { id: 'counter-1', x: -2.93, z: 2.04, ry: 0.15, y: 0.72, approach: -1 },
     ],
     spawn,
     spawns: [
@@ -560,7 +562,7 @@ export function colliders(): Collider[] {
   if (isPresent(BAR_TABLE)) {
     rect(BAR_TABLE.x, BAR_TABLE.z, BAR_TABLE.w, BAR_TABLE.d, 0, BAR_TABLE.h);
     // 바 스툴은 따로(앉기 히트)
-    for (const s of SEATS.filter((seat) => seat.id.startsWith('bar-'))) {
+    for (const s of SEATS.filter((seat) => seat.id.startsWith('bar-') || seat.id.startsWith('counter-'))) {
       rect(s.x, s.z, 0.4, 0.4, 0, 0.95, [s.id]);
     }
   }

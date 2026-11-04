@@ -1,6 +1,6 @@
 // 영화감상실: 스크린 클릭 → 유튜브 재생. Esc·닫기로 끝냄.
 
-const YT_ID = 'CH1PZxNQ8RU';
+const YT_ID = 'gM2q676UGJc';
 const YT_START = 0;
 
 export class CinemaWatch {
