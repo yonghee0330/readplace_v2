@@ -33,6 +33,7 @@ import { BookSheet } from './ui/bookSheet';
 import { CinemaWatch } from './ui/cinemaWatch';
 import { DrinkSheet } from './ui/drinkSheet';
 import { PostitWall } from './ui/postitWall';
+import { MOIM_URL } from './scene/props/moimPoster';
 import { drinkCooldownMs, drinkToast, isDrinkKind, type DrinkKind } from './net/drink';
 import { PostitStore } from './net/postit';
 import {
@@ -802,6 +803,11 @@ export async function startApp(
     if (actor) openBookPeek(actor);
   });
 
+  function openMoimPage(): void {
+    toasts.show('11월 비모임 페이지를 열어요');
+    window.open(MOIM_URL, '_blank', 'noopener');
+  }
+
   function clickAt(clientX: number, clientY: number): void {
     if (focus.active || cinemaWatch.active || postitWall.active || anySheetOpen()) return;
     const rect = canvas.getBoundingClientRect();
@@ -818,6 +824,11 @@ export async function startApp(
       -((clientY - rect.top) / rect.height) * 2 + 1,
     );
     ray.setFromCamera(ndc, camera);
+    const posterMesh = currentSpaceId() === 'seminar' ? store.spaces.seminar.poster?.hitMesh : undefined;
+    if (posterMesh && ray.intersectObject(posterMesh, false).length) {
+      openMoimPage();
+      return;
+    }
     const boardMesh = store.eventBoard?.hitMesh;
     const targets = boardMesh && currentSpaceId() === 'hub'
       ? [boardMesh, ...hitGroup.children, store.floor]
@@ -880,6 +891,14 @@ export async function startApp(
       -((e.clientY - rect.top) / rect.height) * 2 + 1,
     );
     ray.setFromCamera(ndc, camera);
+    const posterHit = currentSpaceId() === 'seminar' ? store.spaces.seminar.poster?.hitMesh : undefined;
+    if (posterHit) {
+      const ph = ray.intersectObjects([posterHit, ...hitGroup.children], false);
+      if (ph[0]?.object === posterHit) {
+        canvas.style.cursor = 'pointer';
+        return;
+      }
+    }
     if (currentSpaceId() === 'hub') {
       const board = store.eventBoard?.hitMesh;
       const boardTargets = board ? [board, ...hitGroup.children] : hitGroup.children;

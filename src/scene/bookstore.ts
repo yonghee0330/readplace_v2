@@ -19,6 +19,7 @@ import {
 import { buildLamps } from './props/lamps';
 import { buildPlant } from './props/plants';
 import { buildEventBoard, type EventBoardProp } from './props/eventBoard';
+import { buildMoimPoster, type MoimPosterProp } from './props/moimPoster';
 import { buildPortalGlow, buildPortals, type PortalGlow } from './props/portals';
 import { buildCeiling, buildFloor, buildWalls } from './props/room';
 import { buildShelves } from './props/shelf';
@@ -36,6 +37,7 @@ export interface SpaceView {
   floor: THREE.Object3D;
   portalGlow: PortalGlow;
   eventBoard: EventBoardProp | null;
+  poster: MoimPosterProp | null;
 }
 
 export interface Bookstore {
@@ -118,10 +120,12 @@ function buildOneSpace(
   group.add(books.build(mats.bookCover as THREE.MeshStandardMaterial, mats.bookPages));
   group.add(portalGlow.group);
   if (eventBoard) group.add(eventBoard.group);
+  const poster = id === 'seminar' ? buildMoimPoster() : null;
+  if (poster) group.add(poster.group);
   const floor = group.getObjectByName('merged:floor')!;
   floor.name = `merged:floor:${id}`;
   return {
-    view: { id, group, floor, portalGlow, eventBoard },
+    view: { id, group, floor, portalGlow, eventBoard, poster },
     books: books.items.length,
     planks,
     lamps,
