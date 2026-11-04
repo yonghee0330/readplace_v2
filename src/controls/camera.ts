@@ -131,12 +131,12 @@ export class FollowCamera {
       Math.sin(this.shown.pitch),
       Math.cos(this.shown.yaw) * Math.cos(this.shown.pitch),
     );
-    // 벽·천장 + 높은 가구(서가 등). 등 뒤 서가가 시야를 가리면 카메라를 앞으로 당김
+    // 벽·천장 + 가구. 등 뒤 서가·소파가 시야를 가리면 카메라를 앞으로 당김(전 공간 공통)
     const slack = 0.12;
     const wallHit = roomExit(this.target, dir, slack) - 0.22;
-    const furnHit = furnitureExit(this.target, dir, this.shown.dist) - 0.28;
+    const furnHit = furnitureExit(this.target, dir, this.shown.dist) - 0.42;
     const hit = Math.min(wallHit, furnHit);
-    const d = Math.min(this.shown.dist, Math.max(0.55, hit));
+    const d = Math.min(this.shown.dist, Math.max(0.65, hit));
     const orbitPos = this.target.clone().addScaledVector(dir, d);
     // 방 안에 남도록 한 번 더 클램프
     clampInsideRoom(orbitPos, 0.2);
@@ -179,24 +179,35 @@ function roomExit(p: THREE.Vector3, dir: THREE.Vector3, slack = 0): number {
 }
 
 /**
- * 아바타→카메라 선이 높은 가구(서가·칸막이 등)에 닿는 거리.
- * 지금 서 있는 좌석 콜라이더는 건너뛰어 의자에 카메라가 끼지 않게 한다.
+ * 아바타→카메라 선이 가구(서가·소파·카운터 등)에 닿는 거리.
+ * 좌우로 짧게 여러 번 쏴서 등 뒤 가림을 더 잘 잡는다.
  */
 function furnitureExit(p: THREE.Vector3, dir: THREE.Vector3, maxDist: number): number {
   let best = maxDist + 1;
-  const pad = 0.06;
+  const pad = 0.1;
+  const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0));
+  if (right.lengthSq() < 1e-6) right.set(1, 0, 0);
+  else right.normalize();
+  const origins: [number, number, number][] = [
+    [p.x, p.y, p.z],
+    [p.x + right.x * 0.2, p.y, p.z + right.z * 0.2],
+    [p.x - right.x * 0.2, p.y, p.z - right.z * 0.2],
+    [p.x, p.y + 0.25, p.z],
+  ];
   for (const c of colliders()) {
-    if (c.h < 0.95) continue;
+    if (c.h < 0.7) continue;
     // 발밑·앉은 자리 박스는 무시
     if (p.x >= c.x0 - pad && p.x <= c.x1 + pad && p.z >= c.z0 - pad && p.z <= c.z1 + pad) continue;
-    const t = rayAabb(
-      p.x, p.y, p.z,
-      dir.x, dir.y, dir.z,
-      c.x0 - pad, c.x1 + pad,
-      0, c.h + 0.05,
-      c.z0 - pad, c.z1 + pad,
-    );
-    if (t !== null && t > 0.12 && t < best) best = t;
+    for (const [ox, oy, oz] of origins) {
+      const t = rayAabb(
+        ox, oy, oz,
+        dir.x, dir.y, dir.z,
+        c.x0 - pad, c.x1 + pad,
+        0, c.h + 0.08,
+        c.z0 - pad, c.z1 + pad,
+      );
+      if (t !== null && t > 0.1 && t < best) best = t;
+    }
   }
   return best;
 }

@@ -206,7 +206,7 @@ export function buildLighting(
     // 창 없는 세미나·강연: 테이블/무대 펜던트 + 천장 필
     roomFill.intensity = seminar ? 1.35 : lecture ? 1.1 : 0;
     if (seminar) roomFill.position.set(0, 2.2, 0.2);
-    if (lecture) roomFill.position.set(1.95, 2.25, -0.15);
+    if (lecture) roomFill.position.set(2.45, 2.25, -0.55);
 
     if (playing) {
       key.intensity = 0.02;

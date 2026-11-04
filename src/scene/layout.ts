@@ -173,10 +173,10 @@ function makeHub(): SpaceLayout {
   // 측벽(+서가가 비는 칸)에 붙인 문형 포털. 벽면 x≈±4.5
   const doorX = 4.32;
   const portals: PortalDef[] = [
-    { to: 'seminar', x: -doorX, z: -2.45, ry: Math.PI / 2, label: '세미나실', w: 0.88, d: 0.28 },
-    { to: 'cinema', x: doorX, z: -2.45, ry: -Math.PI / 2, label: '영화감상실', w: 0.88, d: 0.28 },
-    { to: 'lecture', x: -doorX, z: 1.2, ry: Math.PI / 2, label: '계단식 강연장', w: 0.88, d: 0.28 },
-    { to: 'solo', x: doorX, z: 1.2, ry: -Math.PI / 2, label: '1인 작업실', w: 0.88, d: 0.28 },
+    { to: 'seminar', x: -doorX, z: -2.45, ry: Math.PI / 2, label: '세미나실', w: 0.82, d: 0.2 },
+    { to: 'cinema', x: doorX, z: -2.45, ry: -Math.PI / 2, label: '영화감상실', w: 0.82, d: 0.2 },
+    { to: 'lecture', x: -doorX, z: 1.2, ry: Math.PI / 2, label: '계단식 강연장', w: 0.82, d: 0.2 },
+    { to: 'solo', x: doorX, z: 1.2, ry: -Math.PI / 2, label: '1인 작업실', w: 0.82, d: 0.2 },
   ];
   return {
     ...emptyBase('hub', '서점 중앙', room),
@@ -282,7 +282,7 @@ function makeSeminar(): SpaceLayout {
     spawn,
     spawns: [spawn, { x: -0.7, z: 1.7, ry: Math.PI }, { x: 0.7, z: 1.7, ry: Math.PI }],
     // 출입문은 뒤벽(창·문 개구) — 포털도 같은 쪽
-    portals: [{ to: 'hub', x: 0, z: -2.45, ry: Math.PI, label: '서점 중앙', w: 0.95, d: 0.35 }],
+    portals: [{ to: 'hub', x: 0, z: -2.45, ry: Math.PI, label: '서점 중앙', w: 0.88, d: 0.22 }],
   };
 }
 
@@ -315,7 +315,7 @@ function makeCinema(): SpaceLayout {
     ],
     spawn,
     spawns: [spawn, { x: -1.6, z: -1.4, ry: 0.5 }],
-    portals: [{ to: 'hub', x: 0, z: -2.2, ry: Math.PI, label: '서점 중앙', w: 0.95, d: 0.35 }],
+    portals: [{ to: 'hub', x: 0, z: -2.2, ry: Math.PI, label: '서점 중앙', w: 0.88, d: 0.22 }],
   };
 }
 
@@ -333,14 +333,14 @@ function makeLecture(): SpaceLayout {
     stairSide: 1, idPrefix: 'th-w',
   };
   const theaters = [north, west];
-  // 강사·연주자: 열린 바닥 가운데 원형 카페트 + 윙백. 둘레 서가는 유지(카메라가 가구에 가리지 않음).
-  const rug = { x: 1.95, z: -0.15, w: 1.9, d: 1.9, round: true };
+  // 강사·연주자: 열린 바닥 중간(문·객석 사이) 원형 카페트 + 작은 1인 윙백
+  const rug = { x: 2.45, z: -0.55, w: 1.45, d: 1.45, round: true };
   // 객석(북·서)을 바라봄
-  const performerRy = Math.atan2(-1.2 - rug.x, 0.85 - rug.z);
-  const spawn = { x: 2.35, z: -1.85, ry: -2.0 };
+  const performerRy = Math.atan2(-1.0 - rug.x, 0.7 - rug.z);
+  const spawn = { x: 2.2, z: -1.95, ry: -1.8 };
   const seats = [
     ...theaters.flatMap(theaterSeats),
-    { id: 'stage-1', x: rug.x, z: rug.z, ry: performerRy, y: 0.45, approach: 1 as const },
+    { id: 'stage-1', x: rug.x, z: rug.z, ry: performerRy, y: 0.4, approach: 1 as const },
   ];
   return {
     ...emptyBase('lecture', '계단식 강연장', room),
@@ -367,8 +367,8 @@ function makeLecture(): SpaceLayout {
     floorPlants: [{ x: 2.75, z: 2.35, scale: 0.8 }],
     seats,
     spawn,
-    spawns: [spawn, { x: 2.55, z: -1.35, ry: -1.8 }, { x: 1.35, z: -2.15, ry: -0.4 }],
-    portals: [{ to: 'hub', x: 2.5, z: -2.7, ry: Math.PI, label: '서점 중앙', w: 0.95, d: 0.35 }],
+    spawns: [spawn, { x: 2.55, z: -1.55, ry: -1.8 }, { x: 1.55, z: -2.15, ry: -0.4 }],
+    portals: [{ to: 'hub', x: 2.5, z: -2.7, ry: Math.PI, label: '서점 중앙', w: 0.88, d: 0.22 }],
   };
 }
 
@@ -395,7 +395,7 @@ function makeSolo(): SpaceLayout {
     spawn,
     spawns: [spawn],
     // 문 안쪽으로 들여 내비·근접 탐지가 막히지 않게. open: 문짝 없이 등 뒤가 보임
-    portals: [{ to: 'hub', x: 0, z: -0.95, ry: Math.PI, label: '서점 중앙', w: 0.82, d: 0.32, open: true }],
+    portals: [{ to: 'hub', x: 0, z: -0.95, ry: Math.PI, label: '서점 중앙', w: 0.72, d: 0.2, open: true }],
   };
 }
 
@@ -625,8 +625,8 @@ export function colliders(): Collider[] {
     rect(STAGE.x, STAGE.z, STAGE.w, STAGE.d, 0, STAGE.h + 0.05, stageIds.length ? stageIds : undefined);
   } else {
     for (const s of SEATS.filter((seat) => seat.id.startsWith('stage-'))) {
-      // 윙백 1인 소파
-      rect(s.x, s.z, 0.78, 0.82, s.ry, 1.15, [s.id]);
+      // 작은 1인 윙백
+      rect(s.x, s.z, 0.55, 0.58, s.ry, 1.0, [s.id]);
     }
   }
   for (const th of THEATERS) {

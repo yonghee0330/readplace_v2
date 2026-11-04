@@ -711,9 +711,12 @@ export async function startApp(
       hitGroup.add(box);
     }
     for (const p of PORTALS) {
-      // 모바일 탭이 쉬운 두꺼운 히트 박스
-      const box = new THREE.Mesh(new THREE.BoxGeometry(p.w + 0.15, 2.2, Math.max(0.75, p.d + 0.55)), new THREE.MeshBasicMaterial({ visible: false }));
-      box.position.set(p.x, 1.1, p.z);
+      // 문짝 크기만 — 멀리서·옆에서 넓게 잡히지 않게
+      const box = new THREE.Mesh(
+        new THREE.BoxGeometry(p.w, 2.1, Math.max(0.2, p.d + 0.06)),
+        new THREE.MeshBasicMaterial({ visible: false }),
+      );
+      box.position.set(p.x, 1.05, p.z);
       box.rotation.y = p.ry;
       box.userData.portal = p;
       hitGroup.add(box);
@@ -1028,16 +1031,16 @@ export async function startApp(
       const p = me.root.position;
       store.updatePortals(t, { x: p.x, z: p.z, ry: lookYaw(), space: currentSpaceId() });
     }
-    // 포털 문 앞에 서면 확인만 띄움(자동 전환 없음). 포털끼리 직접 연결하지 않음.
+    // 포털은 문 클릭으로만(근접 자동 팝업 없음). 1인실만 문 바로 앞에서 안내.
     if (!focus.active && !cinemaWatch.active && !postitWall.active && !anySheetOpen() && performance.now() > portalPromptIgnoreUntil) {
-      const p = me.root.position;
-      for (const portal of PORTALS) {
-        if (!portalUsable(portal)) continue;
-        // 작은 방(1인실)은 문까지 발걸음이 짧아 탐지 거리를 조금 넓힘
-        const reach = currentSpaceId() === 'solo' ? 1.05 : 0.75;
-        if (Math.hypot(p.x - portal.x, p.z - portal.z) < reach) {
-          if (portalPromptFor !== portal.to) askEnterPortal(portal);
-          break;
+      if (currentSpaceId() === 'solo') {
+        const p = me.root.position;
+        for (const portal of PORTALS) {
+          if (!portalUsable(portal)) continue;
+          if (Math.hypot(p.x - portal.x, p.z - portal.z) < 0.55) {
+            if (portalPromptFor !== portal.to) askEnterPortal(portal);
+            break;
+          }
         }
       }
     }

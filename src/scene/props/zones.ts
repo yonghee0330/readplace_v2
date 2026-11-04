@@ -185,51 +185,45 @@ function buildSoloArmchair(bucket: MergeBucket, r: Rng, m: THREE.Matrix4): void 
 }
 
 /**
- * 회색 윙백 1인 소파(STRANDMON 느낌). 앉은 사람은 +z.
- * 높은 등·날개·스크롤 팔걸이·버튼 터프팅·검정 테이퍼 다리.
+ * 회색 윙백 1인 소파(STRANDMON 느낌, 아바타 한 명 크기). 앉은 사람은 +z.
  */
 function buildWingbackArmchair(bucket: MergeBucket, r: Rng, m: THREE.Matrix4): void {
   const at = (mm: THREE.Matrix4) => m.clone().multiply(mm);
   const fabric = (g: THREE.BufferGeometry, mm: THREE.Matrix4, k = 1) => {
-    projectUV(g, 'x', { along: 0.28, across: 0.28, offset: [r.float(), r.float()] });
+    projectUV(g, 'x', { along: 0.32, across: 0.32, offset: [r.float(), r.float()] });
     bucket.add('wingback', g, mm, new THREE.Color(k, k, k));
   };
-  const legH = 0.12;
-  const seatH = 0.42;
-  const w = 0.72;
-  const d = 0.74;
+  const legH = 0.1;
+  const seatH = 0.38;
+  const w = 0.5;
+  const d = 0.52;
   const gray = 1.0;
   const grayDeep = 0.9;
 
-  // 짧은 검정 테이퍼 다리
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    const leg = taperLeg(legH, 0.028, 0.016);
+    const leg = taperLeg(legH, 0.022, 0.014);
     projectUV(leg, 'y', { offset: [r.float(), r.float()] });
-    bucket.add('iron', leg, at(trs(sx * (w / 2 - 0.1), 0, sz * (d / 2 - 0.1))), 0x1a1a1a);
+    bucket.add('iron', leg, at(trs(sx * (w / 2 - 0.07), 0, sz * (d / 2 - 0.07))), 0x1a1a1a);
   }
 
-  // 받침·좌석 쿠션
-  fabric(bevelBox(w - 0.04, 0.12, d - 0.1, 0.045, 4), at(trs(0, seatH - 0.08, 0.02)), gray);
-  fabric(bevelBox(w - 0.1, 0.1, d - 0.16, 0.05, 5), at(trs(0, seatH + 0.02, 0.04)), 1.05);
+  fabric(bevelBox(w - 0.03, 0.09, d - 0.08, 0.035, 4), at(trs(0, seatH - 0.06, 0.015)), gray);
+  fabric(bevelBox(w - 0.08, 0.08, d - 0.12, 0.04, 5), at(trs(0, seatH + 0.015, 0.03)), 1.05);
 
-  // 스크롤 팔걸이(위가 바깥으로 벌어짐)
   for (const sx of [-1, 1]) {
-    fabric(bevelBox(0.11, 0.28, d - 0.14, 0.04, 4), at(trs(sx * (w / 2 - 0.07), seatH + 0.1, 0.02)), grayDeep);
-    fabric(bevelBox(0.14, 0.08, 0.22, 0.035, 4), at(trs(sx * (w / 2 - 0.02), seatH + 0.26, 0.06, 0, 0, sx * 0.35)), gray);
+    fabric(bevelBox(0.08, 0.2, d - 0.12, 0.03, 4), at(trs(sx * (w / 2 - 0.05), seatH + 0.07, 0.015)), grayDeep);
+    fabric(bevelBox(0.1, 0.06, 0.15, 0.028, 4), at(trs(sx * (w / 2 - 0.015), seatH + 0.19, 0.04, 0, 0, sx * 0.3)), gray);
   }
 
-  // 높은 등받이 + 양옆 윙
-  const backZ = -d / 2 + 0.12;
-  fabric(bevelBox(w - 0.12, 0.72, 0.11, 0.04, 4), at(trs(0, seatH + 0.38, backZ, -0.08)), grayDeep);
+  const backZ = -d / 2 + 0.09;
+  fabric(bevelBox(w - 0.1, 0.52, 0.09, 0.032, 4), at(trs(0, seatH + 0.28, backZ, -0.08)), grayDeep);
   for (const sx of [-1, 1]) {
-    fabric(bevelBox(0.12, 0.42, 0.28, 0.04, 4), at(trs(sx * (w / 2 - 0.1), seatH + 0.48, backZ + 0.12, -0.05, 0, sx * 0.2)), gray);
-    fabric(bevelBox(0.1, 0.2, 0.18, 0.035, 4), at(trs(sx * (w / 2 - 0.12), seatH + 0.72, backZ + 0.06, 0.15)), grayDeep);
+    fabric(bevelBox(0.085, 0.3, 0.2, 0.03, 4), at(trs(sx * (w / 2 - 0.07), seatH + 0.36, backZ + 0.09, -0.05, 0, sx * 0.18)), gray);
+    fabric(bevelBox(0.07, 0.14, 0.12, 0.028, 4), at(trs(sx * (w / 2 - 0.08), seatH + 0.52, backZ + 0.04, 0.12)), grayDeep);
   }
-  // 등 하단 가로 터프팅(버튼 4개)
-  fabric(bevelBox(w - 0.22, 0.2, 0.06, 0.03, 3), at(trs(0, seatH + 0.22, backZ + 0.06, -0.12)), 0.95);
+  fabric(bevelBox(w - 0.18, 0.14, 0.05, 0.025, 3), at(trs(0, seatH + 0.16, backZ + 0.05, -0.1)), 0.95);
   for (let i = 0; i < 4; i++) {
-    const bx = (i - 1.5) * 0.12;
-    bucket.add('iron', new THREE.SphereGeometry(0.012, 8, 6), at(trs(bx, seatH + 0.22, backZ + 0.1)), 0x2c2c2c);
+    const bx = (i - 1.5) * 0.08;
+    bucket.add('iron', new THREE.SphereGeometry(0.009, 8, 6), at(trs(bx, seatH + 0.16, backZ + 0.08)), 0x2c2c2c);
   }
 }
 
@@ -334,11 +328,11 @@ export function buildTheater(bucket: MergeBucket, rng: Rng): void {
     const seat = SEATS.find((s) => s.id === 'stage-1');
     const ry = seat?.ry ?? Math.atan2(-1.2 - cx, 0.85 - cz);
     buildWingbackArmchair(bucket, r.fork('performer'), trs(cx, 0, cz, 0, ry));
-    // 마이크는 소파 오른쪽 앞(로컬 +x,+z)
+    // 마이크는 의자 오른쪽 앞(로컬 +x,+z)
     const c = Math.cos(ry);
     const s = Math.sin(ry);
-    const lx = 0.42;
-    const lz = 0.28;
+    const lx = 0.32;
+    const lz = 0.22;
     const mx = cx + lx * c + lz * s;
     const mz = cz - lx * s + lz * c;
     bucket.add('iron', new THREE.CylinderGeometry(0.08, 0.1, 0.016, 16), trs(mx, 0.008, mz));
