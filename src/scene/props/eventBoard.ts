@@ -106,19 +106,18 @@ function paintBoard(ctx: CanvasRenderingContext2D, notes: PostitNote[]): void {
   ctx.fillText('b.books-M 공간이 생겼어요!', w / 2, 36);
 
   for (const n of notes) {
+    // UI와 같이 네모 기본 크기(모든 모양 동일 박스)
+    const pw = 78;
+    const ph = 78;
     const heart = n.shape === 'heart';
-    const pw = heart ? 124 : 78;
-    const ph = heart ? 116 : 70;
     const px = n.x * w - pw / 2;
     const py = n.y * h - ph / 2;
     ctx.save();
     ctx.translate(n.x * w, n.y * h);
     ctx.rotate((n.rot * Math.PI) / 180);
     ctx.translate(-n.x * w, -n.y * h);
-    // 그림자
     drawShape(ctx, n.shape, px + 3, py + 4, pw, ph, 'rgba(40,25,10,0.18)');
     drawShape(ctx, n.shape, px, py, pw, ph, colorHex(n.color));
-    // 압정 (하트는 왼쪽 윗볼록 안쪽)
     ctx.fillStyle = '#c0392b';
     ctx.beginPath();
     ctx.arc(heart ? px + pw * 0.27 : n.x * w, heart ? py + ph * 0.14 : py + 8, 3.2, 0, Math.PI * 2);
@@ -126,20 +125,18 @@ function paintBoard(ctx: CanvasRenderingContext2D, notes: PostitNote[]): void {
     ctx.fillStyle = '#2a241c';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    if (heart) fitText(ctx, n.text, n.x * w, py + ph * 0.27, 84, ph * 0.5);
-    else {
-      ctx.font = '600 11px "Pretendard", system-ui, sans-serif';
-      wrapText(ctx, n.text, n.x * w, py + 16, pw - 14, 13);
-    }
+    const textTop = heart ? py + ph * 0.22 : py + 14;
+    const textH = heart ? ph * 0.55 : ph - 28;
+    fitText(ctx, n.text, n.x * w, textTop, pw - 14, textH);
     ctx.restore();
   }
 }
 
 /** 영역(maxW × maxH)에 들어갈 때까지 글자 크기를 줄여 가며 줄바꿈해 그린다. */
 function fitText(ctx: CanvasRenderingContext2D, text: string, cx: number, y: number, maxW: number, maxH: number): void {
-  for (const size of [11, 10, 9, 8]) {
+  for (const size of [12, 11, 10, 9, 8, 7]) {
     ctx.font = `600 ${size}px "Pretendard", system-ui, sans-serif`;
-    const lh = size + 2;
+    const lh = size * 1.3;
     const lines: string[] = [];
     let line = '';
     for (const ch of [...text]) {
@@ -149,28 +146,12 @@ function fitText(ctx: CanvasRenderingContext2D, text: string, cx: number, y: num
       } else line += ch;
     }
     if (line) lines.push(line);
-    if (lines.length * lh <= maxH || size === 8) {
+    if (lines.length * lh <= maxH || size === 7) {
       const top = y + Math.max(0, (maxH - lines.length * lh) / 2);
       lines.forEach((l, i) => ctx.fillText(l, cx, top + i * lh));
       return;
     }
   }
-}
-
-function wrapText(ctx: CanvasRenderingContext2D, text: string, cx: number, y: number, maxW: number, lh: number): void {
-  const chars = [...text];
-  let line = '';
-  let yy = y;
-  for (const ch of chars) {
-    const test = line + ch;
-    if (ctx.measureText(test).width > maxW && line) {
-      ctx.fillText(line, cx, yy);
-      line = ch;
-      yy += lh;
-      if (yy > y + lh * 3.2) break;
-    } else line = test;
-  }
-  if (line && yy <= y + lh * 3.2) ctx.fillText(line, cx, yy);
 }
 
 /** 머지드 나무 틀 + 별도 코르크 면(텍스처 갱신). */

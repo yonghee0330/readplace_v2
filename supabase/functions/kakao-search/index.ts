@@ -4,6 +4,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const KAKAO_BOOK_URL = "https://dapi.kakao.com/v3/search/book";
+const BLURB_MAX = 900;
 
 function cors(res: Response): Response {
   const h = new Headers(res.headers);
@@ -31,12 +32,22 @@ function enlargeThumbnail(url: string): string {
   return url.replace(/\/thumb\/R\d+x\d+\./, "/thumb/R300x400.");
 }
 
+function yearFromDatetime(dt: string | undefined | null): number | null {
+  if (!dt) return null;
+  const m = /^(\d{4})/.exec(dt.trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  return y >= 1000 && y <= 2100 ? y : null;
+}
+
 type Hit = {
   title: string;
   author: string;
   publisher: string;
   coverUrl: string;
   blurb: string | null;
+  datetime: string | null;
+  year: number | null;
   link: string | null;
 };
 
@@ -47,20 +58,24 @@ function toHit(
     publisher?: string;
     thumbnail?: string;
     contents?: string;
+    datetime?: string;
     url?: string;
   },
   fallbackTitle: string,
 ): Hit | null {
   const cover = httpsUrl(doc.thumbnail);
   const blurbRaw = stripHtml(doc.contents ?? "");
-  const blurb = blurbRaw ? blurbRaw.slice(0, 280) : null;
+  const blurb = blurbRaw ? blurbRaw.slice(0, BLURB_MAX) : null;
   if (!cover && !blurb) return null;
+  const datetime = doc.datetime?.trim() || null;
   return {
     title: stripHtml(doc.title ?? fallbackTitle),
     author: (doc.authors ?? []).map(stripHtml).filter(Boolean).join(", "),
     publisher: stripHtml(doc.publisher ?? ""),
     coverUrl: cover ? enlargeThumbnail(cover) : "",
     blurb,
+    datetime,
+    year: yearFromDatetime(datetime),
     link: httpsUrl(doc.url),
   };
 }
@@ -99,6 +114,7 @@ Deno.serve(async (req) => {
         publisher?: string;
         thumbnail?: string;
         contents?: string;
+        datetime?: string;
         url?: string;
       }[];
     };

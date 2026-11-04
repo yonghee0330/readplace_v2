@@ -7,8 +7,12 @@ export interface KakaoBookHit {
   author: string;
   publisher: string;
   coverUrl: string;
-  /** 카카오 책 소개 요약(본문 아님) */
+  /** 카카오 책 소개(요약). UI에서 추천 문단으로 쓴다. */
   blurb: string | null;
+  /** 출간일 ISO 또는 연도 문자열 */
+  datetime: string | null;
+  /** datetime에서 뽑은 출간 연도 */
+  year: number | null;
   link: string | null;
 }
 
@@ -17,6 +21,7 @@ export type KakaoSearchResult =
   | { ok: false; error: 'no_key' | 'upstream' | 'empty' | 'forbidden'; message: string };
 
 const KAKAO_BOOK_URL = 'https://dapi.kakao.com/v3/search/book';
+const BLURB_MAX = 900;
 
 function stripHtml(s: string): string {
   return s.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
@@ -28,9 +33,16 @@ function httpsUrl(u: string | undefined | null): string | null {
   return s.startsWith('https://') ? s : null;
 }
 
-/** 카카오 CDN 썸네일을 조금 더 큰 크기로 바꾼다(실패해도 원본 URL 사용). */
 function enlargeThumbnail(url: string): string {
   return url.replace(/\/thumb\/R\d+x\d+\./, '/thumb/R300x400.');
+}
+
+function yearFromDatetime(dt: string | undefined | null): number | null {
+  if (!dt) return null;
+  const m = /^(\d{4})/.exec(dt.trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  return y >= 1000 && y <= 2100 ? y : null;
 }
 
 function toHit(
@@ -40,20 +52,24 @@ function toHit(
     publisher?: string;
     thumbnail?: string;
     contents?: string;
+    datetime?: string;
     url?: string;
   },
   fallbackTitle: string,
 ): KakaoBookHit | null {
   const cover = httpsUrl(doc.thumbnail);
   const blurbRaw = stripHtml(doc.contents ?? '');
-  const blurb = blurbRaw ? blurbRaw.slice(0, 280) : null;
+  const blurb = blurbRaw ? blurbRaw.slice(0, BLURB_MAX) : null;
   if (!cover && !blurb) return null;
+  const datetime = doc.datetime?.trim() || null;
   return {
     title: stripHtml(doc.title ?? fallbackTitle),
     author: (doc.authors ?? []).map(stripHtml).filter(Boolean).join(', '),
     publisher: stripHtml(doc.publisher ?? ''),
     coverUrl: cover ? enlargeThumbnail(cover) : '',
     blurb,
+    datetime,
+    year: yearFromDatetime(datetime),
     link: httpsUrl(doc.url),
   };
 }
@@ -99,6 +115,7 @@ export async function searchKakaoBooks(
         publisher?: string;
         thumbnail?: string;
         contents?: string;
+        datetime?: string;
         url?: string;
       }[];
     };

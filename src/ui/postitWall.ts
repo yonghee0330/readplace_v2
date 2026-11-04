@@ -276,7 +276,9 @@ export class PostitWall {
     this.ghost.className = `postit-ghost postit-note shape-${this.shape}`;
     this.ghost.style.setProperty('--c', colorHex(this.color));
     this.ghost.innerHTML = `<span class="postit-pin" aria-hidden="true"></span><p class="postit-note-text"></p>`;
-    this.ghost.querySelector('.postit-note-text')!.textContent = text.slice(0, POSTIT_MAX_LEN);
+    const textEl = this.ghost.querySelector<HTMLElement>('.postit-note-text')!;
+    textEl.textContent = text.slice(0, POSTIT_MAX_LEN);
+    requestAnimationFrame(() => fitNoteText(textEl));
   }
 
   private syncPicks(): void {
@@ -300,9 +302,23 @@ export class PostitWall {
       el.style.top = `${n.y * 100}%`;
       el.style.transform = `translate(-50%, -50%) rotate(${n.rot}deg)`;
       el.innerHTML = `<span class="postit-pin" aria-hidden="true"></span><p class="postit-note-text"></p><span class="postit-note-nick"></span>`;
-      el.querySelector('.postit-note-text')!.textContent = n.text;
+      const textEl = el.querySelector<HTMLElement>('.postit-note-text')!;
+      textEl.textContent = n.text;
       el.querySelector('.postit-note-nick')!.textContent = n.nickname;
       this.board.appendChild(el);
+      requestAnimationFrame(() => fitNoteText(textEl));
     }
   }
+}
+
+/** 기본 12px에서 시작해, 칸을 넘치면 글자만 줄인다. */
+function fitNoteText(textEl: HTMLElement): void {
+  const max = 12;
+  const min = 7;
+  textEl.style.lineHeight = '1.3';
+  for (let size = max; size >= min; size -= 0.5) {
+    textEl.style.fontSize = `${size}px`;
+    if (textEl.scrollHeight <= textEl.clientHeight + 1) return;
+  }
+  textEl.style.fontSize = `${min}px`;
 }

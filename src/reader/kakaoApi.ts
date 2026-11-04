@@ -7,6 +7,8 @@ export interface KakaoBookItem {
   publisher: string;
   coverUrl: string;
   blurb: string | null;
+  datetime: string | null;
+  year: number | null;
   link: string | null;
 }
 
@@ -47,15 +49,27 @@ function authHeaders(url: string): HeadersInit | undefined {
   };
 }
 
-function normalizeItem(raw: Partial<KakaoBookItem> | null | undefined): KakaoBookItem | null {
+function yearFromDatetime(dt: string | null | undefined): number | null {
+  if (!dt) return null;
+  const m = /^(\d{4})/.exec(dt.trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  return y >= 1000 && y <= 2100 ? y : null;
+}
+
+function normalizeItem(raw: Partial<KakaoBookItem> & { datetime?: string | null } | null | undefined): KakaoBookItem | null {
   if (!raw?.title?.trim()) return null;
   const cover = raw.coverUrl && raw.coverUrl.startsWith('http') ? raw.coverUrl : '';
+  const datetime = raw.datetime ?? null;
+  const year = typeof raw.year === 'number' ? raw.year : yearFromDatetime(datetime);
   return {
     title: raw.title.trim(),
     author: (raw.author ?? '').trim(),
     publisher: (raw.publisher ?? '').trim(),
     coverUrl: cover,
     blurb: raw.blurb ?? null,
+    datetime,
+    year,
     link: raw.link ?? null,
   };
 }
@@ -110,4 +124,12 @@ export async function fetchKakaoBook(
   signal?: AbortSignal,
 ): Promise<KakaoClientResult> {
   return searchKakaoBooks(title, signal);
+}
+
+/** 표시용 출간연도. 원서가 있으면 2026(2019) 형식. */
+export function formatPublishYears(year: number | null | undefined, originalYear?: number | null): string {
+  if (!year && !originalYear) return '';
+  if (year && originalYear && originalYear !== year) return `${year}(${originalYear})`;
+  if (year) return String(year);
+  return String(originalYear);
 }
