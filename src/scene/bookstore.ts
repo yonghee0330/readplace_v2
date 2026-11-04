@@ -120,7 +120,7 @@ function buildOneSpace(
   group.add(books.build(mats.bookCover as THREE.MeshStandardMaterial, mats.bookPages));
   group.add(portalGlow.group);
   if (eventBoard) group.add(eventBoard.group);
-  const poster = id === 'seminar' ? buildMoimPoster() : null;
+  const poster = id === 'hub' ? buildMoimPoster() : null;
   if (poster) group.add(poster.group);
   const floor = group.getObjectByName('merged:floor')!;
   floor.name = `merged:floor:${id}`;

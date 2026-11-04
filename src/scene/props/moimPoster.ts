@@ -1,6 +1,6 @@
-// 세미나실 화이트보드 우측 포스터: 이달의 비모임 안내. 클릭하면 비북스 모임 페이지로 이동.
+// 중앙 홀 포스트잇 보드 우측 포스터: 이달의 비모임 안내. 클릭하면 비북스 모임 페이지로 이동.
 import * as THREE from 'three';
-import { WHITEBOARD, isPresent } from '../layout';
+import { EVENT_BOARD, isPresent } from '../layout';
 
 export const MOIM_URL = 'https://bbooks.co.kr/moim/';
 const TW = 720;
@@ -82,14 +82,14 @@ function paint(ctx: CanvasRenderingContext2D): void {
   ctx.fillText('눌러서 11월 모임 보기 →', TW / 2, by + bh / 2 + 1);
 }
 
-/** 화이트보드의 오른쪽 끝(방 안쪽에서 볼 때)에 걸리는 포스터. 세미나실 전용. */
+/** 중앙 홀 포스트잇 보드 오른쪽(오른쪽 창) 유리에 붙는 포스터. 허브 전용. */
 export function buildMoimPoster(): MoimPosterProp | null {
-  if (!isPresent(WHITEBOARD) || WHITEBOARD.w < 0.1) return null;
-  const { x, z, ry, w, h } = WHITEBOARD;
-  const ph = Math.min(h - 0.1, 1.5);
+  if (!isPresent(EVENT_BOARD) || EVENT_BOARD.w < 0.2) return null;
+  const { x, z, ry } = EVENT_BOARD;
+  const ph = 1.4;
   const pw = ph * (TW / TH);
-  // 보드는 ry=π라 방 안에서 볼 때 오른쪽이 로컬 +x(=월드 -x). 로컬 x가 +인 쪽 끝에 붙인다.
-  const lx = w / 2 - pw / 2 - 0.12;
+  // 보드는 ry=0(벽이 -z, 방 안쪽 +z를 향함). 방 안에서 볼 때 오른쪽 = +x.
+  const lx = 2.35;
   const canvas = document.createElement('canvas');
   canvas.width = TW;
   canvas.height = TH;
@@ -103,7 +103,7 @@ export function buildMoimPoster(): MoimPosterProp | null {
 
   const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, metalness: 0 });
   const hitMesh = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), mat);
-  hitMesh.position.set(lx, 0, 0.032);
+  hitMesh.position.set(lx, 0, 0.034);
   hitMesh.name = 'moim-poster-face';
   hitMesh.userData.moimPoster = true;
 
@@ -115,7 +115,7 @@ export function buildMoimPoster(): MoimPosterProp | null {
   ];
   const group = new THREE.Group();
   group.name = 'moim-poster';
-  group.position.set(x, 1.05 + h / 2, z);
+  group.position.set(x, 1.75, z);
   group.rotation.y = ry;
   for (const [bw, bh, bx, by] of bars) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.03), frameMat);

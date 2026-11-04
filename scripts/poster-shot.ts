@@ -15,9 +15,9 @@ async function main(): Promise<void> {
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(`${base}/?cam=avatar&seed=1&npc=0&quality=medium&presence=local`);
   await page.waitForFunction(() => (window as unknown as { __BBOOKS_READY?: boolean }).__BBOOKS_READY === true, null, { timeout: 180_000 });
-  await page.evaluate(() => (window as unknown as Win).__BBOOKS.enterSpace('seminar'));
+  await page.evaluate(() => (window as unknown as Win).__BBOOKS.enterSpace('hub'));
   await page.waitForTimeout(1500);
-  await page.evaluate(() => { const w = window as unknown as Win; w.__BBOOKS.teleport(-1.4, 0.9, Math.PI); w.__BBOOKS_LOOP.start(); });
+  await page.evaluate(() => { const w = window as unknown as Win; w.__BBOOKS.teleport(1.2, 0.4, 0); w.__BBOOKS_LOOP.start(); });
   await page.waitForTimeout(800);
   const d = Number(process.env.DRAG ?? 524);
   await page.mouse.move(d < 0 ? 800 : 200, 300);
@@ -28,7 +28,7 @@ async function main(): Promise<void> {
   await page.evaluate(() => (window as unknown as Win).__BBOOKS_LOOP.stop());
   if (process.env.CLICK) {
     await page.evaluate(() => { (window as unknown as { __opened: string[] }).__opened = []; window.open = ((u: string) => { (window as unknown as { __opened: string[] }).__opened.push(u); return null; }) as typeof window.open; });
-    await page.mouse.click(635, 130);
+    await page.mouse.click(583, 110);
     await page.waitForTimeout(300);
     console.log('opened:', await page.evaluate(() => (window as unknown as { __opened: string[] }).__opened));
   }

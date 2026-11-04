@@ -213,7 +213,7 @@
 - 세션 3(Claude Code 데스크톱, Mac): `session-3-finish` 브랜치. Playwright 크로미움(headless shell 1243) 설치.
 - 결정(운영자): 실제 책 본문 없음 → 9장 삭제, 3-9는 집중 독서 화면. 실내 그림자 광원은 SpotLight. 기본 구조는 산사와 같게.
 
-## 세미나실 11월 비모임 포스터
-- 세미나실 화이트보드 우측(방 안쪽 시점)에 캔버스 텍스처 포스터(`src/scene/props/moimPoster.ts`). 11월 비모임 안내를 크게 표시.
+## 중앙 홀 11월 비모임 포스터
+- 중앙 홀 포스트잇 보드 오른쪽(창 유리)에 캔버스 텍스처 포스터(`src/scene/props/moimPoster.ts`). 11월 비모임 안내를 크게 표시.
 - 포스터를 클릭하면 https://bbooks.co.kr/moim/ 을 새 탭으로 연다(`openMoimPage`, app.ts). 마우스 올리면 포인터 커서.
 - 다음 달 문구는 `moimPoster.ts`의 `paint()`에서 월·부제만 바꾸면 된다. 점검 캡처: `npx tsx scripts/poster-shot.ts out.png`.

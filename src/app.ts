@@ -824,7 +824,7 @@ export async function startApp(
       -((clientY - rect.top) / rect.height) * 2 + 1,
     );
     ray.setFromCamera(ndc, camera);
-    const posterMesh = currentSpaceId() === 'seminar' ? store.spaces.seminar.poster?.hitMesh : undefined;
+    const posterMesh = currentSpaceId() === 'hub' ? store.spaces.hub.poster?.hitMesh : undefined;
     if (posterMesh && ray.intersectObject(posterMesh, false).length) {
       openMoimPage();
       return;
@@ -891,7 +891,7 @@ export async function startApp(
       -((e.clientY - rect.top) / rect.height) * 2 + 1,
     );
     ray.setFromCamera(ndc, camera);
-    const posterHit = currentSpaceId() === 'seminar' ? store.spaces.seminar.poster?.hitMesh : undefined;
+    const posterHit = currentSpaceId() === 'hub' ? store.spaces.hub.poster?.hitMesh : undefined;
     if (posterHit) {
       const ph = ray.intersectObjects([posterHit, ...hitGroup.children], false);
       if (ph[0]?.object === posterHit) {
