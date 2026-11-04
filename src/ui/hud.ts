@@ -93,9 +93,21 @@ export class Hud {
     this.setConnected(false);
   }
 
+  private cap = ROOM_CAPACITY;
+  private n = 1;
+
   setCount(n: number): void {
+    this.n = n;
     this.count.textContent = String(n);
-    this.count.parentElement!.setAttribute('aria-label', `지금 함께 있는 사람 ${n}명, 최대 ${ROOM_CAPACITY}명`);
+    this.count.parentElement!.setAttribute('aria-label', `지금 함께 있는 사람 ${n}명, 최대 ${this.cap}명`);
+  }
+
+  /** 지금 공간의 정원 표시(/20 등) */
+  setCapacity(cap: number): void {
+    this.cap = cap;
+    const el = this.count.parentElement!.querySelector('.count-cap');
+    if (el) el.textContent = `/${cap}`;
+    this.setCount(this.n);
   }
 
   setRoomName(name: string): void {

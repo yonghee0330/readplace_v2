@@ -97,7 +97,8 @@ export function apiBaseFromWs(ws: string): string {
   }
 }
 
-/** 입장 장소 이름. 방 번호는 붙이지 않는다. */
+/** 입장 장소의 화면 표기. 방 번호는 붙이지 않는다. */
 export function roomLabel(): string {
-  return ROOM_NAME;
+  // 화면에 보이는 이름. ROOM_NAME(비북스-M)은 접속 채널 이름이라 바꾸지 않는다.
+  return '서점 중앙';
 }

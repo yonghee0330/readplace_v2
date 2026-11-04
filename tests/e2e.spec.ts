@@ -241,7 +241,7 @@ test.describe('접근성·소리·PWA', () => {
       stops.push(info.name);
     }
     for (const want of ['서점에서 나가기', '서점 소리 켜기', '설정 열기', '눈인사 (단축키 1)']) expect(stops).toContain(want);
-    await expect(page.locator('.pill-room')).toHaveText('비북스-M');
+    await expect(page.locator('.pill-room')).toHaveText('서점 중앙');
     await expect(page.locator('.count-cap')).toHaveText('/20');
 
     // 설정 시트: 키보드로 열고 Esc로 닫으면 포커스가 버튼으로 돌아온다

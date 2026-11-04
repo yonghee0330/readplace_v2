@@ -153,11 +153,11 @@ function makeHub(): SpaceLayout {
   const portals: PortalDef[] = [
     { to: 'seminar', x: -doorX, z: -2.45, ry: Math.PI / 2, label: '세미나실', w: 0.88, d: 0.28 },
     { to: 'cinema', x: doorX, z: -2.45, ry: -Math.PI / 2, label: '영화감상실', w: 0.88, d: 0.28 },
-    { to: 'lecture', x: -doorX, z: 1.2, ry: Math.PI / 2, label: '계단식 강연', w: 0.88, d: 0.28 },
+    { to: 'lecture', x: -doorX, z: 1.2, ry: Math.PI / 2, label: '계단식 강연장', w: 0.88, d: 0.28 },
     { to: 'solo', x: doorX, z: 1.2, ry: -Math.PI / 2, label: '1인 작업실', w: 0.88, d: 0.28 },
   ];
   return {
-    ...emptyBase('hub', '비북스-M', room),
+    ...emptyBase('hub', '서점 중앙', room),
     openings: [
       { cx: -2.2, w: 1.55, y0: 1.0, y1: 2.5, kind: 'window' },
       { cx: 0.15, w: 1.7, y0: 1.0, y1: 2.5, kind: 'window' },
@@ -260,7 +260,7 @@ function makeSeminar(): SpaceLayout {
     spawn,
     spawns: [spawn, { x: -0.7, z: 1.7, ry: Math.PI }, { x: 0.7, z: 1.7, ry: Math.PI }],
     // 출입문은 뒤벽(창·문 개구) — 포털도 같은 쪽
-    portals: [{ to: 'hub', x: 0, z: -2.45, ry: Math.PI, label: '비북스-M', w: 0.95, d: 0.35 }],
+    portals: [{ to: 'hub', x: 0, z: -2.45, ry: Math.PI, label: '서점 중앙', w: 0.95, d: 0.35 }],
   };
 }
 
@@ -293,7 +293,7 @@ function makeCinema(): SpaceLayout {
     ],
     spawn,
     spawns: [spawn, { x: -1.6, z: -1.4, ry: 0.5 }],
-    portals: [{ to: 'hub', x: 0, z: -2.2, ry: Math.PI, label: '비북스-M', w: 0.95, d: 0.35 }],
+    portals: [{ to: 'hub', x: 0, z: -2.2, ry: Math.PI, label: '서점 중앙', w: 0.95, d: 0.35 }],
   };
 }
 
@@ -325,7 +325,7 @@ function makeLecture(): SpaceLayout {
     { id: 'stage-1', x: author.x, z: author.z, ry: author.ry, y: stage.h + 0.46, approach: 1 as const },
   ];
   return {
-    ...emptyBase('lecture', '계단식 강연', room),
+    ...emptyBase('lecture', '계단식 강연장', room),
     openings: [{ cx: 2.5, w: 0.95, y0: 0, y1: 2.15, kind: 'door' }],
     shelves: [
       // 코너 뒤·옆 (계단 위·옆)
@@ -347,7 +347,7 @@ function makeLecture(): SpaceLayout {
     seats,
     spawn,
     spawns: [spawn, { x: 2.0, z: -1.6, ry: -1.0 }],
-    portals: [{ to: 'hub', x: 2.5, z: -2.7, ry: Math.PI, label: '비북스-M', w: 0.95, d: 0.35 }],
+    portals: [{ to: 'hub', x: 2.5, z: -2.7, ry: Math.PI, label: '서점 중앙', w: 0.95, d: 0.35 }],
   };
 }
 
@@ -374,7 +374,7 @@ function makeSolo(): SpaceLayout {
     spawn,
     spawns: [spawn],
     // 문 안쪽으로 들여 내비·근접 탐지가 막히지 않게. open: 문짝 없이 등 뒤가 보임
-    portals: [{ to: 'hub', x: 0, z: -0.95, ry: Math.PI, label: '비북스-M', w: 0.82, d: 0.32, open: true }],
+    portals: [{ to: 'hub', x: 0, z: -0.95, ry: Math.PI, label: '서점 중앙', w: 0.82, d: 0.32, open: true }],
   };
 }
 
@@ -398,6 +398,19 @@ export function currentSpaceId(): SpaceId {
 
 export function currentSpace(): SpaceLayout {
   return SPACE_LAYOUTS[activeId];
+}
+
+/** 공간별 최대 인원. 차면 들어올 수 없다. */
+export const SPACE_CAPACITY: Record<SpaceId, number> = {
+  hub: 20,
+  seminar: 8,
+  cinema: 8,
+  lecture: 20,
+  solo: 1,
+};
+
+export function spaceCapacity(id: SpaceId = activeId): number {
+  return SPACE_CAPACITY[id];
 }
 
 export function spaceLabel(id: SpaceId = activeId): string {

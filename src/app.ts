@@ -11,7 +11,7 @@ import { CAM_PRESETS, FollowCamera, applyPreset, createCamera } from './controls
 import { CanvasInput, isTyping } from './controls/input';
 import { Movement } from './controls/movement';
 import { Loop } from './core/loop';
-import { ROOM_CAPACITY, apiBaseFromWs, resolvePresence, type Params, type QualityLevel } from './core/params';
+import { apiBaseFromWs, resolvePresence, type Params, type QualityLevel } from './core/params';
 import { detectQuality, profileFor, type QualityProfile } from './core/quality';
 import { Rng } from './core/rng';
 import { MANAGER_COLOR, MANAGER_NICKNAME } from './core/manager';
@@ -36,7 +36,7 @@ import { PostitWall } from './ui/postitWall';
 import { drinkCooldownMs, drinkToast, isDrinkKind, type DrinkKind } from './net/drink';
 import { PostitStore } from './net/postit';
 import {
-  EVENT_BOARD, PORTALS, SCREEN, SEATS, SPAWN, SPAWNS, applyLayout, colliders, currentSpaceId, isPresent, spaceLabel,
+  EVENT_BOARD, PORTALS, SCREEN, SEATS, SPAWN, SPAWNS, applyLayout, colliders, currentSpaceId, isPresent, spaceCapacity, spaceLabel,
   type PortalDef, type SpaceId,
 } from './scene/layout';
 import { buildPostFx, type PostFx } from './scene/postfx';
@@ -432,11 +432,13 @@ export async function startApp(
   }
 
   function capacityForSpace(space: SpaceId): number {
-    return space === 'solo' ? 1 : params.cap;
+    // ?cap=은 테스트용 상한이라 공간 정원과 둘 중 작은 쪽을 쓴다
+    return Math.min(params.cap, spaceCapacity(space));
   }
 
   async function connect(): Promise<'ok' | 'full'> {
     presence.setCapacity(capacityForSpace(currentSpaceId()));
+    hud.setCapacity(capacityForSpace(currentSpaceId()));
     const result = await presence.connect(presenceRoom(), instance, myState());
     if (result === 'ok') syncPeers();
     return result;
@@ -761,15 +763,12 @@ export async function startApp(
     try {
       const admission = await connect();
       if (admission === 'full') {
-        const occupied = to === 'solo'
-          ? '현재 이용 중입니다. 기다려주세요.'
-          : '이 공간은 자리가 가득 찼어요';
-        toasts.show(occupied);
+        toasts.show(`${spaceLabel(to)} 자리가 다 찼어요. 잠시 뒤에 다시 와 주세요`);
         switchingSpace = false;
         if (to !== 'hub') await enterSpace('hub');
         return;
       }
-      toasts.show(to === 'hub' ? '비북스-M으로 돌아왔어요' : `${spaceLabel(to)}에 들어왔어요`);
+      toasts.show(to === 'hub' ? `${spaceLabel(to)}으로 돌아왔어요` : `${spaceLabel(to)}에 들어왔어요`);
       if (to === 'cinema') toasts.show('스크린을 누르면 영화가 시작돼요');
       pushState(true);
       syncPeers();
@@ -971,7 +970,7 @@ export async function startApp(
   if (admission === 'full') {
     hud.root.hidden = true;
     const full = document.getElementById('full')!;
-    const limit = presenceMode === 'local' ? params.cap : ROOM_CAPACITY;
+    const limit = capacityForSpace(currentSpaceId());
     document.getElementById('full-copy')!.innerHTML = `지금은 ${limit}명이 모두 모였어요.<br />누군가 나가면 다시 들어올 수 있어요.`;
     full.hidden = false;
     const back = document.getElementById('full-back')!;

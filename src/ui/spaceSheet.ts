@@ -1,5 +1,5 @@
 // 우측 상단 「공간」— 허브·서브룸을 고르고 확인 후 이동.
-import { SPACE_ORDER, currentSpaceId, spaceLabel, type SpaceId } from '../scene/layout';
+import { SPACE_ORDER, currentSpaceId, spaceCapacity, spaceLabel, type SpaceId } from '../scene/layout';
 import { Sheet } from './sheet';
 
 export class SpaceSheet {
@@ -30,7 +30,7 @@ export class SpaceSheet {
       btn.disabled = current;
       btn.setAttribute('aria-current', current ? 'true' : 'false');
       btn.innerHTML = `<span class="space-item-name">${spaceLabel(id)}</span>
-        <span class="space-item-meta">${current ? '지금 여기' : id === 'hub' ? '중앙 서점' : '포털 공간'}</span>`;
+        <span class="space-item-meta">${current ? '지금 여기 · ' : ''}최대 ${spaceCapacity(id)}명</span>`;
       if (!current) {
         btn.addEventListener('click', () => {
           const pick = this.onPick;
