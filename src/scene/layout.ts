@@ -11,7 +11,11 @@ export interface RoomBounds {
 
 export interface Opening { cx: number; w: number; y0: number; y1: number; kind: 'window' | 'door' }
 export interface Placement { x: number; z: number; ry: number }
-export interface Seat { id: string; x: number; z: number; ry: number; y: number; approach: 1 | -1 }
+export interface Seat {
+  id: string; x: number; z: number; ry: number; y: number; approach: 1 | -1;
+  /** 좁은 곳의 좌석: 다가가는 지점을 직접 지정(없으면 앞/뒤 0.5m) */
+  from?: { x: number; z: number };
+}
 export interface Collider {
   x0: number; x1: number; z0: number; z1: number; h: number;
   seatable: boolean;
@@ -202,6 +206,8 @@ function makeHub(): SpaceLayout {
       { id: 'bar-3', x: 1.0, z: -2.7, ry: Math.PI, y: 0.72, approach: 1 },
       // 카운터 손님 쪽(방 안, -z) 높은 바 스툴 — 카운터를 바라보고 앉는다
       { id: 'counter-1', x: -2.93, z: 2.04, ry: 0.15, y: 0.72, approach: -1 },
+      // 카운터 안쪽(매니저 자리): 뒤 서가 오른쪽 빈 곳, 카운터를 바라보고 앉는다. 오른쪽(+x)에서 들어간다.
+      { id: 'counter-2', x: -2.1, z: 3.1, ry: Math.PI + 0.15, y: 0.72, approach: 1, from: { x: -1.5, z: 3.05 } },
     ],
     spawn,
     spawns: [
@@ -501,6 +507,7 @@ export const PORTALS: PortalDef[] = [...HUB.portals];
 applyLayout('hub');
 
 export function seatApproach(s: Seat, dist = 0.5): { x: number; z: number } {
+  if (s.from) return s.from;
   return { x: s.x + Math.sin(s.ry) * dist * s.approach, z: s.z + Math.cos(s.ry) * dist * s.approach };
 }
 

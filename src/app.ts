@@ -119,6 +119,8 @@ export async function startApp(
   let cat: Cat | null = null;
   /** 디버그: 고양이 가까이 보는 카메라 오프셋 */
   let catCam: [number, number, number] | null = null;
+  /** 디버그: 내 아바타를 가까이서 보는 카메라 오프셋 */
+  let meCam: [number, number, number] | null = null;
   const refreshNpcs = () => {
     const on = params.npc && settings.npc;
     syncNpcVisibility(npcs, currentSpaceId(), on);
@@ -1013,6 +1015,11 @@ export async function startApp(
       camera.position.set(p.x + catCam[0], p.y + catCam[1], p.z + catCam[2]);
       camera.lookAt(p.x, p.y + 0.16, p.z);
     }
+    if (meCam) {
+      const p = me.root.position;
+      camera.position.set(p.x + meCam[0], p.y + meCam[1], p.z + meCam[2]);
+      camera.lookAt(p.x, p.y + 0.55, p.z);
+    }
     badgeHits.sync(crowd, camera, canvas, !focus.active && !cinemaWatch.active && !postitWall.active && !anySheetOpen());
     ring.update(dt);
     {
@@ -1067,6 +1074,7 @@ export async function startApp(
     cat: () => (cat ? { mode: cat.mood, x: cat.root.position.x, y: cat.root.position.y, z: cat.root.position.z, visible: cat.root.visible } : null),
     teleport: (x: number, z: number, ry = 0) => movement.place(x, z, ry),
     catCam: (o: [number, number, number] | null) => { catCam = o; me.root.visible = !o; if (me.nameplate) me.nameplate.mesh.visible = !o; },
+    meCam: (o: [number, number, number] | null) => { meCam = o; },
     catDo: (kind: string) => cat?.perform(kind),
     catForce: (mode: Parameters<Cat['force']>[0], dur?: number) => cat?.force(mode, dur),
     npcCount: () => npcs.filter((n) => n.actor.root.visible).length,
@@ -1087,6 +1095,7 @@ export async function startApp(
       return max;
     },
     peekBook: (title: string, author: string, publisher: string) => bookPeek.open({ nickname: '써든리 매니저', book: { title, author, publisher, coverUrl: null } as never }),
+    sipNow: (kind: Parameters<typeof me.avatar.anim.sip>[0]) => me.avatar.anim.sip(kind),
     walkTo: (x: number, z: number) => movement.walkTo({ x, z }),
     space: () => currentSpaceId(),
     enterSpace: (id: SpaceId) => enterSpace(id),

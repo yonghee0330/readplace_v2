@@ -1,11 +1,18 @@
 // 뼈 없는 트랜스폼 애니메이션: 숨쉬기, 걷기, 앉기 전환, 읽기(책 들고 고개 숙임, 가끔 페이지 넘김), 눈인사, 마시기, 깜빡임.
 import { DRINK_OPTIONS, DRINK_TIMING, drinkAnimDuration, type DrinkKind } from '../net/drink';
 import type { AvatarState } from '../net/presence';
+import * as THREE from 'three';
 import type { Avatar } from './avatar';
 
 const damp = (cur: number, target: number, rate: number, dt: number) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
 
 const T = DRINK_TIMING;
+
+// 오른쪽 팔 기본 어깨 위치(avatar.ts의 arm.position과 같다)와, 입에 잔을 댈 때의 팔 각도
+const ARM_R_X = -0.15;
+const ARM_R_Y = 0.24;
+const MOUTH_ARM_X = -1.87;
+const MOUTH_ARM_Z = 0.49;
 
 function easeInOut(t: number): number {
   const x = Math.min(1, Math.max(0, t));
@@ -210,10 +217,17 @@ export class AvatarAnimator {
     a.armR.rotation.y = armY;
     // 어깨를 살짝 앞으로 — 잔이 카메라에 잘 잡히게
     a.armR.position.z = 0.055 * present;
+    // 입(얼굴 한가운데 아래쪽)으로: 입이 가까워질수록(mouth→1) 팔을 앞·위로 들어 잔을 입 앞에 둔다.
+    // 아바타 팔이 짧아서 어깨를 앞·위로 조금 옮겨 손이 닿게 한다.
+    const m = drinkMouth;
+    a.armR.rotation.x += (MOUTH_ARM_X - a.armR.rotation.x) * m;
+    a.armR.rotation.z += (MOUTH_ARM_Z - a.armR.rotation.z) * m;
+    a.armR.rotation.y *= 1 - m;
+    a.armR.position.set(ARM_R_X + 0.06 * m, ARM_R_Y + 0.04 * m, a.armR.position.z * (1 - m) + 0.06 * m);
 
     // 머리: 읽을 때 숙임. 마실 때는 살짝만 끄덕(입에 대지 않음).
     let headX = 0.28 * this.readW * sipMute + Math.sin(this.time * 0.9) * 0.02 * (1 - this.walkW)
-      - 0.06 * sipLift - 0.03 * drinkTip;
+      + 0.12 * sipLift - 0.1 * drinkTip; // 입으로 갈 땐 살짝 숙이고, 잔을 기울일 땐 고개를 젖힌다
     let headZ = Math.sin(this.time * 0.6) * 0.03 * (1 - this.walkW) * (1 - this.readW) * sipMute;
 
     // 가끔 페이지 넘기는 손짓
@@ -251,7 +265,15 @@ export class AvatarAnimator {
       a.cup.rotation.x = 0.25 + 0.55 * drinkTip + 0.12 * sipLift;
       a.cup.rotation.y = 0.15;
       a.cup.rotation.z = -0.35;
-      a.body.rotation.x += -0.03 * sipLift - 0.02 * drinkTip;
+      // 입 쪽으로 갈수록 잔을 세워서(팔이 올라간 만큼 되돌려) 입에 가져가고, 마실 땐 입술 쪽으로 기울인다
+      if (m > 0.001) {
+        const armQ = new THREE.Quaternion().setFromEuler(a.armR.rotation);
+        const tilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -(0.12 + 0.75 * drinkTip));
+        const target = armQ.clone().invert().multiply(tilt);
+        const cur = new THREE.Quaternion().setFromEuler(a.cup.rotation);
+        a.cup.quaternion.copy(cur.slerp(target, m));
+      }
+      a.body.rotation.x += -0.02 * drinkTip;
       if (this.sipKind === 'water' && sipLift > 0.85) {
         a.body.position.y += 0.008 * drinkTip;
       }
@@ -260,7 +282,7 @@ export class AvatarAnimator {
       a.cup.position.set(0.01, -0.175, 0.02);
       a.cup.rotation.set(0.35, 0.2, -0.4);
       a.armR.rotation.y = 0;
-      a.armR.position.z = 0;
+      a.armR.position.set(ARM_R_X, ARM_R_Y, 0);
     }
 
     a.head.rotation.x = headX;
