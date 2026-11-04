@@ -28,7 +28,7 @@ async function main(): Promise<void> {
   await page.evaluate(() => (window as unknown as Win).__BBOOKS_LOOP.stop());
   if (process.env.CLICK) {
     await page.evaluate(() => { (window as unknown as { __opened: string[] }).__opened = []; window.open = ((u: string) => { (window as unknown as { __opened: string[] }).__opened.push(u); return null; }) as typeof window.open; });
-    await page.mouse.click(583, 110);
+    await page.mouse.click(472, 120);
     await page.waitForTimeout(300);
     console.log('opened:', await page.evaluate(() => (window as unknown as { __opened: string[] }).__opened));
   }

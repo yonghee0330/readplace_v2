@@ -82,14 +82,14 @@ function paint(ctx: CanvasRenderingContext2D): void {
   ctx.fillText('눌러서 11월 모임 보기 →', TW / 2, by + bh / 2 + 1);
 }
 
-/** 중앙 홀 포스트잇 보드 오른쪽(오른쪽 창) 유리에 붙는 포스터. 허브 전용. */
+/** 중앙 홀 포스트잇 보드 와 오른쪽 창 사이 벽에 붙는 포스터. 허브 전용. */
 export function buildMoimPoster(): MoimPosterProp | null {
   if (!isPresent(EVENT_BOARD) || EVENT_BOARD.w < 0.2) return null;
   const { x, z, ry } = EVENT_BOARD;
-  const ph = 1.4;
+  const ph = 0.76;
   const pw = ph * (TW / TH);
   // 보드는 ry=0(벽이 -z, 방 안쪽 +z를 향함). 방 안에서 볼 때 오른쪽 = +x.
-  const lx = 2.35;
+  const lx = 1.215;
   const canvas = document.createElement('canvas');
   canvas.width = TW;
   canvas.height = TH;
@@ -108,7 +108,7 @@ export function buildMoimPoster(): MoimPosterProp | null {
   hitMesh.userData.moimPoster = true;
 
   const frameMat = new THREE.MeshStandardMaterial({ color: 0x3a2a20, roughness: 0.6 });
-  const t = 0.03;
+  const t = 0.018;
   const bars: [number, number, number, number][] = [
     [pw + t * 2, t, 0, ph / 2 + t / 2], [pw + t * 2, t, 0, -ph / 2 - t / 2],
     [t, ph, -pw / 2 - t / 2, 0], [t, ph, pw / 2 + t / 2, 0],
