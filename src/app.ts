@@ -184,6 +184,9 @@ export async function startApp(
   // AudioContext는 사용자가 처음 누른 뒤에만 만든다. 지난번에 켜 두었으면 첫 클릭·키 입력에서 다시 켠다.
   const amb = new Ambience();
   const bgm = new BookstoreBgm();
+  bgm.onBlocked = () => toasts.show('음악이 안 나오면 화면을 한 번 눌러 주세요');
+  // 첫 터치에서 유튜브 API를 미리 받아 두면, 소리 켜기 직후 바로 재생을 시작할 수 있다
+  addEventListener('pointerdown', () => bgm.warm(), { once: true, capture: true });
   const sfx = new Sfx(amb);
   // 서점 고양이 치즈(허브 전용 NPC)
   cat = new Cat(rng.fork('cat'), {
@@ -1078,6 +1081,7 @@ export async function startApp(
     catForce: (mode: Parameters<Cat['force']>[0], dur?: number) => cat?.force(mode, dur),
     npcCount: () => npcs.filter((n) => n.actor.root.visible).length,
     sound: () => amb.status(),
+    bgm: () => bgm.status(),
     weather: () => weather,
     /** 장면이 쓰는 텍스처 중 가장 큰 변의 길이(성능 예산: 1024px 이하) */
     maxTextureSize: () => {

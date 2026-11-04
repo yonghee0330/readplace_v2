@@ -6,7 +6,10 @@ const YT_ID = 'xjOG0beBrgM';
 export class BookstoreBgm {
   enabled = false;
   private host: HTMLDivElement | null = null;
-  private frame: HTMLIFrameElement | null = null;
+  /** 모바일(특히 iOS)이 자동재생을 막았을 때 화면을 한 번 누르게 안내하는 콜백 */
+  onBlocked: (() => void) | null = null;
+  private blockedTimer = 0;
+  private retryArmed = false;
   private player: YtPlayer | null = null;
   private apiReady: Promise<void> | null = null;
   /** 0~100 */
@@ -27,8 +30,15 @@ export class BookstoreBgm {
     }
   }
 
-  status(): { enabled: boolean; playing: boolean } {
-    return { enabled: this.enabled, playing: !!this.frame && this.enabled };
+  status(): { enabled: boolean; playing: boolean; state: number | null } {
+    let state: number | null = null;
+    try {
+      state = this.player?.getPlayerState?.() ?? null;
+    } catch {
+      state = null;
+    }
+    // YT.PlayerState: 1 재생 중, 3 버퍼링, -1 시작 전, 5 큐됨(막히면 여기 머문다)
+    return { enabled: this.enabled, playing: state === 1 || state === 3, state };
   }
 
   private ensureHost(): HTMLDivElement {
@@ -36,10 +46,16 @@ export class BookstoreBgm {
     const el = document.createElement('div');
     el.id = 'bbooks-bgm';
     el.setAttribute('aria-hidden', 'true');
-    el.style.cssText = 'position:fixed;width:1px;height:1px;left:-9999px;top:0;overflow:hidden;opacity:0;pointer-events:none';
+    // 화면 밖(-9999px)에 두면 모바일 브라우저가 재생을 막거나 멈출 수 있어, 화면 안 모서리에 투명하게 둔다
+    el.style.cssText = 'position:fixed;width:2px;height:2px;left:0;bottom:0;overflow:hidden;opacity:0.01;pointer-events:none;z-index:-1';
     document.body.appendChild(el);
     this.host = el;
     return el;
+  }
+
+  /** 유튜브 API를 미리 받아 둔다(탭 직후에 바로 플레이어를 만들 수 있게). */
+  warm(): void {
+    void this.loadApi();
   }
 
   private loadApi(): Promise<void> {
@@ -104,7 +120,7 @@ export class BookstoreBgm {
     host.replaceChildren();
     const mount = document.createElement('div');
     host.appendChild(mount);
-    this.frame = null;
+    this.watchStart();
     this.player = new YT.Player(mount, {
       videoId: YT_ID,
       width: 1,
@@ -132,7 +148,9 @@ export class BookstoreBgm {
             /* ignore */
           }
         },
+        onAutoplayBlocked: () => this.handleBlocked(),
         onStateChange: (e: { data: number; target: YtPlayer }) => {
+          if (e.data === 1) this.clearBlocked();
           // 끝났을 때 다시(루프 보강). YT.PlayerState.ENDED = 0
           if (e.data === 0 && this.enabled) {
             try {
@@ -153,11 +171,56 @@ export class BookstoreBgm {
     frame.allow = 'autoplay; encrypted-media';
     frame.src = `https://www.youtube.com/embed/${YT_ID}?autoplay=1&loop=1&playlist=${YT_ID}&controls=0&disablekb=1&fs=0&modestbranding=1&playsinline=1&rel=0`;
     host.appendChild(frame);
-    this.frame = frame;
     this.player = null;
   }
 
+  /** 3.5초 안에 재생이 시작되지 않으면 막힌 것으로 보고, 다음 터치에서 다시 재생을 시도한다. */
+  private watchStart(): void {
+    window.clearTimeout(this.blockedTimer);
+    this.blockedTimer = window.setTimeout(() => {
+      if (this.enabled && !this.status().playing) this.handleBlocked();
+    }, 3500);
+  }
+
+  private handleBlocked(): void {
+    if (!this.enabled || this.retryArmed) return;
+    this.retryArmed = true;
+    this.onBlocked?.();
+    // 사용자 터치 안에서 다시 재생을 요청한다(iOS 사파리·인앱 브라우저는 이래야 소리가 난다)
+    const retry = () => {
+      try {
+        const p = this.player;
+        if (p && this.enabled) {
+          p.unMute?.();
+          p.setVolume(this.volume);
+          p.playVideo();
+        }
+      } catch {
+        /* ignore */
+      }
+      window.setTimeout(() => {
+        if (this.status().playing) this.clearBlocked();
+      }, 800);
+    };
+    this.retryFn = retry;
+    addEventListener('pointerup', retry, true);
+    addEventListener('touchend', retry, true);
+  }
+
+  private retryFn: (() => void) | null = null;
+
+  private clearBlocked(): void {
+    window.clearTimeout(this.blockedTimer);
+    if (this.retryFn) {
+      removeEventListener('pointerup', this.retryFn, true);
+      removeEventListener('touchend', this.retryFn, true);
+      this.retryFn = null;
+    }
+    this.retryArmed = false;
+  }
+
   private stop(): void {
+    this.clearBlocked();
     try {
       this.player?.pauseVideo();
     } catch {
@@ -167,7 +230,6 @@ export class BookstoreBgm {
       this.host.replaceChildren();
     }
     this.player = null;
-    this.frame = null;
   }
 }
 
@@ -175,4 +237,6 @@ interface YtPlayer {
   playVideo(): void;
   pauseVideo(): void;
   setVolume(n: number): void;
+  getPlayerState?(): number;
+  unMute?(): void;
 }
