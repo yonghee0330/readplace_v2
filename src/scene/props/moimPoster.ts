@@ -164,19 +164,18 @@ function canvasFace(w: number, h: number, pw: number, ph: number, draw: (ctx: Ca
   return { mesh, redraw: () => { draw(ctx); tex.needsUpdate = true; } };
 }
 
-/** 중앙 홀 포스트잇 보드와 오른쪽 창 사이 벽에 위아래로 붙는 포스터 두 장. 허브 전용. */
+/** 중앙 홀 포스트잇 보드 양쪽 벽에 하나씩 붙는 포스터 두 장(왼쪽 11월 비모임, 오른쪽 서귤 북토크). 허브 전용. */
 export function buildMoimPoster(): MoimPosterProp | null {
   if (!isPresent(EVENT_BOARD) || EVENT_BOARD.w < 0.2) return null;
   const { x, z, ry } = EVENT_BOARD;
-  const lx = 1.215;
-  const pw = 0.56;
+  // 보드 양쪽 벽 틈(왼쪽 중심 x≈-1.13, 오른쪽 ≈1.36)의 중앙. 보드 기준 로컬 좌표.
+  const lxL = -1.28;
+  const lxR = 1.215;
+  const pw = 0.5;
   const ph1 = pw * (TH / TW);
   const ph2 = pw * (BH / BW);
-  const gap = 0.07;
-  const top = 2.5;
-  const y1 = top - ph1 / 2 - 1.75;
-  const y2 = top - ph1 - gap - ph2 / 2 - 1.75;
-
+  const y1 = 0;
+  const y2 = 0;
   const group = new THREE.Group();
   group.name = 'moim-posters';
   group.position.set(x, 1.75, z);
@@ -184,12 +183,12 @@ export function buildMoimPoster(): MoimPosterProp | null {
 
   const a = canvasFace(TW, TH, pw, ph1, paint, 'moim-poster-face');
   a.mesh.userData.moimPoster = true;
-  makeFrame(pw, ph1, lx, y1, group, a.mesh);
+  makeFrame(pw, ph1, lxL, y1, group, a.mesh);
 
   let cover: HTMLImageElement | null = null;
   const b = canvasFace(BW, BH, pw, ph2, (c) => paintBtalk(c, cover), 'btalk-poster-face');
   b.mesh.userData.moimPoster = true;
-  makeFrame(pw, ph2, lx, y2, group, b.mesh);
+  makeFrame(pw, ph2, lxR, y2, group, b.mesh);
   const img = new Image();
   img.onload = () => { cover = img; b.redraw(); };
   img.src = `${import.meta.env.BASE_URL}posters/chaedalgeumjeon.jpg`;

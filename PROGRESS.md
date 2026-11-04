@@ -217,4 +217,4 @@
 - 중앙 홀 포스트잇 보드 오른쪽(창 유리)에 캔버스 텍스처 포스터(`src/scene/props/moimPoster.ts`). 11월 비모임 안내를 크게 표시.
 - 포스터를 클릭하면 https://bbooks.co.kr/moim/ 을 새 탭으로 연다(`openMoimPage`, app.ts). 마우스 올리면 포인터 커서.
 - 다음 달 문구는 `moimPoster.ts`의 `paint()`에서 월·부제만 바꾸면 된다. 점검 캡처: `npx tsx scripts/poster-shot.ts out.png`.
-- 포스트잇 보드와 오른쪽 창 사이 벽에 포스터 2장(위: 11월 비모임 → /moim/, 아래: 서귤 《채달금전》 북토크 → /moim/m/btalk-seogyul-2611/). 표지 이미지는 `public/posters/chaedalgeumjeon.jpg`.
+- 포스트잇 보드 양쪽 벽에 포스터 1장씩(왼쪽: 11월 비모임 → /moim/, 오른쪽: 서귤 《채달금전》 북토크 → /moim/m/btalk-seogyul-2611/). 표지 이미지는 `public/posters/chaedalgeumjeon.jpg`.
