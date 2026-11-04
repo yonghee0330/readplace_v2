@@ -1082,6 +1082,7 @@ export async function startApp(
     npcCount: () => npcs.filter((n) => n.actor.root.visible).length,
     sound: () => amb.status(),
     bgm: () => bgm.status(),
+    openBoard: () => setPostitWall(true),
     weather: () => weather,
     /** 장면이 쓰는 텍스처 중 가장 큰 변의 길이(성능 예산: 1024px 이하) */
     maxTextureSize: () => {

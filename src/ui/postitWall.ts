@@ -26,6 +26,7 @@ export class PostitWall {
   private placing = false;
   private viewDay = todayBoardDay();
   private onExit: () => void;
+  private dragging = false;
   private unsub: (() => void) | null = null;
   private getNickname: () => string;
   private getAuthorId: () => string;
@@ -178,7 +179,8 @@ export class PostitWall {
     this.setPlacing(false);
     this.refreshView();
     this.unsub = this.store.onChange(() => {
-      if (this.active) this.refreshView();
+      // 옮기는 중에는 다시 그리지 않는다(손에 든 쪽지가 사라지지 않게)
+      if (this.active && !this.dragging) this.refreshView();
     });
     requestAnimationFrame(() => {
       this.el.classList.add('is-in');
@@ -290,6 +292,51 @@ export class PostitWall {
     );
   }
 
+  /** 오늘 보드의 쪽지는 누구나 끌어서 옮길 수 있다. 놓은 자리가 저장된다. */
+  private makeDraggable(el: HTMLElement, n: PostitNote): void {
+    el.classList.add('is-movable');
+    el.setAttribute('title', '끌어서 옮길 수 있어요');
+    el.addEventListener('pointerdown', (e) => {
+      if (this.placing || !this.isToday() || e.button > 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const rect = this.board.getBoundingClientRect();
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const from = { x: n.x, y: n.y };
+      let moved = false;
+      let cur = { ...from };
+      el.setPointerCapture(e.pointerId);
+      this.dragging = true;
+      el.classList.add('is-dragging');
+      const move = (ev: PointerEvent) => {
+        if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 4) return;
+        moved = true;
+        cur = {
+          x: Math.min(0.92, Math.max(0.08, from.x + (ev.clientX - startX) / rect.width)),
+          y: Math.min(0.92, Math.max(0.08, from.y + (ev.clientY - startY) / rect.height)),
+        };
+        el.style.left = `${cur.x * 100}%`;
+        el.style.top = `${cur.y * 100}%`;
+      };
+      const end = () => {
+        el.removeEventListener('pointermove', move);
+        el.removeEventListener('pointerup', end);
+        el.removeEventListener('pointercancel', end);
+        el.classList.remove('is-dragging');
+        this.dragging = false;
+        if (moved) {
+          this.hint.textContent = '옮겼어요. 아래 쪽지도 끌어서 볼 수 있어요.';
+          void this.store.move(n.id, cur.x, cur.y);
+        }
+        this.refreshView();
+      };
+      el.addEventListener('pointermove', move);
+      el.addEventListener('pointerup', end);
+      el.addEventListener('pointercancel', end);
+    });
+  }
+
   private renderNotes(notes: PostitNote[]): void {
     const keep = this.ghost;
     this.board.replaceChildren();
@@ -301,10 +348,12 @@ export class PostitWall {
       el.style.left = `${n.x * 100}%`;
       el.style.top = `${n.y * 100}%`;
       el.style.transform = `translate(-50%, -50%) rotate(${n.rot}deg)`;
+      el.dataset.id = n.id;
       el.innerHTML = `<span class="postit-pin" aria-hidden="true"></span><p class="postit-note-text"></p><span class="postit-note-nick"></span>`;
+      if (this.isToday()) this.makeDraggable(el, n);
       const textEl = el.querySelector<HTMLElement>('.postit-note-text')!;
       textEl.textContent = n.text;
-      el.querySelector('.postit-note-nick')!.textContent = n.nickname;
+      el.querySelector('.postit-note-nick')!.textContent = n.nickname.replace(/서든리/g, '써든리');
       this.board.appendChild(el);
       requestAnimationFrame(() => fitNoteText(textEl));
     }

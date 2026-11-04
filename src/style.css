@@ -867,6 +867,12 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   pointer-events: none;
   overflow: hidden;
 }
+/* 오늘 보드의 쪽지는 끌어서 옮길 수 있다 */
+.postit-note.is-movable { pointer-events: auto; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.postit-note.is-dragging {
+  cursor: grabbing; z-index: 5;
+  box-shadow: 4px 8px 16px rgba(40, 25, 10, 0.32);
+}
 .postit-pin {
   position: absolute;
   top: 6px; left: 50%;

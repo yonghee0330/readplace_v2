@@ -350,6 +350,17 @@ export class PostitStore {
     return note;
   }
 
+  /** 보드 위 위치 옮기기: 누구나 오늘 보드의 모든 쪽지를 옮길 수 있다(다른 사람 글이 가려도 치워 볼 수 있게). */
+  async move(id: string, x: number, y: number): Promise<PostitNote | null> {
+    const cur = this.notes.find((n) => n.id === id);
+    if (!cur || cur.day !== todayBoardDay()) return null;
+    const note = clampNote({ ...cur, x, y });
+    if (!note) return null;
+    this.upsertLocal(note, true);
+    void this.pushRemote(note);
+    return note;
+  }
+
   async remove(id: string, who: { authorId: string; nickname: string }): Promise<boolean> {
     const cur = this.notes.find((n) => n.id === id);
     if (!cur || !isPostitMine(cur, who.authorId, who.nickname)) return false;
