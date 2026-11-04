@@ -565,7 +565,7 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   flex: none;
 }
 .book-peek-cover {
-  width: 84px; height: 120px; flex: none; border-radius: 4px; overflow: hidden;
+  width: 104px; height: 150px; flex: none; border-radius: 4px; overflow: hidden;
   background: #d9d0c0; display: grid; place-items: center; font: 600 12px/1 var(--serif); color: #7a6a55;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
 }
@@ -580,32 +580,9 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
 }
 .book-peek-title { font: 700 17px/1.35 var(--serif); }
 .book-peek-sub { font-size: 13px; color: #7a6a55; line-height: 1.4; }
-.book-peek-toc {
-  margin-top: 4px;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
-}
-.book-peek-toc-label {
-  margin: 0 0 4px;
-  font: 600 11px/1.2 var(--sans);
-  color: #8a7a65;
-  letter-spacing: 0.04em;
-}
-.book-peek-toc-list {
-  margin: 0;
-  padding: 0 0 0 1.1em;
-  font-size: 11px;
-  line-height: 1.45;
-  color: #5b4f40;
-  max-height: 72px;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-.book-peek-toc-list li { margin: 0 0 2px; }
 .book-peek-intro {
   flex: 1 1 auto;
-  min-height: 140px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   margin: 0 0 8px;
@@ -624,10 +601,14 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  font-size: 14px;
-  line-height: 1.75;
-  color: #5b4f40;
+  font: 500 15px/1.8 var(--serif);
+  word-break: keep-all;
+  color: #4a3f31;
   white-space: pre-wrap;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(196, 103, 60, 0.07);
+  border-left: 3px solid #c4673c;
 }
 .book-peek-sheet .sheet-actions { flex: none; margin-top: auto; }
 

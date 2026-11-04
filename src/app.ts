@@ -1086,6 +1086,7 @@ export async function startApp(
       });
       return max;
     },
+    peekBook: (title: string, author: string, publisher: string) => bookPeek.open({ nickname: '써든리 매니저', book: { title, author, publisher, coverUrl: null } as never }),
     walkTo: (x: number, z: number) => movement.walkTo({ x, z }),
     space: () => currentSpaceId(),
     enterSpace: (id: SpaceId) => enterSpace(id),
