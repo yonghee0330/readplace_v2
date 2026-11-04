@@ -49,7 +49,7 @@ export function buildCounterSign(): THREE.Mesh | null {
   const lx = 0.32;
   const lz = -d / 2 - 0.012;
   const c = Math.cos(ry), s = Math.sin(ry);
-  sign.position.set(x + lx * c + lz * s, 0.62, z - lx * s + lz * c);
+  sign.position.set(x + lx * c + lz * s, 0.8, z - lx * s + lz * c);
   sign.rotation.y = ry + Math.PI;
   return sign;
 }
