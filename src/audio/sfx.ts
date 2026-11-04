@@ -2,7 +2,7 @@
 // 서점 소리가 켜져 있을 때만 난다.
 import { whiteNoise, type Ambience } from './ambience';
 
-export type SfxName = 'page' | 'nod' | 'tap';
+export type SfxName = 'page' | 'nod' | 'tap' | 'meow';
 
 export class Sfx {
   private noise: AudioBuffer | null = null;
@@ -15,6 +15,7 @@ export class Sfx {
     const t = ctx.currentTime + 0.01;
     if (name === 'page') this.page(ctx, bus, t);
     else if (name === 'nod') this.chime(ctx, bus, t);
+    else if (name === 'meow') this.meow(ctx, bus, t);
     else this.tap(ctx, bus, t);
   }
 
@@ -53,6 +54,28 @@ export class Sfx {
       o.start(t + dt);
       o.stop(t + dt + 1.2);
     }
+  }
+
+  /** 고양이 야옹: 톱니파를 대역통과로 깎고 음높이를 올렸다 내린다 */
+  private meow(ctx: AudioContext, out: AudioNode, t: number): void {
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(520, t);
+    o.frequency.exponentialRampToValueAtTime(880, t + 0.16);
+    o.frequency.exponentialRampToValueAtTime(560, t + 0.52);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 3.2;
+    bp.frequency.setValueAtTime(900, t);
+    bp.frequency.exponentialRampToValueAtTime(1900, t + 0.18);
+    bp.frequency.exponentialRampToValueAtTime(1100, t + 0.52);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.1, t + 0.06);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.56);
+    o.connect(bp).connect(g).connect(out);
+    o.start(t);
+    o.stop(t + 0.6);
   }
 
   /** 버튼: 나무를 살짝 두드린 듯한 짧은 소리 */

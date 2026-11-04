@@ -87,7 +87,7 @@ npm run server
 | `api=http://localhost:8787` | 카카오 표지 프록시 origin을 직접 지정 |
 | `presence=supabase` | Supabase Realtime 함께 있기(env에 URL·키 필요). 미지정이면 env 있으면 자동 |
 | `presence=local` / `ws` | 탭 간 BroadcastChannel / 로컬 ws 서버 |
-| `npc=0` | NPC 독자 숨기기 |
+| `npc=0` | NPC 독자와 서점 고양이 숨기기 |
 | `autoread=1` | 바로 읽기 모드 |
 | `weather=rain\|snow\|clear` | 부천 실시간 날씨 대신 연출 고정(캡처·테스트용) |
 | `seat=sofa-2` | 앉은 채로 시작(캡처·테스트용) |

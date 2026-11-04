@@ -5,6 +5,7 @@ import { BookstoreBgm } from './audio/bgm';
 import { Sfx } from './audio/sfx';
 import { Crowd, type Actor } from './avatar/crowd';
 import { OVERLAY_LAYER } from './avatar/nameplate';
+import { Cat } from './avatar/cat';
 import { placeAtSeat, spawnNpcs, syncNpcVisibility } from './avatar/npc';
 import { CAM_PRESETS, FollowCamera, applyPreset, createCamera } from './controls/camera';
 import { CanvasInput, isTyping } from './controls/input';
@@ -115,7 +116,14 @@ export async function startApp(
     me.accent = MANAGER_COLOR;
   }
   const npcs = spawnNpcs(crowd, rng);
-  const refreshNpcs = () => syncNpcVisibility(npcs, currentSpaceId(), params.npc && settings.npc);
+  let cat: Cat | null = null;
+  /** 디버그: 고양이 가까이 보는 카메라 오프셋 */
+  let catCam: [number, number, number] | null = null;
+  const refreshNpcs = () => {
+    const on = params.npc && settings.npc;
+    syncNpcVisibility(npcs, currentSpaceId(), on);
+    cat?.setVisible(on && currentSpaceId() === 'hub');
+  };
   refreshNpcs();
 
   let lastSentAt = 0;
@@ -175,6 +183,16 @@ export async function startApp(
   const amb = new Ambience();
   const bgm = new BookstoreBgm();
   const sfx = new Sfx(amb);
+  // 서점 고양이 치즈(허브 전용 NPC)
+  cat = new Cat(rng.fork('cat'), {
+    player: () => ({ x: me.root.position.x, z: me.root.position.z }),
+    seatTaken: (id) => crowd.takenSeats().has(id),
+    grid: () => movement.grid,
+    labelsHidden: () => me.hideLabel,
+    onMeow: () => sfx.play('meow'),
+  });
+  scene.add(cat.root, cat.overlay);
+  refreshNpcs();
   amb.setMusicSynth(false);
   amb.setNatureLevel(0);
   function applySoundLayers(): void {
@@ -790,6 +808,10 @@ export async function startApp(
     // 머리 위 책 배지: 화면 좌표 히트(오버레이 레이어·빌보드 뒷면 문제 없음)
     const badgeActor = crowd.pickBookBadge(clientX, clientY, camera, rect);
     if (badgeActor && openBookPeek(badgeActor)) return;
+    if (cat?.hit(clientX, clientY, camera, rect)) {
+      cat.pet();
+      return;
+    }
 
     const ndc = new THREE.Vector2(
       ((clientX - rect.left) / rect.width) * 2 - 1,
@@ -966,6 +988,12 @@ export async function startApp(
       follow.update(dt);
     }
     crowd.update(dt, t, camera);
+    cat?.update(dt, t, camera);
+    if (catCam && cat) {
+      const p = cat.root.position;
+      camera.position.set(p.x + catCam[0], p.y + catCam[1], p.z + catCam[2]);
+      camera.lookAt(p.x, p.y + 0.16, p.z);
+    }
     badgeHits.sync(crowd, camera, canvas, !focus.active && !cinemaWatch.active && !postitWall.active && !anySheetOpen());
     ring.update(dt);
     {
@@ -1017,6 +1045,11 @@ export async function startApp(
     toasts: () => [...toasts.log],
     peers: () => [...peers.values()].map((p) => ({ id: p.id, nickname: p.nickname, state: p.state, seatId: p.seatId, book: p.book })),
     visiblePeerAvatars: () => crowd.list('peer').filter((a) => a.root.visible && a.root.parent).map((a) => ({ id: a.id, nickname: a.nickname, nameplate: !!a.nameplate?.mesh.visible })),
+    cat: () => (cat ? { mode: cat.mood, x: cat.root.position.x, y: cat.root.position.y, z: cat.root.position.z, visible: cat.root.visible } : null),
+    teleport: (x: number, z: number, ry = 0) => movement.place(x, z, ry),
+    catCam: (o: [number, number, number] | null) => { catCam = o; me.root.visible = !o; if (me.nameplate) me.nameplate.mesh.visible = !o; },
+    catDo: (kind: string) => cat?.perform(kind),
+    catForce: (mode: Parameters<Cat['force']>[0], dur?: number) => cat?.force(mode, dur),
     npcCount: () => npcs.filter((n) => n.actor.root.visible).length,
     sound: () => amb.status(),
     weather: () => weather,

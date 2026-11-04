@@ -31,9 +31,9 @@ export const HEAD_Y = 0.69;
 export const HIP_Y = 0.2;
 
 /** 정점 위치(y, x, z)로 색을 정하는 함수. */
-type Painter = (y: number, x: number, z: number) => THREE.Color;
+export type Painter = (y: number, x: number, z: number) => THREE.Color;
 
-function paint(g: THREE.BufferGeometry, color: THREE.Color | Painter): THREE.BufferGeometry {
+export function paint(g: THREE.BufferGeometry, color: THREE.Color | Painter): THREE.BufferGeometry {
   const ng = g.index ? g.toNonIndexed() : g;
   const pos = ng.getAttribute('position');
   const arr = new Float32Array(pos.count * 3);
@@ -46,7 +46,7 @@ function paint(g: THREE.BufferGeometry, color: THREE.Color | Painter): THREE.Buf
   return ng;
 }
 
-function merge(list: THREE.BufferGeometry[]): THREE.BufferGeometry {
+export function merge(list: THREE.BufferGeometry[]): THREE.BufferGeometry {
   const g = mergeGeometries(list)!;
   g.computeBoundingSphere();
   return g;
