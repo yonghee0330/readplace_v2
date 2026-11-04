@@ -322,26 +322,13 @@ export function buildTheater(bucket: MergeBucket, rng: Rng): void {
     return;
   }
 
-  // —— 원형 카페트 위 윙백 + 마이크(강연장)
+  // —— 원형 카페트 위 윙백(강연장)
   if (isPresent(RUG) && RUG.round) {
     const cx = RUG.x;
     const cz = RUG.z;
     const seat = SEATS.find((s) => s.id === 'stage-1');
     const ry = seat?.ry ?? Math.atan2(-1.2 - cx, 0.85 - cz);
     buildWingbackArmchair(bucket, r.fork('performer'), trs(cx, 0, cz, 0, ry), 0.76);
-    // 마이크는 의자 오른쪽 앞(로컬 +x,+z)
-    const c = Math.cos(ry);
-    const s = Math.sin(ry);
-    const lx = 0.3;
-    const lz = 0.2;
-    const mx = cx + lx * c + lz * s;
-    const mz = cz - lx * s + lz * c;
-    bucket.add('iron', new THREE.CylinderGeometry(0.08, 0.1, 0.016, 16), trs(mx, 0.008, mz));
-    bucket.add('iron', new THREE.CylinderGeometry(0.012, 0.012, 1.12, 8), trs(mx, 0.56, mz));
-    bucket.add('iron', new THREE.CylinderGeometry(0.018, 0.014, 0.09, 8),
-      trs(mx - 0.04 * c, 1.14, mz + 0.04 * c, 0, 0, 0.85));
-    bucket.add('iron', new THREE.SphereGeometry(0.028, 10, 8),
-      trs(mx - 0.08 * c, 1.17, mz + 0.06 * c));
   }
 }
 
