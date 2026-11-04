@@ -502,7 +502,14 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
 .book-preview-sub { margin-top: 4px; font-size: 13px; color: #7a6a55; }
 
 /* 책 제목 검색 → 결과에서 고르기 */
-.book-search-form { margin: 0 0 12px; }
+.book-search-form { margin: 0 0 12px; padding: 0 3px; /* 포커스 테두리가 시트 가장자리에 잘리지 않게 */ }
+.book-manual {
+  display: block; width: 100%; margin: 0 0 10px; padding: 12px 14px; min-height: 44px;
+  border: 1px dashed rgba(36, 37, 31, 0.3); border-radius: 12px; background: transparent;
+  color: var(--green); font: 500 14px/1.4 var(--sans); text-align: left; cursor: pointer;
+  touch-action: manipulation; word-break: keep-all;
+}
+.book-manual[hidden] { display: none; }
 .book-search-form .field-label { display: block; margin-bottom: 8px; }
 .book-search-row { display: flex; gap: 8px; align-items: stretch; }
 .book-search-row .field-input { flex: 1; min-width: 0; }
