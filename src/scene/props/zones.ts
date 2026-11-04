@@ -187,7 +187,8 @@ function buildSoloArmchair(bucket: MergeBucket, r: Rng, m: THREE.Matrix4): void 
 /**
  * 회색 윙백 1인 소파(STRANDMON 느낌, 아바타 한 명 크기). 앉은 사람은 +z.
  */
-function buildWingbackArmchair(bucket: MergeBucket, r: Rng, m: THREE.Matrix4): void {
+function buildWingbackArmchair(bucket: MergeBucket, r: Rng, m0: THREE.Matrix4, scale = 1): void {
+  const m = m0.clone().multiply(new THREE.Matrix4().makeScale(scale, scale, scale));
   const at = (mm: THREE.Matrix4) => m.clone().multiply(mm);
   const fabric = (g: THREE.BufferGeometry, mm: THREE.Matrix4, k = 1) => {
     projectUV(g, 'x', { along: 0.32, across: 0.32, offset: [r.float(), r.float()] });
@@ -327,12 +328,12 @@ export function buildTheater(bucket: MergeBucket, rng: Rng): void {
     const cz = RUG.z;
     const seat = SEATS.find((s) => s.id === 'stage-1');
     const ry = seat?.ry ?? Math.atan2(-1.2 - cx, 0.85 - cz);
-    buildWingbackArmchair(bucket, r.fork('performer'), trs(cx, 0, cz, 0, ry));
+    buildWingbackArmchair(bucket, r.fork('performer'), trs(cx, 0, cz, 0, ry), 0.76);
     // 마이크는 의자 오른쪽 앞(로컬 +x,+z)
     const c = Math.cos(ry);
     const s = Math.sin(ry);
-    const lx = 0.32;
-    const lz = 0.22;
+    const lx = 0.3;
+    const lz = 0.2;
     const mx = cx + lx * c + lz * s;
     const mz = cz - lx * s + lz * c;
     bucket.add('iron', new THREE.CylinderGeometry(0.08, 0.1, 0.016, 16), trs(mx, 0.008, mz));

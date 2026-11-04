@@ -323,24 +323,24 @@ function makeLecture(): SpaceLayout {
   const room = roomOf(7, 6);
   // ㄱ자 객석: (+z) 윙 + (-x) 윙이 북서쪽 코너에서 만남. 열린 바닥(+x,-z)에 원형 카페트.
   const north: TheaterBlock = {
-    x: -0.25, z: 2.32, ry: Math.PI,
+    x: 0.25, z: 2.32, ry: Math.PI,
     rows: 4, cols: 5, rowDepth: 0.6, seatW: 0.5, rise: 0.2, firstY: 0.11,
     stairSide: -1, idPrefix: 'th-n',
   };
   const west: TheaterBlock = {
-    x: -3.05, z: -0.45, ry: Math.PI / 2,
-    rows: 4, cols: 4, rowDepth: 0.6, seatW: 0.5, rise: 0.2, firstY: 0.11,
+    x: -3.05, z: -0.8, ry: Math.PI / 2,
+    rows: 3, cols: 4, rowDepth: 0.6, seatW: 0.5, rise: 0.2, firstY: 0.11,
     stairSide: 1, idPrefix: 'th-w',
   };
   const theaters = [north, west];
   // 강사·연주자: 열린 바닥 중간(문·객석 사이) 원형 카페트 + 작은 1인 윙백
-  const rug = { x: 2.45, z: -0.55, w: 1.45, d: 1.45, round: true };
-  // 객석(북·서)을 바라봄
-  const performerRy = Math.atan2(-1.0 - rug.x, 0.7 - rug.z);
+  const rug = { x: 0.35, z: -1.3, w: 1.5, d: 1.5, round: true };
+  // 객석(북·서)이 만나는 모서리를 바라봄
+  const performerRy = Math.atan2(-0.9 - rug.x, 0.2 - rug.z);
   const spawn = { x: 2.2, z: -1.95, ry: -1.8 };
   const seats = [
     ...theaters.flatMap(theaterSeats),
-    { id: 'stage-1', x: rug.x, z: rug.z, ry: performerRy, y: 0.4, approach: 1 as const },
+    { id: 'stage-1', x: rug.x, z: rug.z, ry: performerRy, y: 0.33, approach: 1 as const },
   ];
   return {
     ...emptyBase('lecture', '계단식 강연장', room),
@@ -626,7 +626,7 @@ export function colliders(): Collider[] {
   } else {
     for (const s of SEATS.filter((seat) => seat.id.startsWith('stage-'))) {
       // 작은 1인 윙백
-      rect(s.x, s.z, 0.55, 0.58, s.ry, 1.0, [s.id]);
+      rect(s.x, s.z, 0.42, 0.45, s.ry, 0.8, [s.id]);
     }
   }
   for (const th of THEATERS) {
@@ -636,7 +636,11 @@ export function colliders(): Collider[] {
     const prefix = th.idPrefix ?? 'theater';
     const theaterIds = SEATS.filter((s) => s.id.startsWith(`${prefix}-`)).map((s) => s.id);
     const mid = theaterWorld(th.x, th.z, th.ry, 0, td * 0.45);
-    rect(mid.x, mid.z, tw, td, th.ry, 1.2, theaterIds);
+    // 걷기 통과용 바닥 박스(낮게): 방석 하나하나는 아래 개별 히트 박스로 잡는다
+    rect(mid.x, mid.z, tw, td, th.ry, 0.05, theaterIds);
+    for (const s of SEATS.filter((seat) => seat.id.startsWith(`${prefix}-`))) {
+      rect(s.x, s.z, 0.46, 0.46, 0, s.y, [s.id]);
+    }
     const side = th.stairSide ?? -1;
     const stairLocalX = side * (tw / 2 + 0.35);
     const stair = theaterWorld(th.x, th.z, th.ry, stairLocalX, td * 0.45);
