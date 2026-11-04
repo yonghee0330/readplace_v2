@@ -9,7 +9,7 @@ async function main(): Promise<void> {
   const server = await preview({ preview: { port: 4175, strictPort: false }, logLevel: 'warn' });
   const base = server.resolvedUrls?.local[0]?.replace(/\/$/, '') ?? 'http://localhost:4175';
   const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-  const page = await (await browser.newContext({ viewport: { width: 1000, height: 640 } })).newPage();
+  const page = await (await browser.newContext({ viewport: { width: 1000, height: 640 }, deviceScaleFactor: Number(process.env.DSF ?? 1) })).newPage();
   const errors: string[] = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(e.message));
@@ -28,7 +28,7 @@ async function main(): Promise<void> {
   await page.evaluate(() => (window as unknown as Win).__BBOOKS_LOOP.stop());
   if (process.env.CLICK) {
     await page.evaluate(() => { (window as unknown as { __opened: string[] }).__opened = []; window.open = ((u: string) => { (window as unknown as { __opened: string[] }).__opened.push(u); return null; }) as typeof window.open; });
-    await page.mouse.click(472, 120);
+    await page.mouse.click(472, Number(process.env.CY ?? 120));
     await page.waitForTimeout(300);
     console.log('opened:', await page.evaluate(() => (window as unknown as { __opened: string[] }).__opened));
   }

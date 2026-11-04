@@ -5,10 +5,14 @@ import { EVENT_BOARD, isPresent } from '../layout';
 export const MOIM_URL = 'https://bbooks.co.kr/moim/';
 const TW = 720;
 const TH = 860;
+const BW = 720;
+const BH = 900;
+export const BTALK_URL = 'https://bbooks.co.kr/moim/m/btalk-seogyul-2611/';
 
+export interface PosterHit { mesh: THREE.Mesh; url: string; toast: string }
 export interface MoimPosterProp {
   group: THREE.Group;
-  hitMesh: THREE.Mesh;
+  hits: PosterHit[];
 }
 
 const SPINES: { c: string; h: number; w: number }[] = [
@@ -82,54 +86,122 @@ function paint(ctx: CanvasRenderingContext2D): void {
   ctx.fillText('눌러서 11월 모임 보기 →', TW / 2, by + bh / 2 + 1);
 }
 
-/** 중앙 홀 포스트잇 보드 와 오른쪽 창 사이 벽에 붙는 포스터. 허브 전용. */
-export function buildMoimPoster(): MoimPosterProp | null {
-  if (!isPresent(EVENT_BOARD) || EVENT_BOARD.w < 0.2) return null;
-  const { x, z, ry } = EVENT_BOARD;
-  const ph = 0.76;
-  const pw = ph * (TW / TH);
-  // 보드는 ry=0(벽이 -z, 방 안쪽 +z를 향함). 방 안에서 볼 때 오른쪽 = +x.
-  const lx = 1.215;
-  const canvas = document.createElement('canvas');
-  canvas.width = TW;
-  canvas.height = TH;
-  const ctx = canvas.getContext('2d')!;
-  paint(ctx);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
-  // 웹폰트가 늦게 로드되면 한 번 더 그린다
-  void document.fonts?.ready.then(() => { paint(ctx); tex.needsUpdate = true; });
 
-  const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, metalness: 0 });
-  const hitMesh = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), mat);
-  hitMesh.position.set(lx, 0, 0.034);
-  hitMesh.name = 'moim-poster-face';
-  hitMesh.userData.moimPoster = true;
+function paintBtalk(ctx: CanvasRenderingContext2D, cover: HTMLImageElement | null): void {
+  const sans = '"Pretendard", "Apple SD Gothic Neo", system-ui, sans-serif';
+  ctx.fillStyle = '#404d73';
+  ctx.fillRect(0, 0, BW, BH);
+  // 협업 라벨(글자만)
+  ctx.fillStyle = '#fffdf8';
+  ctx.beginPath();
+  ctx.roundRect(70, 40, BW - 70, 62, [31, 0, 0, 31]);
+  ctx.fill();
+  ctx.fillStyle = '#1c1c20';
+  ctx.font = `700 27px ${sans}`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('비북스 b.books  ✕  위즈덤하우스  ✕  yes24', 100, 72);
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#d9def0';
+  ctx.font = `400 25px ${sans}`;
+  ctx.fillText('잔꾀와 눈물과 육두문자로 써 내려간', 48, 162);
+  ctx.fillText('유쾌 발랄 여걸 활극의 탄생!', 48, 197);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 80px ${sans}`;
+  ctx.fillText('《채달금전》', 44, 282);
+  ctx.fillText('서귤 작가와의 만남', 44, 372);
+  // 신간 표지(크게)
+  const ch = 500;
+  const cw = ch * (301 / 486);
+  const cx = (BW - cw) / 2;
+  const cy = 392;
+  if (cover) {
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 8;
+    ctx.drawImage(cover, cx, cy, cw, ch);
+    ctx.shadowColor = 'transparent';
+  } else {
+    ctx.fillStyle = '#7a3aa0';
+    ctx.fillRect(cx, cy, cw, ch);
+  }
+}
 
+function makeFrame(pw: number, ph: number, lx: number, ly: number, group: THREE.Group, face: THREE.Mesh): void {
   const frameMat = new THREE.MeshStandardMaterial({ color: 0x3a2a20, roughness: 0.6 });
-  const t = 0.018;
+  const t = 0.014;
   const bars: [number, number, number, number][] = [
     [pw + t * 2, t, 0, ph / 2 + t / 2], [pw + t * 2, t, 0, -ph / 2 - t / 2],
     [t, ph, -pw / 2 - t / 2, 0], [t, ph, pw / 2 + t / 2, 0],
   ];
-  const group = new THREE.Group();
-  group.name = 'moim-poster';
-  group.position.set(x, 1.75, z);
-  group.rotation.y = ry;
   for (const [bw, bh, bx, by] of bars) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.03), frameMat);
-    m.position.set(lx + bx, by, 0.026);
+    m.position.set(lx + bx, ly + by, 0.026);
     group.add(m);
   }
-  // 마스킹테이프 두 조각
   const tapeMat = new THREE.MeshStandardMaterial({ color: 0xe8d9a8, roughness: 0.9, transparent: true, opacity: 0.85 });
   for (const sx of [-1, 1]) {
-    const tape = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.05), tapeMat);
-    tape.position.set(lx + sx * (pw / 2 - 0.1), ph / 2 + 0.01, 0.045);
+    const tape = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.04), tapeMat);
+    tape.position.set(lx + sx * (pw / 2 - 0.07), ly + ph / 2 + 0.008, 0.045);
     tape.rotation.z = sx * 0.35;
     group.add(tape);
   }
-  group.add(hitMesh);
-  return { group, hitMesh };
+  face.position.set(lx, ly, 0.034);
+  group.add(face);
+}
+
+function canvasFace(w: number, h: number, pw: number, ph: number, draw: (ctx: CanvasRenderingContext2D) => void, name: string): { mesh: THREE.Mesh; redraw: () => void } {
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
+  draw(ctx);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, metalness: 0 }));
+  mesh.name = name;
+  return { mesh, redraw: () => { draw(ctx); tex.needsUpdate = true; } };
+}
+
+/** 중앙 홀 포스트잇 보드와 오른쪽 창 사이 벽에 위아래로 붙는 포스터 두 장. 허브 전용. */
+export function buildMoimPoster(): MoimPosterProp | null {
+  if (!isPresent(EVENT_BOARD) || EVENT_BOARD.w < 0.2) return null;
+  const { x, z, ry } = EVENT_BOARD;
+  const lx = 1.215;
+  const pw = 0.56;
+  const ph1 = pw * (TH / TW);
+  const ph2 = pw * (BH / BW);
+  const gap = 0.07;
+  const top = 2.5;
+  const y1 = top - ph1 / 2 - 1.75;
+  const y2 = top - ph1 - gap - ph2 / 2 - 1.75;
+
+  const group = new THREE.Group();
+  group.name = 'moim-posters';
+  group.position.set(x, 1.75, z);
+  group.rotation.y = ry;
+
+  const a = canvasFace(TW, TH, pw, ph1, paint, 'moim-poster-face');
+  a.mesh.userData.moimPoster = true;
+  makeFrame(pw, ph1, lx, y1, group, a.mesh);
+
+  let cover: HTMLImageElement | null = null;
+  const b = canvasFace(BW, BH, pw, ph2, (c) => paintBtalk(c, cover), 'btalk-poster-face');
+  b.mesh.userData.moimPoster = true;
+  makeFrame(pw, ph2, lx, y2, group, b.mesh);
+  const img = new Image();
+  img.onload = () => { cover = img; b.redraw(); };
+  img.src = `${import.meta.env.BASE_URL}posters/chaedalgeumjeon.jpg`;
+
+  // 웹폰트가 늦게 로드되면 한 번 더 그린다
+  void document.fonts?.ready.then(() => { a.redraw(); b.redraw(); });
+
+  return {
+    group,
+    hits: [
+      { mesh: a.mesh, url: MOIM_URL, toast: '11월 비모임 페이지를 열어요' },
+      { mesh: b.mesh, url: BTALK_URL, toast: '서귤 북토크 페이지를 열어요' },
+    ],
+  };
 }

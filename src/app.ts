@@ -33,7 +33,6 @@ import { BookSheet } from './ui/bookSheet';
 import { CinemaWatch } from './ui/cinemaWatch';
 import { DrinkSheet } from './ui/drinkSheet';
 import { PostitWall } from './ui/postitWall';
-import { MOIM_URL } from './scene/props/moimPoster';
 import { drinkCooldownMs, drinkToast, isDrinkKind, type DrinkKind } from './net/drink';
 import { PostitStore } from './net/postit';
 import {
@@ -803,9 +802,9 @@ export async function startApp(
     if (actor) openBookPeek(actor);
   });
 
-  function openMoimPage(): void {
-    toasts.show('11월 비모임 페이지를 열어요');
-    window.open(MOIM_URL, '_blank', 'noopener');
+  function openPosterLink(url: string, msg: string): void {
+    toasts.show(msg);
+    window.open(url, '_blank', 'noopener');
   }
 
   function clickAt(clientX: number, clientY: number): void {
@@ -824,9 +823,10 @@ export async function startApp(
       -((clientY - rect.top) / rect.height) * 2 + 1,
     );
     ray.setFromCamera(ndc, camera);
-    const posterMesh = currentSpaceId() === 'hub' ? store.spaces.hub.poster?.hitMesh : undefined;
-    if (posterMesh && ray.intersectObject(posterMesh, false).length) {
-      openMoimPage();
+    const posterHits = currentSpaceId() === 'hub' ? store.spaces.hub.poster?.hits : undefined;
+    const posterPick = posterHits?.find((h) => ray.intersectObject(h.mesh, false).length);
+    if (posterPick) {
+      openPosterLink(posterPick.url, posterPick.toast);
       return;
     }
     const boardMesh = store.eventBoard?.hitMesh;
@@ -891,10 +891,10 @@ export async function startApp(
       -((e.clientY - rect.top) / rect.height) * 2 + 1,
     );
     ray.setFromCamera(ndc, camera);
-    const posterHit = currentSpaceId() === 'hub' ? store.spaces.hub.poster?.hitMesh : undefined;
-    if (posterHit) {
-      const ph = ray.intersectObjects([posterHit, ...hitGroup.children], false);
-      if (ph[0]?.object === posterHit) {
+    const posterMeshes = currentSpaceId() === 'hub' ? store.spaces.hub.poster?.hits.map((h) => h.mesh) : undefined;
+    if (posterMeshes) {
+      const ph = ray.intersectObjects([...posterMeshes, ...hitGroup.children], false);
+      if (ph[0] && posterMeshes.includes(ph[0].object as THREE.Mesh)) {
         canvas.style.cursor = 'pointer';
         return;
       }
