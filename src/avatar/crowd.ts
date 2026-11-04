@@ -20,7 +20,7 @@ export class Actor {
   nickname: string;
   /** 이름표 점 색(옷 색) */
   accent: string;
-  /** 매니저(서든리 매니저) */
+  /** 매니저(써든리 매니저) */
   isManager = false;
   /** 읽기 중이면 이름표(나) 또는 배지(타인)에 보이는 책 제목 */
   bookTitle: string | null = null;

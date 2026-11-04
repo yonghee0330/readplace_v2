@@ -46,7 +46,7 @@ export class SettingsSheet {
       <div class="field">
         <div class="field-label">매니저 계정</div>
         <div class="nick" aria-live="polite"></div>
-        <p class="field-note">서든리 매니저(대표) 전용 아바타예요. 닉네임·외형은 고정입니다.</p>
+        <p class="field-note">써든리 매니저(대표) 전용 아바타예요. 닉네임·외형은 고정입니다.</p>
       </div>` : `
       <div class="field">
         <div class="field-row">
@@ -162,7 +162,7 @@ export class SettingsSheet {
     const nick = b.querySelector('.nick');
     if (nick) nick.textContent = this.manager ? `${this.profile.nickname} (대표)` : this.profile.nickname;
     const blurb = b.querySelector('[data-nick-blurb]');
-    if (blurb) blurb.textContent = this.manager ? '서든리 매니저(대표) 전용 아바타예요.' : characterBlurb(this.profile.nickname);
+    if (blurb) blurb.textContent = this.manager ? '써든리 매니저(대표) 전용 아바타예요.' : characterBlurb(this.profile.nickname);
     b.querySelectorAll<HTMLInputElement>('[data-set]').forEach((i) => {
       const key = i.dataset.set as 'reducedMotion' | 'npc' | 'keyboardMove' | 'music';
       i.checked = Boolean(this.settings[key]);

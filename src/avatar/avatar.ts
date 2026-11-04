@@ -20,7 +20,7 @@ const SHOE = new THREE.Color('#2a211c');
 const GOLD = new THREE.Color('#c4a46a');
 const MOLE = new THREE.Color('#5a3a28');
 
-/** 서든리 매니저의 옷 색(먼지 낀 핑크 티셔츠). 매니저는 look.color 대신 이 색을 쓴다. */
+/** 써든리 매니저의 옷 색(먼지 낀 핑크 티셔츠). 매니저는 look.color 대신 이 색을 쓴다. */
 export const MANAGER_COLOR = '#d6b0ab';
 
 /** 모든 아바타가 같이 쓰는 재질(색은 정점 색). */
@@ -57,7 +57,7 @@ function hairShell(r: number, frontGap: number, thetaLen: number, thetaStart = 0
   return new THREE.SphereGeometry(r, 28, 14, Math.PI / 2 + frontGap / 2, Math.PI * 2 - frontGap, thetaStart, thetaLen);
 }
 
-/** 회색 머리가 군데군데 섞인 머리색(서든리용). */
+/** 회색 머리가 군데군데 섞인 머리색(써든리용). */
 const graying: Painter = (y, x, z) => {
   const s = Math.sin(x * 95 + z * 41 + y * 23) * Math.sin(z * 77 - x * 29 + y * 57);
   return s > 0.35 ? HAIR_STREAK : HAIR;
@@ -75,7 +75,7 @@ function headGeometry(hair: HairStyle): THREE.BufferGeometry {
     parts.push(paint(c, BLUSH));
   }
   const hc: THREE.Color | Painter = hair === 'curtain' ? graying : HAIR;
-  // 머리카락 3종 + 서든리용 커튼
+  // 머리카락 3종 + 써든리용 커튼
   const top = (thetaLen: number, tilt: number, r = 0.226) => {
     const g = new THREE.SphereGeometry(r, 28, 12, 0, Math.PI * 2, 0, thetaLen);
     g.rotateX(-tilt);
@@ -94,7 +94,7 @@ function headGeometry(hair: HairStyle): THREE.BufferGeometry {
     const fringe = new THREE.SphereGeometry(0.234, 24, 6, Math.PI * 0.1, Math.PI * 0.8, Math.PI * 0.18, Math.PI * 0.12);
     parts.push(paint(fringe, hc));
   } else if (hair === 'curtain') {
-    // 서든리 매니저: 숱 많은 검은 머리에 흰머리가 섞인 커튼 헤어.
+    // 써든리 매니저: 숱 많은 검은 머리에 흰머리가 섞인 커튼 헤어.
     // 정수리는 이마 위까지만, 앞머리 띠가 눈썹 바로 위까지 내려오고, 옆머리는 귀 윗부분을 덮는다.
     parts.push(top(Math.PI * 0.36, 0.08, 0.228));
     parts.push(paint(hairShell(0.23, Math.PI * 0.7, Math.PI * 0.66), hc));
@@ -111,7 +111,7 @@ function headGeometry(hair: HairStyle): THREE.BufferGeometry {
   return merge(parts);
 }
 
-/** 서든리 얼굴 요소: 귀, 코, 짙은 눈썹, 콧수염, 턱선을 따라 난 회색 섞인 수염, 오른쪽 볼 점. */
+/** 써든리 얼굴 요소: 귀, 코, 짙은 눈썹, 콧수염, 턱선을 따라 난 회색 섞인 수염, 오른쪽 볼 점. */
 function faceExtrasGeometry(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
 
@@ -437,7 +437,7 @@ function heldBookGeometry(cover: THREE.Color): THREE.BufferGeometry {
 export interface AvatarLook {
   color: string;
   hair: HairStyle;
-  /** 서든리 매니저 전용 외형(안경·수염·목수 앞치마 등) */
+  /** 써든리 매니저 전용 외형(안경·수염·목수 앞치마 등) */
   manager?: boolean;
 }
 

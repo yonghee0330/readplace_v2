@@ -1,6 +1,6 @@
 // 매니저(어드민) 계정: 입장 코드로만 들어온다. 일반 방문객과 프로필·아바타를 분리한다.
 
-export const MANAGER_NICKNAME = '서든리 매니저';
+export const MANAGER_NICKNAME = '써든리 매니저';
 export const MANAGER_TITLE = '(대표)';
 /** 먼지 낀 핑크 티셔츠(아바타 본체와 동일) */
 export const MANAGER_COLOR = '#d6b0ab';
