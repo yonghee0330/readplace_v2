@@ -30,8 +30,10 @@ export const DEFAULT_SEED = 86;
 /** 입장 장소는 한 곳. 번호로 방을 나누지 않는다. */
 export const ROOM_NAME = '비북스-M';
 
-/** 한 서점에 함께 있을 수 있는 사람 수. NPC는 세지 않는다. */
+/** 서점 중앙(허브) 기본 정원. NPC는 세지 않는다. */
 export const ROOM_CAPACITY = 20;
+/** 공간별 정원 상한(강연장 등). presence·ws 클램프에 쓴다. */
+export const MAX_SPACE_CAPACITY = 40;
 
 export function readParams(search = location.search): Params {
   const q = new URLSearchParams(search);
@@ -42,7 +44,7 @@ export function readParams(search = location.search): Params {
   const quality = q.get('quality');
   const cam = q.get('cam');
   const instance = Math.min(999, Math.max(1, Math.round(num('instance', 86))));
-  const cap = Math.min(ROOM_CAPACITY, Math.max(1, Math.round(num('cap', ROOM_CAPACITY))));
+  const cap = Math.min(MAX_SPACE_CAPACITY, Math.max(1, Math.round(num('cap', ROOM_CAPACITY))));
   const autoread = q.has('autoread') && q.get('autoread') !== '0';
   const weatherRaw = q.get('weather');
   const weather = weatherRaw === 'rain' || weatherRaw === 'snow' || weatherRaw === 'clear' ? weatherRaw : null;

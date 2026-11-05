@@ -1,7 +1,7 @@
 // LocalPresence: BroadcastChannel로 같은 브라우저의 탭끼리 함께 있기.
 // 2초마다 하트비트, 6초 동안 소식 없는 피어는 제거(탭이 닫힌 경우 대비).
 // 입장 직후 잠깐 다른 탭의 소식을 모은 뒤, 정원을 넘기면 들어오지 않는다.
-import { ROOM_CAPACITY } from '../core/params';
+import { MAX_SPACE_CAPACITY, ROOM_CAPACITY } from '../core/params';
 import {
   HEARTBEAT_MS, PeerTracker, STATE_INTERVAL_MS, channelName, fitsCapacity, isPlayerState,
   type ActionEvent, type Presence, type PlayerState,
@@ -33,7 +33,7 @@ export class LocalPresence extends PeerTracker implements Presence {
   }
 
   setCapacity(n: number): void {
-    this.capacity = Math.max(1, Math.min(ROOM_CAPACITY, Math.round(n)));
+    this.capacity = Math.max(1, Math.min(MAX_SPACE_CAPACITY, Math.round(n)));
   }
 
   async connect(room: string, instance: number, me: PlayerState): Promise<'ok' | 'full'> {

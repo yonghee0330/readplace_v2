@@ -4,7 +4,7 @@
 // (track을 자주 보내면 서버가 "Client presence rate limit exceeded"로 채널을 닫는다.)
 // 채널이 닫히거나 끊기면 1·2·4·8·15초 간격으로 다시 붙는다.
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { ROOM_CAPACITY } from '../core/params';
+import { MAX_SPACE_CAPACITY, ROOM_CAPACITY } from '../core/params';
 import { getSupabase } from './supabaseClient';
 import {
   HEARTBEAT_MS, PeerTracker, STATE_INTERVAL_MS, channelName, fitsCapacity, isPlayerState,
@@ -43,7 +43,7 @@ export class SupabasePresence extends PeerTracker implements Presence {
   }
 
   setCapacity(n: number): void {
-    this.capacity = Math.max(1, Math.min(ROOM_CAPACITY, Math.round(n)));
+    this.capacity = Math.max(1, Math.min(MAX_SPACE_CAPACITY, Math.round(n)));
   }
 
   async connect(room: string, instance: number, me: PlayerState): Promise<'ok' | 'full'> {

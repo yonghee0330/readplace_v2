@@ -1,6 +1,6 @@
 // WsPresence: server/index.ts 중계 서버에 붙어 다른 기기와도 함께 있기(?presence=ws&ws=ws://...).
 // 끊기면 1·2·4·8·최대 15초 간격으로 다시 연결한다.
-import { ROOM_CAPACITY } from '../core/params';
+import { MAX_SPACE_CAPACITY, ROOM_CAPACITY } from '../core/params';
 import {
   HEARTBEAT_MS, PeerTracker, STATE_INTERVAL_MS, isPlayerState,
   type ActionEvent, type Presence, type PlayerState,
@@ -39,7 +39,7 @@ export class WsPresence extends PeerTracker implements Presence {
   }
 
   setCapacity(n: number): void {
-    this.capacity = Math.max(1, Math.min(ROOM_CAPACITY, Math.round(n)));
+    this.capacity = Math.max(1, Math.min(MAX_SPACE_CAPACITY, Math.round(n)));
   }
 
   connect(room: string, instance: number, me: PlayerState): Promise<'ok' | 'full'> {

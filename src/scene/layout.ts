@@ -426,7 +426,7 @@ export const SPACE_CAPACITY: Record<SpaceId, number> = {
   hub: 20,
   seminar: 8,
   cinema: 8,
-  lecture: 20,
+  lecture: 40,
   solo: 1,
 };
 

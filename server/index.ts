@@ -1,12 +1,12 @@
 // 실시간 중계(ws) + 카카오 책 표지 검색 프록시(HTTP).
-// 한 방은 20명까지. 넘치면 full을 보내고 넣지 않는다.
+// 방마다 클라이언트가 보낸 cap까지(상한 MAX_SPACE_CAPACITY). 넘치면 full.
 // 실행: npm run server  (PORT, KAKAO_REST_API_KEY 환경 변수 또는 .env)
 // 저장하는 것은 접속 중인 아바타 상태뿐이고, 연결이 끊기면 바로 지운다.
 import http from 'node:http';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
-import { ROOM_CAPACITY } from '../src/core/params';
+import { MAX_SPACE_CAPACITY, ROOM_CAPACITY } from '../src/core/params';
 import { isPlayerState, sanitizePlayerState, type PlayerState } from '../src/net/presence';
 import { searchKakaoBooks } from './kakao';
 
@@ -134,10 +134,10 @@ wss.on('connection', (ws) => {
       leave(c);
       const key = `${room}:${inst}`;
       const set = rooms.get(key) ?? new Set<Client>();
-      // 클라이언트 cap(1인실=1 등). 없으면 기본 20. 서버 상한은 ROOM_CAPACITY.
+      // 클라이언트 cap(1인실=1·강연장=40 등). 없으면 기본 20. 서버 상한은 MAX_SPACE_CAPACITY.
       const rawCap = Number(m.cap);
       const cap = Number.isFinite(rawCap)
-        ? Math.max(1, Math.min(ROOM_CAPACITY, Math.round(rawCap)))
+        ? Math.max(1, Math.min(MAX_SPACE_CAPACITY, Math.round(rawCap)))
         : room.endsWith('-solo') ? 1 : ROOM_CAPACITY;
       if (set.size >= cap) {
         send(c, { type: 'full', limit: cap });
