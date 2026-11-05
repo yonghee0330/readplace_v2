@@ -7,6 +7,7 @@ const TW = 720;
 const TH = 860;
 const BW = 720;
 const BH = 900;
+export const POINT_URL = 'https://bbooks.co.kr/point';
 export const BTALK_URL = 'https://bbooks.co.kr/moim/m/btalk-seogyul-2611/';
 
 export interface PosterHit { mesh: THREE.Mesh; url: string; toast: string }
@@ -127,6 +128,49 @@ function paintBtalk(ctx: CanvasRenderingContext2D, cover: HTMLImageElement | nul
   }
 }
 
+function paintPoint(ctx: CanvasRenderingContext2D, cap: HTMLImageElement | null): void {
+  const sans = '"Pretendard", "Apple SD Gothic Neo", system-ui, sans-serif';
+  ctx.fillStyle = '#e8f2fb';
+  ctx.fillRect(0, 0, TW, TH);
+  // 캡처 위쪽(마감 알약)·아래쪽(안내 문구)을 그대로 쓴다
+  if (cap) {
+    const pw = 300;
+    ctx.drawImage(cap, 266, 46, 322, 50, (TW - pw) / 2, 52, pw, pw * (50 / 322));
+    const sw = 640;
+    ctx.drawImage(cap, 100, 518, 660, 84, (TW - sw) / 2, 596, sw, sw * (84 / 660));
+  } else {
+    ctx.fillStyle = '#f0c57a';
+    ctx.beginPath();
+    ctx.roundRect(210, 52, 300, 46, 23);
+    ctx.fill();
+  }
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#22379a';
+  ctx.font = `700 30px ${sans}`;
+  ctx.fillText('비북스 Bbooks', TW / 2, 160);
+  ctx.fillStyle = '#f0c57a';
+  ctx.fillRect(40, 300, TW - 80, 84);
+  ctx.fillStyle = '#22379a';
+  ctx.font = `900 112px ${sans}`;
+  ctx.fillText('독서포인트', TW / 2, 290 + 70);
+  ctx.font = `900 92px ${sans}`;
+  ctx.fillText('사용 마감', TW / 2, 478);
+  ctx.fillStyle = '#d6453a';
+  ctx.font = `900 112px ${sans}`;
+  ctx.fillText('임박', TW / 2, 590);
+  // 안내 버튼
+  const bx = 56, by = 756, bw = TW - 112, bh = 66, r = 33;
+  ctx.fillStyle = '#22379a';
+  ctx.beginPath();
+  ctx.roundRect(bx, by, bw, bh, r);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = `700 31px ${sans}`;
+  ctx.textBaseline = 'middle';
+  ctx.fillText('눌러서 독서포인트 주문서 보기 →', TW / 2, by + bh / 2 + 1);
+}
+
 function makeFrame(pw: number, ph: number, lx: number, ly: number, group: THREE.Group, face: THREE.Mesh): void {
   const frameMat = new THREE.MeshStandardMaterial({ color: 0x3a2a20, roughness: 0.6 });
   const t = 0.014;
@@ -176,7 +220,10 @@ export function buildMoimPoster(): MoimPosterProp | null {
   const ph2 = pw * (BH / BW);
   const y1 = 0;
   const y2 = 0;
+  const root = new THREE.Group();
+  root.name = 'posters';
   const group = new THREE.Group();
+  root.add(group);
   group.name = 'moim-posters';
   group.position.set(x, 1.75, z);
   group.rotation.y = ry;
@@ -196,9 +243,25 @@ export function buildMoimPoster(): MoimPosterProp | null {
   // 웹폰트가 늦게 로드되면 한 번 더 그린다
   void document.fonts?.ready.then(() => { a.redraw(); b.redraw(); });
 
+  // 카운터 뒤 앞벽(출입문과 서가 사이 빈 벽)의 독서포인트 안내 포스터
+  const pg = new THREE.Group();
+  pg.name = 'point-poster';
+  pg.position.set(-1.45, 1.75, 3.42);
+  pg.rotation.y = Math.PI;
+  root.add(pg);
+  let cap: HTMLImageElement | null = null;
+  const c = canvasFace(TW, TH, pw, ph1, (cx) => paintPoint(cx, cap), 'point-poster-face');
+  c.mesh.userData.moimPoster = true;
+  makeFrame(pw, ph1, 0, 0, pg, c.mesh);
+  const capImg = new Image();
+  capImg.onload = () => { cap = capImg; c.redraw(); };
+  capImg.src = `${import.meta.env.BASE_URL}posters/point-capture.png`;
+  void document.fonts?.ready.then(() => c.redraw());
+
   return {
-    group,
+    group: root,
     hits: [
+      { mesh: c.mesh, url: POINT_URL, toast: '독서포인트 주문서 페이지를 열어요' },
       { mesh: a.mesh, url: MOIM_URL, toast: '11월 비모임 페이지를 열어요' },
       { mesh: b.mesh, url: BTALK_URL, toast: '서귤 북토크 페이지를 열어요' },
     ],
