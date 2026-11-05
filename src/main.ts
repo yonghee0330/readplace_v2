@@ -84,6 +84,14 @@ document.getElementById('start-enter')!.addEventListener('click', () => {
   saveManagerSession(false);
   void enter();
 });
+// 가오픈 N일차(2026-11-03 시작=+0, 한국 날짜 기준)
+{
+  const kst = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const days = Math.round((Date.parse(kst) - Date.parse('2026-11-03')) / 86400000);
+  const el = document.getElementById('start-day');
+  if (el && days >= 1) el.textContent = `가오픈 +${days}일차`;
+}
+
 document.getElementById('start-manager')!.addEventListener('click', (e) => {
   e.preventDefault();
   e.stopPropagation();

@@ -1094,3 +1094,14 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
 /* 설정의 "모션 줄이기"도 시스템 설정과 똑같이 전환 연출을 끈다 */
 .reduce-motion .hud, .reduce-motion .toast, .reduce-motion .sheet-backdrop, .reduce-motion .focus,
 .reduce-motion .action, .reduce-motion .pill, .reduce-motion .loading, .reduce-motion .loading-fill { transition: none !important; }
+
+.start-day {
+  display: inline-block;
+  margin-bottom: 6px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
