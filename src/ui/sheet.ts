@@ -64,7 +64,8 @@ export class Sheet {
     vv?.removeEventListener('resize', this.fitViewport);
     vv?.removeEventListener('scroll', this.fitViewport);
     this.el.style.maxHeight = '';
-    this.backdrop.style.paddingBottom = '';
+    this.backdrop.removeAttribute('style');
+    this.el.classList.remove('is-compact');
     this.backdrop.classList.remove('is-open');
     this.backdrop.hidden = true;
     if (openSheet === this) openSheet = null;
@@ -72,17 +73,24 @@ export class Sheet {
     this.onClose?.();
   }
 
-  /** 키보드·브라우저 UI가 가린 만큼 시트 최대 높이를 줄인다. */
+  /**
+   * 키보드·브라우저 UI가 가린 만큼 시트 영역을 줄인다.
+   * iOS는 키보드가 올라오면 보이는 영역(visualViewport)만 줄고 위로 밀려 올라가므로,
+   * 배경 레이어를 보이는 영역에 정확히 맞춰 시트(와 입력칸)가 늘 키보드 위에 보이게 한다.
+   */
   private fitViewport = (): void => {
     if (!this.isOpen) return;
     const vv = window.visualViewport;
     if (!vv) return;
-    const topGap = Math.max(8, window.scrollY + (vv.offsetTop || 0));
-    const avail = Math.max(200, vv.height - topGap);
-    this.el.style.maxHeight = `${avail}px`;
-    // 레이아웃 뷰포트 하단(키보드 위)과 visualViewport 하단 차이
-    const keyboard = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-    this.backdrop.style.paddingBottom = keyboard > 0 ? `${keyboard}px` : '';
+    const b = this.backdrop.style;
+    b.inset = 'auto';
+    b.left = `${vv.offsetLeft}px`;
+    b.top = `${vv.offsetTop}px`;
+    b.width = `${vv.width}px`;
+    b.height = `${vv.height}px`;
+    this.el.style.maxHeight = `${Math.max(180, vv.height - 8)}px`;
+    // 키보드가 올라온 상태(보이는 높이가 레이아웃 높이보다 120px 넘게 작음)에선 안내 문구를 접는다
+    this.el.classList.toggle('is-compact', window.innerHeight - vv.height > 120);
   };
 
   private focusables(): HTMLElement[] {

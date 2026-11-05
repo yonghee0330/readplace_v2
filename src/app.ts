@@ -681,12 +681,10 @@ export async function startApp(
   }
 
   function portalUsable(portal: PortalDef): boolean {
-    // 1인실 출구 문: 가까이 있거나, 카메라/시선이 문 쪽일 때만
+    // 1인실 출구 문: 뒤돌아서 카메라/시선이 문 쪽을 정확히 향할 때만(자리로 가다 문이 눌리지 않게)
     if (currentSpaceId() !== 'solo') return true;
     const p = me.root.position;
-    const dist = Math.hypot(p.x - portal.x, p.z - portal.z);
-    if (dist < 0.85) return true;
-    return facingPortal(portal, { x: p.x, z: p.z, ry: lookYaw() }, 0.15);
+    return facingPortal(portal, { x: p.x, z: p.z, ry: lookYaw() }, 0.8);
   }
 
   function askEnterPortal(portal: PortalDef, opts?: { fromMenu?: boolean }): void {
@@ -776,6 +774,11 @@ export async function startApp(
       }
       toasts.show(to === 'hub' ? `${spaceLabel(to)}으로 돌아왔어요` : `${spaceLabel(to)}에 들어왔어요`);
       if (to === 'cinema') toasts.show('스크린을 누르면 영화가 시작돼요');
+      // 1인 작업실은 들어오면 바로 의자로 가서 앉는다
+      if (to === 'solo') {
+        const chair = SEATS.find((x) => x.id === 'solo-1');
+        if (chair) movement.goSit(chair);
+      }
       pushState(true);
       syncPeers();
     } finally {
@@ -845,7 +848,7 @@ export async function startApp(
     // 보드·스크린·문·의자처럼 상호작용 가능한 히트를 일반 가구 충돌보다 우선
     const pick = hits.find((h) => {
       const u = h.object.userData;
-      return !!(u.eventBoard || u.screen || u.portal || (u.seats && (u.seats as string[]).length));
+      return !!(u.eventBoard || u.screen || (u.portal && portalUsable(u.portal as PortalDef)) || (u.seats && (u.seats as string[]).length));
     }) ?? hits[0];
     if (pick.object.userData.screen) {
       setCinemaWatch(true);
@@ -857,7 +860,7 @@ export async function startApp(
     }
     const portal = pick.object.userData.portal as PortalDef | undefined;
     if (portal) {
-      askEnterPortal(portal);
+      if (portalUsable(portal)) askEnterPortal(portal);
       return;
     }
     const seats = pick.object.userData.seats as string[] | null | undefined;
