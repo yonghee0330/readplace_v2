@@ -183,13 +183,6 @@ function makeFrame(pw: number, ph: number, lx: number, ly: number, group: THREE.
     m.position.set(lx + bx, ly + by, 0.026);
     group.add(m);
   }
-  const tapeMat = new THREE.MeshStandardMaterial({ color: 0xe8d9a8, roughness: 0.9, transparent: true, opacity: 0.85 });
-  for (const sx of [-1, 1]) {
-    const tape = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.04), tapeMat);
-    tape.position.set(lx + sx * (pw / 2 - 0.07), ly + ph / 2 + 0.008, 0.045);
-    tape.rotation.z = sx * 0.35;
-    group.add(tape);
-  }
   face.position.set(lx, ly, 0.034);
   group.add(face);
 }
