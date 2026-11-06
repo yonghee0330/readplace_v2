@@ -116,6 +116,7 @@ export class AvatarAnimator {
   private bowT = -1;
   private sipT = -1;
   private sipKind: DrinkKind = 'water';
+  private waterT = -1;
   private blinkT = -1;
   private nextBlink = 2 + Math.random() * 3;
   private pageT = -1;
@@ -149,6 +150,18 @@ export class AvatarAnimator {
 
   get sipping(): boolean {
     return this.sipT >= 0;
+  }
+
+  /** 물뿌리개를 들어 화분에 물을 준다(약 2.2초). */
+  water(): void {
+    if (this.sipT >= 0) return;
+    this.waterT = 0;
+    this.a.can.visible = true;
+    this.a.cup.visible = false;
+  }
+
+  get watering(): boolean {
+    return this.waterT >= 0;
   }
 
   update(dt: number, _t: number): void {
@@ -277,10 +290,44 @@ export class AvatarAnimator {
       if (this.sipKind === 'water' && sipLift > 0.85) {
         a.body.position.y += 0.008 * drinkTip;
       }
+    } else if (this.waterT >= 0) {
+      this.waterT += dt;
+      const t = this.waterT;
+      const raise = t < 0.4 ? easeInOut(t / 0.4) : t < 1.85 ? 1 : easeInOut(1 - (t - 1.85) / 0.4);
+      const pour = t < 0.45 ? 0 : t < 1.7 ? easeInOut(Math.min(1, (t - 0.45) / 0.25)) : easeInOut(Math.max(0, 1 - (t - 1.7) / 0.2));
+      a.can.visible = true;
+      a.cup.visible = false;
+      a.armR.rotation.x += -1.15 * raise;
+      a.armR.rotation.z += 0.42 * raise;
+      a.armR.rotation.y = -0.15 * raise;
+      a.armR.position.z = 0.04 * raise;
+      a.can.position.set(0.03, -0.15, 0.05 + 0.02 * raise);
+      a.can.rotation.set(0.55 + 1.05 * pour, 0.15, -0.15);
+      a.can.scale.setScalar(1.15);
+      a.body.rotation.x += 0.08 * raise;
+      const showDrop = pour > 0.35;
+      a.drops.forEach((d, i) => {
+        d.visible = showDrop;
+        if (!showDrop) return;
+        const cycle = ((t * 2.4 + i * 0.22) % 1);
+        d.position.set((i - 2) * 0.006, 0.02 - cycle * 0.09, 0.07 + cycle * 0.02);
+        d.scale.setScalar(1 - cycle * 0.55);
+      });
+      if (t > 2.25) {
+        this.waterT = -1;
+        a.can.visible = false;
+        a.drops.forEach((d) => { d.visible = false; });
+        a.can.scale.setScalar(1);
+        a.armR.rotation.y = 0;
+        a.armR.position.set(ARM_R_X, ARM_R_Y, 0);
+      }
     } else {
       a.cup.visible = false;
       a.cup.position.set(0.01, -0.175, 0.02);
       a.cup.rotation.set(0.35, 0.2, -0.4);
+      a.can.visible = false;
+      a.can.scale.setScalar(1);
+      a.drops.forEach((d) => { d.visible = false; });
       a.armR.rotation.y = 0;
       a.armR.position.set(ARM_R_X, ARM_R_Y, 0);
     }

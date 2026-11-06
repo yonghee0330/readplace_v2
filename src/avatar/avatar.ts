@@ -418,6 +418,33 @@ function cupGeometry(liquid: THREE.Color): THREE.BufferGeometry {
   return merge(parts);
 }
 
+/** 노란 물뿌리개(몸통·주둥이·손잡이). 주둥이는 +z. */
+function wateringCanGeometry(): THREE.BufferGeometry {
+  const yellow = new THREE.Color('#e8a317');
+  const deep = new THREE.Color('#c88810');
+  const parts: THREE.BufferGeometry[] = [];
+  const body = new THREE.CylinderGeometry(0.034, 0.04, 0.07, 16);
+  body.translate(0, 0.04, 0);
+  parts.push(paint(body, yellow));
+  const rim = new THREE.TorusGeometry(0.032, 0.004, 6, 16);
+  rim.rotateX(Math.PI / 2);
+  rim.translate(0, 0.074, 0);
+  parts.push(paint(rim, deep));
+  const spout = new THREE.CylinderGeometry(0.008, 0.011, 0.055, 8);
+  spout.rotateX(Math.PI / 2.6);
+  spout.translate(0, 0.045, 0.04);
+  parts.push(paint(spout, yellow));
+  const rose = new THREE.CylinderGeometry(0.016, 0.014, 0.006, 12);
+  rose.rotateX(Math.PI / 2.4);
+  rose.translate(0, 0.038, 0.068);
+  parts.push(paint(rose, deep));
+  const handle = new THREE.TorusGeometry(0.026, 0.005, 8, 16, Math.PI);
+  handle.rotateZ(Math.PI);
+  handle.translate(0, 0.09, -0.006);
+  parts.push(paint(handle, yellow));
+  return merge(parts);
+}
+
 /** 두 손에 드는 펼친 책. */
 function heldBookGeometry(cover: THREE.Color): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
@@ -454,6 +481,9 @@ export class Avatar {
   readonly book: THREE.Mesh;
   /** 마실 때 오른손에 드는 잔 */
   readonly cup: THREE.Mesh;
+  /** 화분에 물 줄 때 드는 물뿌리개 */
+  readonly can: THREE.Mesh;
+  readonly drops: THREE.Mesh[];
   readonly anim: AvatarAnimator;
   private meshes: THREE.Mesh[] = [];
   private look: AvatarLook;
@@ -467,6 +497,15 @@ export class Avatar {
     this.book.visible = false;
     this.cup = new THREE.Mesh(cupGeometry(new THREE.Color('#9ec9e0')), SHARED);
     this.cup.visible = false;
+    this.can = new THREE.Mesh(wateringCanGeometry(), SHARED);
+    this.can.visible = false;
+    const dropMat = new THREE.MeshBasicMaterial({ color: 0x8fd0ea, transparent: true, opacity: 0.8 });
+    this.drops = [0, 1, 2, 3, 4].map(() => {
+      const d = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), dropMat);
+      d.visible = false;
+      this.can.add(d);
+      return d;
+    });
     this.build();
     this.anim = new AvatarAnimator(this);
   }
@@ -524,6 +563,9 @@ export class Avatar {
     this.cup.position.set(0.01, -0.175, 0.02);
     this.cup.rotation.set(0.35, 0.2, -0.4);
     this.cup.scale.setScalar(1);
+    this.armR.add(this.can);
+    this.can.position.set(0.02, -0.16, 0.03);
+    this.can.rotation.set(0.4, 0.2, -0.2);
   }
 
   setLook(look: AvatarLook): void {

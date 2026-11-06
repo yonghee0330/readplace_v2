@@ -36,7 +36,7 @@ import { PostitWall } from './ui/postitWall';
 import { drinkCooldownMs, drinkToast, isDrinkKind, type DrinkKind } from './net/drink';
 import { PostitStore } from './net/postit';
 import {
-  EVENT_BOARD, PORTALS, SCREEN, SEATS, SPAWN, SPAWNS, applyLayout, colliders, currentSpaceId, isPresent, spaceCapacity, spaceLabel,
+  COUNTER, EVENT_BOARD, PORTALS, SCREEN, SEATS, SPAWN, SPAWNS, applyLayout, colliders, currentSpaceId, isPresent, spaceCapacity, spaceLabel,
   type PortalDef, type SpaceId,
 } from './scene/layout';
 import { buildPostFx, type PostFx } from './scene/postfx';
@@ -720,6 +720,7 @@ export async function startApp(
       box.position.set((c.x0 + c.x1) / 2, c.h / 2, (c.z0 + c.z1) / 2);
       box.userData.seats = c.seats ?? null;
       if (c.eventBoard) box.userData.eventBoard = true;
+      if (c.plant) box.userData.plant = { x: (c.x0 + c.x1) / 2, z: (c.z0 + c.z1) / 2 };
       hitGroup.add(box);
     }
     for (const p of PORTALS) {
@@ -731,6 +732,12 @@ export async function startApp(
       box.position.set(p.x, 1.05, p.z);
       box.rotation.y = p.ry;
       box.userData.portal = p;
+      hitGroup.add(box);
+    }
+    if (isPresent(COUNTER)) {
+      const box = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.32, 0.32), new THREE.MeshBasicMaterial({ visible: false }));
+      box.position.set(COUNTER.x + 0.1, COUNTER.h + 0.14, COUNTER.z - 0.1);
+      box.userData.plant = { x: COUNTER.x + 0.1, z: COUNTER.z - 0.1 };
       hitGroup.add(box);
     }
     if (isPresent(SCREEN) && SCREEN.w > 0.1) {
@@ -804,6 +811,38 @@ export async function startApp(
   const ray = new THREE.Raycaster();
   const ring = makeRing();
   scene.add(ring.mesh);
+  /** 화분까지 걸어간 뒤 물을 줄 자리 */
+  let waterAt: { x: number; z: number } | null = null;
+
+  function startWatering(plant: { x: number; z: number }): void {
+    const p = me.root.position;
+    const dx = p.x - plant.x;
+    const dz = p.z - plant.z;
+    const dist = Math.hypot(dx, dz) || 1;
+    const face = Math.atan2(plant.x - p.x, plant.z - p.z);
+    if (dist < 1.05 && !movement.moving && !movement.seat) {
+      me.root.rotation.y = face;
+      me.avatar.anim.water();
+      waterAt = null;
+      pushState(true);
+      return;
+    }
+    const dest = movement.grid.nearestFree({
+      x: plant.x + (dx / dist) * 0.78,
+      z: plant.z + (dz / dist) * 0.78,
+    }) ?? { x: plant.x + (dx / dist) * 0.78, z: plant.z + (dz / dist) * 0.78 };
+    const got = movement.walkTo(dest);
+    if (got) {
+      waterAt = plant;
+      ring.show(got.x, got.z);
+      pushState(true);
+    } else if (dist < 1.7) {
+      me.root.rotation.y = face;
+      me.avatar.anim.water();
+      waterAt = null;
+      pushState(true);
+    }
+  }
 
   function openBookPeek(actor: Actor): boolean {
     const book = actor.book?.title
@@ -862,7 +901,7 @@ export async function startApp(
     // 보드·스크린·문·의자처럼 상호작용 가능한 히트를 일반 가구 충돌보다 우선
     const pick = hits.find((h) => {
       const u = h.object.userData;
-      return !!(u.eventBoard || u.screen || (u.portal && portalUsable(u.portal as PortalDef)) || (u.seats && (u.seats as string[]).length));
+      return !!(u.eventBoard || u.screen || u.plant || (u.portal && portalUsable(u.portal as PortalDef)) || (u.seats && (u.seats as string[]).length));
     }) ?? hits[0];
     if (pick.object.userData.screen) {
       setCinemaWatch(true);
@@ -877,6 +916,12 @@ export async function startApp(
       if (portalUsable(portal)) askEnterPortal(portal);
       return;
     }
+    const plant = pick.object.userData.plant as { x: number; z: number } | undefined;
+    if (plant) {
+      startWatering(plant);
+      return;
+    }
+    waterAt = null;
     const seats = pick.object.userData.seats as string[] | null | undefined;
     if (seats) {
       const seat = movement.sitNear({ x: pick.point.x, z: pick.point.z }, seats) ?? movement.sitNear({ x: pick.point.x, z: pick.point.z });
@@ -938,6 +983,11 @@ export async function startApp(
         canvas.style.cursor = 'pointer';
         return;
       }
+    }
+    const plantHits = ray.intersectObjects(hitGroup.children, false);
+    if (plantHits.some((h) => h.object.userData.plant)) {
+      canvas.style.cursor = 'pointer';
+      return;
     }
     canvas.style.cursor = '';
   });
@@ -1025,6 +1075,17 @@ export async function startApp(
     }
     movement.cameraYaw = follow.viewYaw;
     movement.update(dt);
+    if (waterAt && !movement.moving) {
+      const p = me.root.position;
+      const dx = waterAt.x - p.x;
+      const dz = waterAt.z - p.z;
+      if (Math.hypot(dx, dz) < 1.5) {
+        me.root.rotation.y = Math.atan2(dx, dz);
+        me.avatar.anim.water();
+        pushState(true);
+      }
+      waterAt = null;
+    }
     if (movement.moving) pushState();
     if (!fixedCam) {
       follow.follow(me.root.position);
