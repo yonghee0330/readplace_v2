@@ -720,7 +720,7 @@ export async function startApp(
       box.position.set((c.x0 + c.x1) / 2, c.h / 2, (c.z0 + c.z1) / 2);
       box.userData.seats = c.seats ?? null;
       if (c.eventBoard) box.userData.eventBoard = true;
-      if (c.plant) box.userData.plant = { x: (c.x0 + c.x1) / 2, z: (c.z0 + c.z1) / 2, style: c.canStyle ?? 0, aimY: 0.34 };
+      if (c.plant) box.userData.plant = { x: (c.x0 + c.x1) / 2, z: (c.z0 + c.z1) / 2, style: c.canStyle ?? 0, aimY: 0.22 };
       hitGroup.add(box);
     }
     for (const p of PORTALS) {
@@ -815,7 +815,7 @@ export async function startApp(
   let waterAt: { x: number; z: number; style: number; aimY: number } | null = null;
 
   function pourOn(plant: { x: number; z: number; style?: number; aimY?: number }, dist: number): void {
-    me.avatar.anim.water(plant.style ?? 0, dist, plant.aimY ?? 0.34);
+    me.avatar.anim.water(plant.style ?? 0, dist, plant.aimY ?? 0.22);
   }
 
   function startWatering(plant: { x: number; z: number; style?: number; aimY?: number }): void {
@@ -838,7 +838,7 @@ export async function startApp(
     }) ?? { x: plant.x + (dx / dist) * stand, z: plant.z + (dz / dist) * stand };
     const got = movement.walkTo(dest);
     if (got) {
-      waterAt = { x: plant.x, z: plant.z, style: plant.style ?? 0, aimY: plant.aimY ?? 0.34 };
+      waterAt = { x: plant.x, z: plant.z, style: plant.style ?? 0, aimY: plant.aimY ?? 0.22 };
       ring.show(got.x, got.z);
       pushState(true);
     } else if (dist < 1.7) {

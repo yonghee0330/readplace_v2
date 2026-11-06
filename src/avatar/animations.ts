@@ -119,7 +119,7 @@ export class AvatarAnimator {
   private waterT = -1;
   /** 아바타 앞(+z)으로 물줄기가 닿을 거리·높이 */
   private waterReach = 0.7;
-  private waterAimY = 0.34;
+  private waterAimY = 0.22;
   private blinkT = -1;
   private nextBlink = 2 + Math.random() * 3;
   private pageT = -1;
@@ -156,7 +156,7 @@ export class AvatarAnimator {
   }
 
   /** 물뿌리개를 들어 화분에 물을 준다. reach·aimY는 아바타 로컬(+z, 높이)에서 물줄기가 닿는 곳. */
-  water(style = 0, reach = 0.7, aimY = 0.34): void {
+  water(style = 0, reach = 0.7, aimY = 0.22): void {
     if (this.sipT >= 0) return;
     this.a.setCanStyle(style);
     this.waterReach = Math.min(1.15, Math.max(0.42, reach));
@@ -304,28 +304,27 @@ export class AvatarAnimator {
       const pour = t < 0.45 ? 0 : t < 1.7 ? easeInOut(Math.min(1, (t - 0.45) / 0.25)) : easeInOut(Math.max(0, 1 - (t - 1.7) / 0.2));
       a.can.visible = true;
       a.cup.visible = false;
-      // 어깨를 몸 앞·가운데로 당겨 손이 화분 쪽으로 더 나가게
-      a.armR.rotation.x = -0.85 * raise;
-      a.armR.rotation.z = 0.06 * raise;
-      a.armR.rotation.y = 0.42 * raise;
-      a.armR.position.set(ARM_R_X + 0.14 * raise, ARM_R_Y + 0.05 * raise, 0.3 * raise);
-      a.can.position.set(0.01, -0.22, 0.12);
-      a.can.rotation.set(0.25 + 1.25 * pour, 0.05, 0);
-      a.can.scale.setScalar(1.2);
-      a.body.rotation.x += 0.38 * raise;
-      a.body.position.z = 0.08 * raise;
+      // 어깨는 제자리. 팔만 앞으로 돌려 물뿌리개를 내민다.
+      a.armR.rotation.x = -1.05 * raise;
+      a.armR.rotation.z = 0.16 * raise;
+      a.armR.rotation.y = 0.08 * raise;
+      a.armR.position.set(ARM_R_X, ARM_R_Y, 0);
+      a.can.position.set(0.02, -0.18, 0.04);
+      a.can.rotation.set(0.35 + 0.95 * pour, 0.12, -0.25);
+      a.can.scale.setScalar(1.15);
+      a.body.position.z = 0;
       const showDrop = pour > 0.35;
+      const z0 = 0.3;
+      const y0 = 0.4;
       const z1 = this.waterReach * 0.92;
       const y1 = this.waterAimY;
       a.drops.forEach((d, i) => {
         d.visible = showDrop;
         if (!showDrop) return;
         const u = (t * 1.7 + i * 0.16) % 1;
-        const z0 = 0.42;
-        const y0 = 0.46;
-        const arc = Math.sin(u * Math.PI) * 0.07;
-        d.position.set((i - 2) * 0.018 * (1 - u), y0 + (y1 - y0) * u + arc, z0 + (z1 - z0) * u);
-        d.scale.setScalar(1.15 - u * 0.35);
+        const arc = Math.sin(u * Math.PI) * 0.05;
+        d.position.set((i - 2) * 0.012 * (1 - u * 0.4), y0 + (y1 - y0) * u + arc, z0 + (z1 - z0) * u);
+        d.scale.setScalar(1.05 - u * 0.25);
       });
       if (t > 2.25) {
         this.waterT = -1;
