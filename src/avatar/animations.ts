@@ -117,6 +117,9 @@ export class AvatarAnimator {
   private sipT = -1;
   private sipKind: DrinkKind = 'water';
   private waterT = -1;
+  /** 아바타 앞(+z)으로 물줄기가 닿을 거리·높이 */
+  private waterReach = 0.7;
+  private waterAimY = 0.34;
   private blinkT = -1;
   private nextBlink = 2 + Math.random() * 3;
   private pageT = -1;
@@ -152,13 +155,16 @@ export class AvatarAnimator {
     return this.sipT >= 0;
   }
 
-  /** 물뿌리개를 들어 화분에 물을 준다(약 2.2초). style은 화분마다 다른 모양. */
-  water(style = 0): void {
+  /** 물뿌리개를 들어 화분에 물을 준다. reach·aimY는 아바타 로컬(+z, 높이)에서 물줄기가 닿는 곳. */
+  water(style = 0, reach = 0.7, aimY = 0.34): void {
     if (this.sipT >= 0) return;
     this.a.setCanStyle(style);
+    this.waterReach = Math.min(1.15, Math.max(0.42, reach));
+    this.waterAimY = aimY;
     this.waterT = 0;
     this.a.can.visible = true;
     this.a.cup.visible = false;
+    for (const d of this.a.drops) this.a.root.add(d);
   }
 
   get watering(): boolean {
@@ -298,27 +304,38 @@ export class AvatarAnimator {
       const pour = t < 0.45 ? 0 : t < 1.7 ? easeInOut(Math.min(1, (t - 0.45) / 0.25)) : easeInOut(Math.max(0, 1 - (t - 1.7) / 0.2));
       a.can.visible = true;
       a.cup.visible = false;
-      a.armR.rotation.x += -1.15 * raise;
-      a.armR.rotation.z += 0.42 * raise;
-      a.armR.rotation.y = -0.15 * raise;
-      a.armR.position.z = 0.04 * raise;
-      a.can.position.set(0.03, -0.15, 0.05 + 0.02 * raise);
-      a.can.rotation.set(0.55 + 1.05 * pour, 0.15, -0.15);
-      a.can.scale.setScalar(1.15);
-      a.body.rotation.x += 0.08 * raise;
+      // 어깨를 몸 앞·가운데로 당겨 손이 화분 쪽으로 더 나가게
+      a.armR.rotation.x = -0.85 * raise;
+      a.armR.rotation.z = 0.06 * raise;
+      a.armR.rotation.y = 0.42 * raise;
+      a.armR.position.set(ARM_R_X + 0.14 * raise, ARM_R_Y + 0.05 * raise, 0.3 * raise);
+      a.can.position.set(0.01, -0.22, 0.12);
+      a.can.rotation.set(0.25 + 1.25 * pour, 0.05, 0);
+      a.can.scale.setScalar(1.2);
+      a.body.rotation.x += 0.38 * raise;
+      a.body.position.z = 0.08 * raise;
       const showDrop = pour > 0.35;
+      const z1 = this.waterReach * 0.92;
+      const y1 = this.waterAimY;
       a.drops.forEach((d, i) => {
         d.visible = showDrop;
         if (!showDrop) return;
-        const cycle = ((t * 2.4 + i * 0.22) % 1);
-        d.position.set((i - 2) * 0.006, 0.02 - cycle * 0.09, 0.07 + cycle * 0.02);
-        d.scale.setScalar(1 - cycle * 0.55);
+        const u = (t * 1.7 + i * 0.16) % 1;
+        const z0 = 0.42;
+        const y0 = 0.46;
+        const arc = Math.sin(u * Math.PI) * 0.07;
+        d.position.set((i - 2) * 0.018 * (1 - u), y0 + (y1 - y0) * u + arc, z0 + (z1 - z0) * u);
+        d.scale.setScalar(1.15 - u * 0.35);
       });
       if (t > 2.25) {
         this.waterT = -1;
         a.can.visible = false;
-        a.drops.forEach((d) => { d.visible = false; });
         a.can.scale.setScalar(1);
+        a.body.position.z = 0;
+        a.drops.forEach((d) => {
+          d.visible = false;
+          a.can.add(d);
+        });
         a.armR.rotation.y = 0;
         a.armR.position.set(ARM_R_X, ARM_R_Y, 0);
       }
@@ -328,6 +345,7 @@ export class AvatarAnimator {
       a.cup.rotation.set(0.35, 0.2, -0.4);
       a.can.visible = false;
       a.can.scale.setScalar(1);
+      a.body.position.z = 0;
       a.drops.forEach((d) => { d.visible = false; });
       a.armR.rotation.y = 0;
       a.armR.position.set(ARM_R_X, ARM_R_Y, 0);
