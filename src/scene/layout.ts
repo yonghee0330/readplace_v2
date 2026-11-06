@@ -24,6 +24,8 @@ export interface Collider {
   eventBoard?: boolean;
   /** 클릭 시 물 주기(이스터 에그) */
   plant?: boolean;
+  /** 이 화분에서 꺼내는 물뿌리개 스타일 */
+  canStyle?: number;
 }
 export interface PortalDef {
   /** 이 포털이 보내는 곳(허브의 포털은 서브룸, 서브룸은 보통 hub) */
@@ -559,7 +561,7 @@ export function colliders(): Collider[] {
   const rect = (
     cx: number, cz: number, w: number, d: number, ry: number, h: number,
     seats?: string[],
-    flags?: { eventBoard?: boolean; plant?: boolean },
+    flags?: { eventBoard?: boolean; plant?: boolean; canStyle?: number },
   ) => {
     if (w <= 0.01 || d <= 0.01) return;
     const rot = Math.abs(Math.sin(ry)) > 0.5;
@@ -569,6 +571,7 @@ export function colliders(): Collider[] {
       seatable: !!seats, seats,
       eventBoard: flags?.eventBoard,
       plant: flags?.plant,
+      canStyle: flags?.canStyle,
     });
   };
   for (const s of SHELVES) rect(s.x, s.z, s.w, SHELF.d, s.ry, SHELF.h);
@@ -650,9 +653,13 @@ export function colliders(): Collider[] {
     rect(stair.x, stair.z, 0.7, td, th.ry, 1.0);
   }
   for (const l of FLOOR_LAMPS) rect(l.x, l.z, 0.34, 0.34, 0, 1.5);
-  for (const p of FLOOR_PLANTS) {
-    rect(p.x, p.z, 0.5 * p.scale, 0.5 * p.scale, 0, 1.15 * p.scale, undefined, { plant: true });
-  }
+  const canSalt = { hub: 0, seminar: 4, cinema: 5, lecture: 6, solo: 2 }[activeId];
+  FLOOR_PLANTS.forEach((p, i) => {
+    rect(p.x, p.z, 0.5 * p.scale, 0.5 * p.scale, 0, 1.15 * p.scale, undefined, {
+      plant: true,
+      canStyle: (canSalt + i) % 7,
+    });
+  });
   // 포털은 막지 않음(통과·클릭 트리거). 내비에서는 열어 둔다.
   return list;
 }

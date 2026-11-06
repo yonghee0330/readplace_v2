@@ -152,9 +152,10 @@ export class AvatarAnimator {
     return this.sipT >= 0;
   }
 
-  /** 물뿌리개를 들어 화분에 물을 준다(약 2.2초). */
-  water(): void {
+  /** 물뿌리개를 들어 화분에 물을 준다(약 2.2초). style은 화분마다 다른 모양. */
+  water(style = 0): void {
     if (this.sipT >= 0) return;
+    this.a.setCanStyle(style);
     this.waterT = 0;
     this.a.can.visible = true;
     this.a.cup.visible = false;

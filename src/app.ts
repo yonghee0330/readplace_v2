@@ -720,7 +720,7 @@ export async function startApp(
       box.position.set((c.x0 + c.x1) / 2, c.h / 2, (c.z0 + c.z1) / 2);
       box.userData.seats = c.seats ?? null;
       if (c.eventBoard) box.userData.eventBoard = true;
-      if (c.plant) box.userData.plant = { x: (c.x0 + c.x1) / 2, z: (c.z0 + c.z1) / 2 };
+      if (c.plant) box.userData.plant = { x: (c.x0 + c.x1) / 2, z: (c.z0 + c.z1) / 2, style: c.canStyle ?? 0 };
       hitGroup.add(box);
     }
     for (const p of PORTALS) {
@@ -737,7 +737,7 @@ export async function startApp(
     if (isPresent(COUNTER)) {
       const box = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.32, 0.32), new THREE.MeshBasicMaterial({ visible: false }));
       box.position.set(COUNTER.x + 0.1, COUNTER.h + 0.14, COUNTER.z - 0.1);
-      box.userData.plant = { x: COUNTER.x + 0.1, z: COUNTER.z - 0.1 };
+      box.userData.plant = { x: COUNTER.x + 0.1, z: COUNTER.z - 0.1, style: 3 };
       hitGroup.add(box);
     }
     if (isPresent(SCREEN) && SCREEN.w > 0.1) {
@@ -812,9 +812,10 @@ export async function startApp(
   const ring = makeRing();
   scene.add(ring.mesh);
   /** 화분까지 걸어간 뒤 물을 줄 자리 */
-  let waterAt: { x: number; z: number } | null = null;
+  let waterAt: { x: number; z: number; style: number } | null = null;
 
-  function startWatering(plant: { x: number; z: number }): void {
+  function startWatering(plant: { x: number; z: number; style?: number }): void {
+    const style = plant.style ?? 0;
     const p = me.root.position;
     const dx = p.x - plant.x;
     const dz = p.z - plant.z;
@@ -822,7 +823,7 @@ export async function startApp(
     const face = Math.atan2(plant.x - p.x, plant.z - p.z);
     if (dist < 1.05 && !movement.moving && !movement.seat) {
       me.root.rotation.y = face;
-      me.avatar.anim.water();
+      me.avatar.anim.water(style);
       waterAt = null;
       pushState(true);
       return;
@@ -833,12 +834,12 @@ export async function startApp(
     }) ?? { x: plant.x + (dx / dist) * 0.78, z: plant.z + (dz / dist) * 0.78 };
     const got = movement.walkTo(dest);
     if (got) {
-      waterAt = plant;
+      waterAt = { x: plant.x, z: plant.z, style };
       ring.show(got.x, got.z);
       pushState(true);
     } else if (dist < 1.7) {
       me.root.rotation.y = face;
-      me.avatar.anim.water();
+      me.avatar.anim.water(style);
       waterAt = null;
       pushState(true);
     }
@@ -916,7 +917,7 @@ export async function startApp(
       if (portalUsable(portal)) askEnterPortal(portal);
       return;
     }
-    const plant = pick.object.userData.plant as { x: number; z: number } | undefined;
+    const plant = pick.object.userData.plant as { x: number; z: number; style?: number } | undefined;
     if (plant) {
       startWatering(plant);
       return;
@@ -1081,7 +1082,7 @@ export async function startApp(
       const dz = waterAt.z - p.z;
       if (Math.hypot(dx, dz) < 1.5) {
         me.root.rotation.y = Math.atan2(dx, dz);
-        me.avatar.anim.water();
+        me.avatar.anim.water(waterAt.style);
         pushState(true);
       }
       waterAt = null;

@@ -418,30 +418,138 @@ function cupGeometry(liquid: THREE.Color): THREE.BufferGeometry {
   return merge(parts);
 }
 
-/** 노란 물뿌리개(몸통·주둥이·손잡이). 주둥이는 +z. */
-function wateringCanGeometry(): THREE.BufferGeometry {
-  const yellow = new THREE.Color('#e8a317');
-  const deep = new THREE.Color('#c88810');
+export const CAN_STYLE_COUNT = 7;
+
+/** 물뿌리개 7종. 주둥이는 대략 +z, 손잡이 위치·몸통 실루엣이 서로 다르다. */
+function wateringCanGeometry(style = 0): THREE.BufferGeometry {
+  const palettes = [
+    ['#e8a317', '#c88810'],
+    ['#7dba8a', '#4e8a62'],
+    ['#e07a62', '#b55240'],
+    ['#6eb0d4', '#3d7ea8'],
+    ['#f3ead2', '#c4b496'],
+    ['#b7a0d4', '#7d68a8'],
+    ['#c46a3a', '#8a4524'],
+  ];
+  const [a, b] = palettes[((style % 7) + 7) % 7]!;
+  const main = new THREE.Color(a);
+  const deep = new THREE.Color(b);
   const parts: THREE.BufferGeometry[] = [];
-  const body = new THREE.CylinderGeometry(0.034, 0.04, 0.07, 16);
-  body.translate(0, 0.04, 0);
-  parts.push(paint(body, yellow));
-  const rim = new THREE.TorusGeometry(0.032, 0.004, 6, 16);
-  rim.rotateX(Math.PI / 2);
-  rim.translate(0, 0.074, 0);
-  parts.push(paint(rim, deep));
-  const spout = new THREE.CylinderGeometry(0.008, 0.011, 0.055, 8);
-  spout.rotateX(Math.PI / 2.6);
-  spout.translate(0, 0.045, 0.04);
-  parts.push(paint(spout, yellow));
-  const rose = new THREE.CylinderGeometry(0.016, 0.014, 0.006, 12);
-  rose.rotateX(Math.PI / 2.4);
-  rose.translate(0, 0.038, 0.068);
-  parts.push(paint(rose, deep));
-  const handle = new THREE.TorusGeometry(0.026, 0.005, 8, 16, Math.PI);
-  handle.rotateZ(Math.PI);
-  handle.translate(0, 0.09, -0.006);
-  parts.push(paint(handle, yellow));
+  const add = (g: THREE.BufferGeometry, c: THREE.Color) => parts.push(paint(g, c));
+  const i = ((style % 7) + 7) % 7;
+
+  if (i === 1) {
+    // 둥근 몸통 · 짧은 주둥이 · 옆 고리 손잡이
+    const body = new THREE.SphereGeometry(0.038, 16, 12);
+    body.translate(0, 0.042, 0);
+    add(body, main);
+    const neck = new THREE.CylinderGeometry(0.016, 0.022, 0.02, 12);
+    neck.translate(0, 0.072, 0);
+    add(neck, deep);
+    const spout = new THREE.CylinderGeometry(0.007, 0.01, 0.034, 8);
+    spout.rotateX(Math.PI / 2.3);
+    spout.translate(0, 0.05, 0.038);
+    add(spout, main);
+    const handle = new THREE.TorusGeometry(0.016, 0.0045, 8, 14);
+    handle.rotateY(Math.PI / 2);
+    handle.translate(-0.034, 0.05, 0);
+    add(handle, deep);
+  } else if (i === 2) {
+    // 길쭉한 콘 · 긴 주둥이 · 작은 고리
+    const body = new THREE.CylinderGeometry(0.02, 0.034, 0.09, 14);
+    body.translate(0, 0.05, 0);
+    add(body, main);
+    const spout = new THREE.CylinderGeometry(0.005, 0.008, 0.07, 8);
+    spout.rotateX(Math.PI / 2.15);
+    spout.translate(0, 0.07, 0.04);
+    add(spout, deep);
+    const rose = new THREE.SphereGeometry(0.012, 10, 8);
+    rose.translate(0, 0.055, 0.078);
+    add(rose, main);
+    const handle = new THREE.TorusGeometry(0.014, 0.0035, 6, 12);
+    handle.translate(0, 0.1, -0.01);
+    add(handle, deep);
+  } else if (i === 3) {
+    // 납작하고 넓은 몸통 · 큰 샤워 헤드
+    const body = new THREE.CylinderGeometry(0.046, 0.048, 0.042, 16);
+    body.translate(0, 0.028, 0);
+    add(body, main);
+    const spout = new THREE.CylinderGeometry(0.012, 0.014, 0.04, 10);
+    spout.rotateX(Math.PI / 2.5);
+    spout.translate(0, 0.03, 0.04);
+    add(spout, deep);
+    const rose = new THREE.CylinderGeometry(0.022, 0.02, 0.008, 14);
+    rose.rotateX(Math.PI / 2.3);
+    rose.translate(0, 0.02, 0.062);
+    add(rose, main);
+    const handle = new THREE.TorusGeometry(0.02, 0.004, 6, 12, Math.PI);
+    handle.rotateY(Math.PI / 2);
+    handle.translate(-0.04, 0.04, 0);
+    add(handle, deep);
+  } else if (i === 4) {
+    // 저그 · 주둥이 대신 짧은 립 · 큰 옆 손잡이
+    const body = new THREE.CylinderGeometry(0.03, 0.036, 0.075, 8);
+    body.translate(0, 0.042, 0);
+    add(body, main);
+    const lip = new THREE.BoxGeometry(0.02, 0.012, 0.028);
+    lip.translate(0, 0.07, 0.028);
+    add(lip, deep);
+    const handle = new THREE.TorusGeometry(0.022, 0.005, 8, 14, Math.PI * 1.15);
+    handle.rotateY(Math.PI / 2);
+    handle.translate(-0.028, 0.05, 0);
+    add(handle, deep);
+  } else if (i === 5) {
+    // 종 모양 · 위로 굽은 손잡이
+    const body = new THREE.CylinderGeometry(0.04, 0.022, 0.07, 16);
+    body.translate(0, 0.04, 0);
+    add(body, main);
+    const spout = new THREE.CylinderGeometry(0.006, 0.009, 0.05, 8);
+    spout.rotateX(1.15);
+    spout.translate(0, 0.055, 0.036);
+    add(spout, deep);
+    const handle = new THREE.TorusGeometry(0.03, 0.004, 6, 16, Math.PI);
+    handle.rotateZ(Math.PI);
+    handle.translate(0, 0.095, 0);
+    add(handle, main);
+  } else if (i === 6) {
+    // 돔 · 거위목 주둥이
+    const body = new THREE.SphereGeometry(0.036, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.65);
+    body.translate(0, 0.02, 0);
+    add(body, main);
+    const base = new THREE.CylinderGeometry(0.03, 0.034, 0.02, 14);
+    base.translate(0, 0.012, 0);
+    add(base, deep);
+    const neck = new THREE.TorusGeometry(0.02, 0.006, 6, 10, Math.PI * 0.7);
+    neck.rotateY(Math.PI / 2);
+    neck.rotateZ(-0.4);
+    neck.translate(0, 0.05, 0.02);
+    add(neck, main);
+    const rose = new THREE.CylinderGeometry(0.012, 0.01, 0.006, 10);
+    rose.rotateX(0.8);
+    rose.translate(0, 0.04, 0.05);
+    add(rose, deep);
+  } else {
+    // 기본: 높은 원통 · 긴 주둥이 · 위 아치 손잡이
+    const body = new THREE.CylinderGeometry(0.034, 0.04, 0.07, 16);
+    body.translate(0, 0.04, 0);
+    add(body, main);
+    const rim = new THREE.TorusGeometry(0.032, 0.004, 6, 16);
+    rim.rotateX(Math.PI / 2);
+    rim.translate(0, 0.074, 0);
+    add(rim, deep);
+    const spout = new THREE.CylinderGeometry(0.008, 0.011, 0.055, 8);
+    spout.rotateX(Math.PI / 2.6);
+    spout.translate(0, 0.045, 0.04);
+    add(spout, main);
+    const rose = new THREE.CylinderGeometry(0.016, 0.014, 0.006, 12);
+    rose.rotateX(Math.PI / 2.4);
+    rose.translate(0, 0.038, 0.068);
+    add(rose, deep);
+    const handle = new THREE.TorusGeometry(0.026, 0.005, 8, 16, Math.PI);
+    handle.rotateZ(Math.PI);
+    handle.translate(0, 0.09, -0.006);
+    add(handle, main);
+  }
   return merge(parts);
 }
 
@@ -487,6 +595,7 @@ export class Avatar {
   readonly anim: AvatarAnimator;
   private meshes: THREE.Mesh[] = [];
   private look: AvatarLook;
+  private canStyle = 0;
 
   constructor(look: AvatarLook) {
     this.look = { ...look };
@@ -497,7 +606,7 @@ export class Avatar {
     this.book.visible = false;
     this.cup = new THREE.Mesh(cupGeometry(new THREE.Color('#9ec9e0')), SHARED);
     this.cup.visible = false;
-    this.can = new THREE.Mesh(wateringCanGeometry(), SHARED);
+    this.can = new THREE.Mesh(wateringCanGeometry(0), SHARED);
     this.can.visible = false;
     const dropMat = new THREE.MeshBasicMaterial({ color: 0x8fd0ea, transparent: true, opacity: 0.8 });
     this.drops = [0, 1, 2, 3, 4].map(() => {
@@ -514,6 +623,15 @@ export class Avatar {
   setCupLiquid(hex: string): void {
     this.cup.geometry.dispose();
     this.cup.geometry = cupGeometry(new THREE.Color(hex));
+  }
+
+  /** 화분마다 다른 물뿌리개. */
+  setCanStyle(style: number): void {
+    const i = ((style % CAN_STYLE_COUNT) + CAN_STYLE_COUNT) % CAN_STYLE_COUNT;
+    if (i === this.canStyle) return;
+    this.canStyle = i;
+    this.can.geometry.dispose();
+    this.can.geometry = wateringCanGeometry(i);
   }
 
   private build(): void {
