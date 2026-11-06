@@ -207,6 +207,12 @@ export async function startApp(
     bgm.setVolume(settings.musicVolume);
     bgm.setEnabled(on && settings.music);
   }
+  function setSoundOn(on: boolean): void {
+    settings.sound = on;
+    saveSettings(settings);
+    hud.setSound(on);
+    applySoundLayers();
+  }
   if (settings.sound) {
     const resume = () => {
       removeEventListener('pointerdown', resume, true);
@@ -223,12 +229,7 @@ export async function startApp(
       sfx.play('tap');
       exitSheet.open();
     },
-    sound: () => {
-      settings.sound = !settings.sound;
-      saveSettings(settings);
-      hud.setSound(settings.sound);
-      applySoundLayers();
-    },
+    sound: () => setSoundOn(!settings.sound),
     settings: () => {
       sfx.play('tap');
       settingsSheet.open();
@@ -313,6 +314,19 @@ export async function startApp(
         },
       },
     });
+  }
+
+  // 소리는 기본 꺼짐. 처음엔 소리 버튼을 눌러 켜도록 안내한다(모바일은 누른 순간에만 재생이 허용됨).
+  if (!settings.sound && !params.cam && !params.autoread) {
+    hud.setSoundHint(true);
+    window.setTimeout(() => {
+      if (settings.sound) return;
+      toasts.show('오른쪽 위 소리 버튼을 누르면 잔잔한 음악이 나와요', {
+        duration: 9000,
+        kind: 'guide',
+        action: { label: '소리 켜기', onClick: () => setSoundOn(true) },
+      });
+    }, 1200);
   }
 
   // ---------- 상태 보내기 ----------

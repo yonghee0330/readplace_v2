@@ -1109,3 +1109,12 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
 /* 모바일 키보드가 올라온 상태: 안내 문구를 접어 입력칸·결과가 보이게 */
 .book-sheet.is-compact .sheet-text, .book-sheet.is-compact .sheet-head { display: none; }
 .book-sheet.is-compact { padding-top: 12px; }
+
+/* 소리 버튼 안내: 켜기 전까지 부드럽게 깜빡임 */
+.pill.is-hint { animation: sound-hint 1.6s ease-in-out infinite; box-shadow: 0 0 0 0 rgba(196, 103, 60, 0.6); }
+@keyframes sound-hint {
+  0% { box-shadow: 0 0 0 0 rgba(196, 103, 60, 0.6); }
+  70% { box-shadow: 0 0 0 12px rgba(196, 103, 60, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(196, 103, 60, 0); }
+}
+.reduce-motion .pill.is-hint { animation: none; outline: 2px solid #c4673c; }

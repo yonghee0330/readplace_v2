@@ -120,7 +120,13 @@ export class Hud {
     this.weatherEl.setAttribute('aria-label', label ? `지금 날씨 ${label}` : '');
   }
 
+  /** 소리 버튼을 눈에 띄게(눌러서 켜 보라는 안내). 켜지면 자동으로 꺼진다. */
+  setSoundHint(on: boolean): void {
+    this.soundBtn.classList.toggle('is-hint', on);
+  }
+
   setSound(on: boolean): void {
+    if (on) this.soundBtn.classList.remove('is-hint');
     this.soundBtn.innerHTML = icon(on ? 'soundOn' : 'soundOff');
     this.soundBtn.setAttribute('aria-pressed', String(on));
     this.soundBtn.setAttribute('aria-label', on ? '서점 소리 끄기' : '서점 소리 켜기');
