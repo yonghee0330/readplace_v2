@@ -390,7 +390,7 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   position: absolute;
   left: 0;
   top: 0;
-  width: min(300px, calc(100vw - 20px));
+  width: min(340px, calc(100vw - 20px));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -404,12 +404,12 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
 .keeper-cloud {
   position: relative;
   width: 100%;
-  max-height: min(52vh, 420px);
+  max-height: min(68vh, 520px);
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding: 12px 14px 14px;
+  padding: 14px 14px 14px;
   border-radius: 26px;
   background: rgba(255, 252, 246, 0.48);
   -webkit-backdrop-filter: blur(6px);
@@ -422,8 +422,9 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   text-align: center;
   touch-action: manipulation;
 }
-.keeper-anchor[data-side='above'] .keeper-cloud::before,
-.keeper-anchor[data-side='above'] .keeper-cloud::after {
+/* 머리에서 아래로 걸치는 배치: 위쪽에 작은 구름 꼬리 */
+.keeper-anchor[data-side='over'] .keeper-cloud::before,
+.keeper-anchor[data-side='over'] .keeper-cloud::after {
   content: '';
   position: absolute;
   background: rgba(255, 252, 246, 0.48);
@@ -431,11 +432,11 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28);
   pointer-events: none;
 }
-.keeper-anchor[data-side='above'] .keeper-cloud::before {
-  width: 20px; height: 20px; left: 42%; bottom: -7px;
+.keeper-anchor[data-side='over'] .keeper-cloud::before {
+  width: 18px; height: 18px; left: 46%; top: -8px;
 }
-.keeper-anchor[data-side='above'] .keeper-cloud::after {
-  width: 11px; height: 11px; left: 50%; bottom: -14px; margin-left: -4px;
+.keeper-anchor[data-side='over'] .keeper-cloud::after {
+  width: 10px; height: 10px; left: 52%; top: -14px; margin-left: -4px;
 }
 .keeper-line {
   margin: 0;
@@ -447,7 +448,7 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
 .keeper-answer {
   font-weight: 500;
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.6;
   text-align: left;
   white-space: normal;
 }
@@ -495,8 +496,8 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
 }
 .keeper-action-ghost:hover, .keeper-action-ghost:active { background: rgba(255, 252, 246, 0.92); }
 @media (max-width: 640px) {
-  .keeper-anchor { width: min(340px, calc(100vw - 16px)); }
-  .keeper-cloud { max-height: min(58vh, 460px); padding: 12px 12px 14px; }
+  .keeper-anchor { width: min(360px, calc(100vw - 16px)); }
+  .keeper-cloud { max-height: min(70vh, 560px); padding: 12px 12px 14px; }
   .keeper-topic, .keeper-action { min-height: 44px; font-size: 13px; padding: 10px 14px; }
   .keeper-answer { font-size: 13.5px; }
 }

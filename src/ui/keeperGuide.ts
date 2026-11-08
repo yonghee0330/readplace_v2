@@ -1,7 +1,7 @@
 // 서점지기 안내: 머리 위 구름 말풍선. 인사(최초 1회)+질문 버튼 → 답 전체 + 닫기.
 
 export const BBOOKS_URL = 'https://bbooks.co.kr/';
-export const MOIM_URL = 'https://bbooks.co.kr/moim/';
+export const MOIM_URL = 'https://moim.bbooks.co.kr/';
 export const INSTAGRAM_URL = 'https://www.instagram.com/b_books2026';
 export const MAP_URL =
   'https://map.naver.com/v5/search/%EA%B2%BD%EA%B8%B0%EB%8F%84%20%EB%B6%80%EC%B2%9C%EC%8B%9C%20%EC%9B%90%EB%AF%B8%EA%B5%AC%20%EB%B6%80%EC%B2%9C%EB%A1%9C136%EB%B2%88%EA%B8%B8%2024';
@@ -64,7 +64,7 @@ export const GUIDE_TOPICS: GuideTopic[] = [
     label: '11·12월 모임',
     question: '이번 달과 다음 달에는 어떤 모임이 있나요?',
     answer:
-      '2026년 11월\n· 글크크 — 금 15:30–17:30 · 파일럿 무료 · 노트북 필수\n· 그림책 읽어주는 이모 — 11/14(토) 10:30\n· 클래식 음악 감상 — 11/14·21(토) 12:00\n· 부천 AI 특공대 1기 — 토 14:00\n\n2026년 12월\n· 글크크 파일럿 이어짐\n· 그 외 일정은 확정되면 안내할게요\n\n시간은 KST예요. 자리·변경은 신청 전에 확인해 주세요.',
+      '11–12월 모임·행사예요. 신청·변경은 비모임에서 확인해 주세요.\n\n글크크 - 매주 금 15:30–17:30 (11–12월)\n그림책 읽어주는 이모 - 11/14(토) 10:30\n클래식 음악 감상 모임 - 11/14·21(토) 12:00\n크래프트모임 - 11/15(일) 14:30–16:00\n다온글방 - 11/19(목) 19:00\n서귤 작가 북토크 - 11/28(토) 16:00–18:00\n써든리 모임 - 11/30(월) 13:00–14:30\n부천 AI 특공대 1기 - 매주 토 14:00',
     actions: [{ label: '모임 자세히 보기', url: MOIM_URL, toast: '비모임 안내를 열어요' }],
   },
   {
@@ -175,25 +175,17 @@ export class KeeperGuide {
     }
     this.measure();
     const pad = 10;
-    const width = Math.min(this.boxW, viewW - pad * 2);
+    const width = Math.min(Math.max(this.boxW, 280), viewW - pad * 2);
     const half = width / 2;
     const left = Math.min(viewW - half - pad, Math.max(half + pad, x));
-    // 위쪽 여유 있으면 머리 위, 없으면 머리 아래(모바일 상단 잘림 방지)
-    const placeAbove = y - 12 - this.boxH >= pad;
-    let top: number;
-    let transform: string;
-    if (placeAbove) {
-      top = y - 12;
-      transform = `translate(${left}px, ${top}px) translate(-50%, -100%)`;
-    } else {
-      top = Math.min(viewH - pad - this.boxH, Math.max(pad, y + 28));
-      transform = `translate(${left}px, ${top}px) translate(-50%, 0)`;
-    }
+    // 머리 높이에서 시작해 아래로 늘어나 서점지기를 걸쳐 보이게 한다
+    const maxH = Math.min(this.boxH, viewH - pad * 2);
+    const top = Math.max(pad, Math.min(y - 36, viewH - pad - Math.min(maxH, viewH * 0.72)));
     this.anchor.style.opacity = '1';
     this.anchor.style.pointerEvents = 'auto';
     this.anchor.style.width = `${width}px`;
-    this.anchor.style.transform = transform;
-    this.anchor.dataset.side = placeAbove ? 'above' : 'below';
+    this.anchor.style.transform = `translate(${left}px, ${top}px) translate(-50%, 0)`;
+    this.anchor.dataset.side = 'over';
   }
 
   update(_dt: number): void {
