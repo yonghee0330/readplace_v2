@@ -6,7 +6,7 @@ import { Sfx } from './audio/sfx';
 import { Crowd, type Actor } from './avatar/crowd';
 import { OVERLAY_LAYER } from './avatar/nameplate';
 import { Cat } from './avatar/cat';
-import { placeAtSeat, spawnNpcs, syncNpcVisibility } from './avatar/npc';
+import { placeAtSeat, spawnNpcs, syncNpcVisibility, updateNpcGreets } from './avatar/npc';
 import { CAM_PRESETS, FollowCamera, applyPreset, createCamera } from './controls/camera';
 import { CanvasInput, isTyping } from './controls/input';
 import { Movement } from './controls/movement';
@@ -1097,6 +1097,7 @@ export async function startApp(
       follow.update(dt);
     }
     crowd.update(dt, t, camera);
+    updateNpcGreets(npcs, t);
     cat?.update(dt, t, camera);
     if (catCam && cat) {
       const p = cat.root.position;

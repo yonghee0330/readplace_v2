@@ -356,6 +356,45 @@ function apronGeometry(): THREE.BufferGeometry {
   return merge(parts);
 }
 
+/** 가슴 명찰(캔버스 텍스처). 앞치마 가슴판 왼쪽(+x)에 붙인다. */
+function nameBadgeMesh(label: string): THREE.Mesh {
+  const W = 160;
+  const H = 80;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#ece6da';
+  ctx.beginPath();
+  ctx.roundRect(4, 4, W - 8, H - 8, 10);
+  ctx.fill();
+  ctx.strokeStyle = '#8a7355';
+  ctx.lineWidth = 5;
+  ctx.stroke();
+  ctx.fillStyle = '#c4a46a';
+  ctx.beginPath();
+  ctx.arc(W / 2, 14, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#2c261f';
+  ctx.font = '700 40px "Pretendard Variable", Pretendard, system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, W / 2, H / 2 + 4);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.068, 0.034), mat);
+  mesh.name = 'name-badge';
+  const x = 0.038;
+  const y = 0.252;
+  const zOff = 0.011;
+  mesh.position.set(x, y, frontZ(y, x, zOff) + 0.001);
+  mesh.rotation.y = Math.asin(Math.min(1, x / Math.max(0.01, bodyR(y) + zOff)));
+  return mesh;
+}
+
 function eyesGeometry(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
   for (const sx of [-1, 1]) {
@@ -574,6 +613,10 @@ export interface AvatarLook {
   hair: HairStyle;
   /** 써든리 매니저 전용 외형(안경·수염·목수 앞치마 등) */
   manager?: boolean;
+  /** 작업용 앞치마(써든리와 동일). manager면 자동으로 입는다. */
+  apron?: boolean;
+  /** 가슴 명찰 글자(예: 안내) */
+  badge?: string;
 }
 
 export class Avatar {
@@ -634,13 +677,22 @@ export class Avatar {
     this.can.geometry = wateringCanGeometry(i);
   }
 
-  private build(): void {
-    for (const m of this.meshes) {
-      m.removeFromParent();
-      m.geometry.dispose();
+  private releaseMesh(m: THREE.Mesh): void {
+    m.removeFromParent();
+    m.geometry.dispose();
+    const mat = m.material;
+    if (mat !== SHARED && !Array.isArray(mat)) {
+      const map = (mat as THREE.MeshBasicMaterial).map;
+      map?.dispose();
+      mat.dispose();
     }
+  }
+
+  private build(): void {
+    for (const m of this.meshes) this.releaseMesh(m);
     this.meshes = [];
     const outfit = new THREE.Color(this.look.manager ? MANAGER_COLOR : this.look.color);
+    const wearApron = !!(this.look.manager || this.look.apron);
     const add = (parent: THREE.Object3D, g: THREE.BufferGeometry) => {
       const m = new THREE.Mesh(g, SHARED);
       m.castShadow = false;
@@ -651,8 +703,13 @@ export class Avatar {
     this.root.add(this.body);
     this.body.position.y = HIP_Y;
     add(this.body, bodyGeometry(outfit)).position.y = -0.01;
-    if (this.look.manager) {
+    if (wearApron) {
       add(this.body, apronGeometry()).position.y = -0.01;
+    }
+    if (this.look.badge) {
+      const badge = nameBadgeMesh(this.look.badge);
+      this.body.add(badge);
+      this.meshes.push(badge);
     }
     this.body.add(this.head);
     this.head.position.y = HEAD_Y - HIP_Y;
@@ -691,6 +748,8 @@ export class Avatar {
       look.color === this.look.color
       && look.hair === this.look.hair
       && !!look.manager === !!this.look.manager
+      && !!look.apron === !!this.look.apron
+      && (look.badge || '') === (this.look.badge || '')
     ) return;
     this.look = { ...look };
     this.build();
@@ -705,7 +764,8 @@ export class Avatar {
   }
 
   dispose(): void {
-    for (const m of this.meshes) m.geometry.dispose();
+    for (const m of this.meshes) this.releaseMesh(m);
+    this.meshes = [];
     this.root.removeFromParent();
   }
 }
