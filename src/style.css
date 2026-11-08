@@ -296,7 +296,7 @@ button { font: inherit; }
 .icon { width: 20px; height: 20px; flex: none; }
 #ui { position: fixed; inset: 0; z-index: 10; pointer-events: none; font-family: var(--sans); }
 #ui > * { pointer-events: none; }
-#ui button, #ui select, #ui label, #ui input, #ui textarea, #ui .pill, #ui .sheet-backdrop, #ui .toast, #ui .book-badge-hit, #ui .cinema-watch, #ui .postit-wall { pointer-events: auto; }
+#ui button, #ui select, #ui label, #ui input, #ui textarea, #ui .pill, #ui .sheet-backdrop, #ui .toast, #ui .book-badge-hit, #ui .cinema-watch, #ui .postit-wall, #ui .keeper-guide { pointer-events: auto; }
 
 /* 머리 위 책 배지 HTML 히트(투명 버튼, 3D 배지 위에 맞춤) */
 .book-badge-hits { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
@@ -376,6 +376,137 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
 .drink-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .drink-name { font: 600 16px/1.25 var(--sans); }
 .drink-hint { font-size: 13px; color: #7a6a55; }
+
+/* ---------- 서점지기 안내 말풍선 ---------- */
+.keeper-guide {
+  position: absolute;
+  z-index: 12;
+  left: max(14px, env(safe-area-inset-left));
+  bottom: max(92px, calc(env(safe-area-inset-bottom) + 78px));
+  width: min(332px, calc(100vw - 28px));
+  pointer-events: auto;
+}
+.keeper-bubble {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(52vh, 420px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 12px 12px;
+  border-radius: 18px 18px 18px 8px;
+  background: rgba(247, 241, 229, 0.97);
+  color: var(--green);
+  box-shadow: 0 12px 36px rgba(20, 18, 14, 0.22);
+  border: 1px solid rgba(36, 37, 31, 0.08);
+  font-family: var(--sans);
+}
+.keeper-bubble::after {
+  content: '';
+  position: absolute;
+  left: 22px;
+  bottom: -7px;
+  width: 14px;
+  height: 14px;
+  background: inherit;
+  border-right: 1px solid rgba(36, 37, 31, 0.08);
+  border-bottom: 1px solid rgba(36, 37, 31, 0.08);
+  transform: rotate(45deg);
+}
+.keeper-bubble-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+.keeper-bubble-who {
+  flex: 1;
+  font: 600 12px/1.2 var(--sans);
+  letter-spacing: 0.02em;
+  color: #8a7355;
+}
+.keeper-back, .keeper-x {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(36, 37, 31, 0.06);
+  color: inherit;
+  font: 600 16px/1 var(--sans);
+  cursor: pointer;
+}
+.keeper-back:hover, .keeper-x:hover { background: rgba(36, 37, 31, 0.12); }
+.keeper-greet {
+  margin: 0;
+  font: 500 13.5px/1.55 var(--sans);
+  color: #3d3830;
+}
+.keeper-prompt {
+  margin: 0;
+  font: 600 13px/1.45 var(--sans);
+  color: var(--green);
+}
+.keeper-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.keeper-topic {
+  margin: 0;
+  padding: 8px 11px;
+  border: 1px solid rgba(36, 37, 31, 0.14);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--green);
+  font: 600 12.5px/1.2 var(--sans);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.keeper-topic:hover {
+  background: #f1eadc;
+  border-color: rgba(36, 37, 31, 0.28);
+}
+.keeper-q {
+  margin: 0;
+  font: 700 14.5px/1.35 var(--sans);
+  color: var(--green);
+}
+.keeper-a {
+  margin: 0;
+  font: 500 13px/1.6 var(--sans);
+  color: #5b4f40;
+  white-space: normal;
+}
+.keeper-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+.keeper-action {
+  margin: 0;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--green);
+  color: var(--paper);
+  font: 600 12.5px/1.2 var(--sans);
+  cursor: pointer;
+}
+.keeper-action:hover { background: #33352c; }
+@media (max-width: 640px) {
+  .keeper-guide {
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(360px, calc(100vw - 20px));
+    bottom: max(86px, calc(env(safe-area-inset-bottom) + 72px));
+  }
+  .keeper-bubble { max-height: min(48vh, 380px); border-radius: 18px; }
+  .keeper-bubble::after { left: 50%; margin-left: -7px; }
+}
 
 /* ---------- 토스트 ---------- */
 .toasts {

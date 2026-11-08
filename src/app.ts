@@ -35,6 +35,7 @@ import { BookPeekSheet } from './ui/bookPeek';
 import { BookSheet } from './ui/bookSheet';
 import { CinemaWatch } from './ui/cinemaWatch';
 import { DrinkSheet } from './ui/drinkSheet';
+import { KeeperGuide } from './ui/keeperGuide';
 import { PostitWall } from './ui/postitWall';
 import { drinkCooldownMs, drinkToast, isDrinkKind, type DrinkKind } from './net/drink';
 import { PostitStore } from './net/postit';
@@ -143,32 +144,6 @@ export async function startApp(
     sfx.play('nod');
   }
 
-  /**
-   * 카운터 앞에 손님이 앉으면 책을 내려놓고 응대(눈인사·바라보기, 알림 없음).
-   * 손님이 일어나면 다시 책을 든다.
-   */
-  function maybeKeeperCounterAttend(dt: number): void {
-    if (currentSpaceId() !== 'hub' || !(params.npc && settings.npc)) {
-      updateKeeperAttend(npcs, null, dt);
-      return;
-    }
-
-    let guest: { x: number; z: number } | null = null;
-    if (movement.seatId === COUNTER_FRONT_SEAT) {
-      guest = { x: me.root.position.x, z: me.root.position.z };
-    } else {
-      for (const [id, s] of peers) {
-        if (s.seatId !== COUNTER_FRONT_SEAT) continue;
-        const a = crowd.get(id);
-        guest = a
-          ? { x: a.root.position.x, z: a.root.position.z }
-          : { x: s.position[0], z: s.position[2] };
-        break;
-      }
-    }
-    updateKeeperAttend(npcs, guest, dt);
-  }
-
   let lastSentAt = 0;
   // HUD·presence가 만들어지기 전에 이동 상태가 바뀌어도 보내지 않게 한다.
   let wired = false;
@@ -206,6 +181,55 @@ export async function startApp(
     syncBoard();
     postitStore.onChange(() => syncBoard());
   });
+  const keeperGuide = new KeeperGuide(ui);
+  keeperGuide.onOpenLink = (url, msg) => {
+    toasts.show(msg);
+    window.open(url, '_blank', 'noopener');
+  };
+  const GUIDE_NEAR = 2.15;
+
+  /** 카운터 근처·카운터 앞 좌석이면 안내 말풍선. */
+  function syncKeeperGuide(): void {
+    const blocked = focus.active || cinemaWatch.active || postitWall.active || anySheetOpen();
+    const on = params.npc && settings.npc && currentSpaceId() === 'hub' && !blocked && isPresent(COUNTER);
+    if (!on) {
+      keeperGuide.setNear(false);
+      return;
+    }
+    const p = me.root.position;
+    const near = Math.hypot(p.x - COUNTER.x, p.z - COUNTER.z) < GUIDE_NEAR
+      || movement.seatId === COUNTER_FRONT_SEAT;
+    keeperGuide.setNear(near);
+  }
+
+  /**
+   * 카운터 응대: 앞자리 손님 또는 안내 말풍선이 열린 나를 보고 책을 내려놓는다.
+   */
+  function maybeKeeperCounterAttend(dt: number): void {
+    if (currentSpaceId() !== 'hub' || !(params.npc && settings.npc)) {
+      updateKeeperAttend(npcs, null, dt);
+      return;
+    }
+
+    let guest: { x: number; z: number } | null = null;
+    if (movement.seatId === COUNTER_FRONT_SEAT) {
+      guest = { x: me.root.position.x, z: me.root.position.z };
+    } else {
+      for (const [id, s] of peers) {
+        if (s.seatId !== COUNTER_FRONT_SEAT) continue;
+        const a = crowd.get(id);
+        guest = a
+          ? { x: a.root.position.x, z: a.root.position.z }
+          : { x: s.position[0], z: s.position[2] };
+        break;
+      }
+    }
+    if (!guest && keeperGuide.active) {
+      guest = { x: me.root.position.x, z: me.root.position.z };
+    }
+    updateKeeperAttend(npcs, guest, dt);
+  }
+
   const bookCard = new BookCard(ui);
   const bookSheet = new BookSheet();
   const bookPeek = new BookPeekSheet();
@@ -1053,6 +1077,7 @@ export async function startApp(
     if (e.key === 'Escape') {
       // 시트가 열려 있으면 시트를 먼저 닫는다(포커스가 시트 밖에 있어도)
       if (anySheetOpen()) closeOpenSheet();
+      else if (keeperGuide.active) keeperGuide.close();
       else if (postitWall.active) setPostitWall(false);
       else if (cinemaWatch.active) setCinemaWatch(false);
       else if (focus.active) setFocus(false);
@@ -1151,6 +1176,7 @@ export async function startApp(
       params.debug ? 90 : undefined,
       params.debug ? 60 : undefined,
     );
+    syncKeeperGuide();
     maybeKeeperCounterAttend(dt);
     cat?.update(dt, t, camera);
     if (catCam && cat) {
