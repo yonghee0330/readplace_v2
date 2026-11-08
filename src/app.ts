@@ -186,20 +186,28 @@ export async function startApp(
     toasts.show(msg);
     window.open(url, '_blank', 'noopener');
   };
-  const GUIDE_NEAR = 2.15;
+  const _keeperHead = new THREE.Vector3();
 
-  /** 카운터 근처·카운터 앞 좌석이면 안내 말풍선. */
-  function syncKeeperGuide(): void {
-    const blocked = focus.active || cinemaWatch.active || postitWall.active || anySheetOpen();
-    const on = params.npc && settings.npc && currentSpaceId() === 'hub' && !blocked && isPresent(COUNTER);
-    if (!on) {
-      keeperGuide.setNear(false);
-      return;
+  /** 서점지기 머리(화면 좌표). 안 보이면 null. */
+  function keeperHeadScreen(clientX?: number, clientY?: number, rect?: DOMRectReadOnly): { x: number; y: number; hit: boolean } | null {
+    const k = findKeeper(npcs);
+    if (!k?.actor.root.visible || currentSpaceId() !== 'hub') return null;
+    if (!(params.npc && settings.npc)) return null;
+    const seated = k.actor.avatar.anim.seated;
+    const p = k.actor.root.position;
+    _keeperHead.set(p.x, p.y + (seated ? 0.92 : 1.05), p.z);
+    _keeperHead.project(camera);
+    if (_keeperHead.z > 1) return null;
+    const r = rect ?? canvas.getBoundingClientRect();
+    const x = (_keeperHead.x * 0.5 + 0.5) * r.width;
+    const y = (-_keeperHead.y * 0.5 + 0.5) * r.height;
+    let hit = false;
+    if (clientX !== undefined && clientY !== undefined) {
+      const lx = clientX - r.left;
+      const ly = clientY - r.top;
+      hit = Math.hypot(lx - x, ly - y) < 42;
     }
-    const p = me.root.position;
-    const near = Math.hypot(p.x - COUNTER.x, p.z - COUNTER.z) < GUIDE_NEAR
-      || movement.seatId === COUNTER_FRONT_SEAT;
-    keeperGuide.setNear(near);
+    return { x, y, hit };
   }
 
   /**
@@ -953,6 +961,11 @@ export async function startApp(
     // 머리 위 책 배지: 화면 좌표 히트(오버레이 레이어·빌보드 뒷면 문제 없음)
     const badgeActor = crowd.pickBookBadge(clientX, clientY, camera, rect);
     if (badgeActor && openBookPeek(badgeActor)) return;
+    const keeperHead = keeperHeadScreen(clientX, clientY, rect);
+    if (keeperHead?.hit) {
+      keeperGuide.toggle();
+      return;
+    }
     if (cat?.hit(clientX, clientY, camera, rect)) {
       cat.pet();
       return;
@@ -1029,6 +1042,10 @@ export async function startApp(
     }
     const rect = canvas.getBoundingClientRect();
     if (crowd.pickBookBadge(e.clientX, e.clientY, camera, rect)) {
+      canvas.style.cursor = 'pointer';
+      return;
+    }
+    if (keeperHeadScreen(e.clientX, e.clientY, rect)?.hit) {
       canvas.style.cursor = 'pointer';
       return;
     }
@@ -1176,7 +1193,23 @@ export async function startApp(
       params.debug ? 90 : undefined,
       params.debug ? 60 : undefined,
     );
-    syncKeeperGuide();
+    keeperGuide.update(dt);
+    {
+      const head = keeperHeadScreen();
+      const uiRect = ui.getBoundingClientRect();
+      const canvasRect = canvas.getBoundingClientRect();
+      if (head && keeperGuide.active) {
+        keeperGuide.setScreenPos(
+          head.x + (canvasRect.left - uiRect.left),
+          head.y + (canvasRect.top - uiRect.top),
+          true,
+        );
+      } else {
+        keeperGuide.setScreenPos(0, 0, false);
+      }
+      // 공간을 떠나면 안내 닫기
+      if (keeperGuide.active && currentSpaceId() !== 'hub') keeperGuide.close();
+    }
     maybeKeeperCounterAttend(dt);
     cat?.update(dt, t, camera);
     if (catCam && cat) {
