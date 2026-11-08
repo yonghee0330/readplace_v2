@@ -184,7 +184,15 @@ export async function startApp(
   const keeperGuide = new KeeperGuide(ui);
   keeperGuide.onOpenLink = (url, msg) => {
     toasts.show(msg);
-    window.open(url, '_blank', 'noopener');
+    // 모바일에서 같은 탭으로 넘어가지 않게 새 창/앱으로만 연다
+    if (url.startsWith('tel:')) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.rel = 'noopener';
+      a.click();
+      return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
   const _keeperHead = new THREE.Vector3();
 
@@ -205,7 +213,8 @@ export async function startApp(
     if (clientX !== undefined && clientY !== undefined) {
       const lx = clientX - r.left;
       const ly = clientY - r.top;
-      hit = Math.hypot(lx - x, ly - y) < 42;
+      const radius = r.width < 640 ? 56 : 44;
+      hit = Math.hypot(lx - x, ly - y) < radius;
     }
     return { x, y, hit };
   }
@@ -966,6 +975,8 @@ export async function startApp(
       keeperGuide.toggle();
       return;
     }
+    // 안내 말풍선이 열린 동안 바닥 클릭으로 걸어가지 않음(모바일 오탭 방지)
+    if (keeperGuide.active) return;
     if (cat?.hit(clientX, clientY, camera, rect)) {
       cat.pet();
       return;
@@ -1045,7 +1056,7 @@ export async function startApp(
       canvas.style.cursor = 'pointer';
       return;
     }
-    if (keeperHeadScreen(e.clientX, e.clientY, rect)?.hit) {
+    if (!keeperGuide.active && keeperHeadScreen(e.clientX, e.clientY, rect)?.hit) {
       canvas.style.cursor = 'pointer';
       return;
     }
@@ -1202,12 +1213,13 @@ export async function startApp(
         keeperGuide.setScreenPos(
           head.x + (canvasRect.left - uiRect.left),
           head.y + (canvasRect.top - uiRect.top),
+          uiRect.width,
+          uiRect.height,
           true,
         );
       } else {
-        keeperGuide.setScreenPos(0, 0, false);
+        keeperGuide.setScreenPos(0, 0, uiRect.width, uiRect.height, false);
       }
-      // 공간을 떠나면 안내 닫기
       if (keeperGuide.active && currentSpaceId() !== 'hub') keeperGuide.close();
     }
     maybeKeeperCounterAttend(dt);

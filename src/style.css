@@ -390,52 +390,52 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   position: absolute;
   left: 0;
   top: 0;
-  width: min(280px, calc(100vw - 24px));
+  width: min(300px, calc(100vw - 20px));
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
   opacity: 0;
   transition: opacity 0.15s ease;
   will-change: transform;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .keeper-cloud {
   position: relative;
   width: 100%;
-  padding: 12px 16px 14px;
-  border-radius: 28px;
-  background: rgba(255, 252, 246, 0.42);
-  -webkit-backdrop-filter: blur(5px);
-  backdrop-filter: blur(5px);
+  max-height: min(52vh, 420px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 14px 14px;
+  border-radius: 26px;
+  background: rgba(255, 252, 246, 0.48);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   color: var(--green);
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.35),
     0 8px 24px rgba(20, 18, 14, 0.12);
   pointer-events: auto;
   text-align: center;
+  touch-action: manipulation;
 }
-.keeper-cloud::before,
-.keeper-cloud::after {
+.keeper-anchor[data-side='above'] .keeper-cloud::before,
+.keeper-anchor[data-side='above'] .keeper-cloud::after {
   content: '';
   position: absolute;
-  background: rgba(255, 252, 246, 0.42);
-  -webkit-backdrop-filter: blur(5px);
-  backdrop-filter: blur(5px);
+  background: rgba(255, 252, 246, 0.48);
   border-radius: 50%;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28);
   pointer-events: none;
 }
-.keeper-cloud::before {
-  width: 22px;
-  height: 22px;
-  left: 28%;
-  bottom: -8px;
+.keeper-anchor[data-side='above'] .keeper-cloud::before {
+  width: 20px; height: 20px; left: 42%; bottom: -7px;
 }
-.keeper-cloud::after {
-  width: 12px;
-  height: 12px;
-  left: 38%;
-  bottom: -16px;
+.keeper-anchor[data-side='above'] .keeper-cloud::after {
+  width: 11px; height: 11px; left: 50%; bottom: -14px; margin-left: -4px;
 }
 .keeper-line {
   margin: 0;
@@ -443,51 +443,63 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   color: #2c281f;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
 }
+.keeper-greet { margin-bottom: 10px; }
+.keeper-answer {
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 1.55;
+  text-align: left;
+  white-space: normal;
+}
 .keeper-topics {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 5px;
+  gap: 6px;
   max-width: 100%;
-  pointer-events: auto;
+}
+.keeper-topic,
+.keeper-action {
+  margin: 0;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font: 600 12.5px/1.2 var(--sans);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 .keeper-topic {
-  margin: 0;
-  padding: 7px 10px;
   border: 1px solid rgba(36, 37, 31, 0.16);
-  border-radius: 999px;
-  background: rgba(255, 252, 246, 0.55);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
+  background: rgba(255, 252, 246, 0.62);
   color: var(--green);
-  font: 600 12px/1.2 var(--sans);
-  cursor: pointer;
 }
-.keeper-topic:hover { background: rgba(255, 252, 246, 0.82); }
+.keeper-topic:hover, .keeper-topic:active { background: rgba(255, 252, 246, 0.9); }
 .keeper-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 5px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 10px;
 }
 .keeper-action {
-  margin: 0;
-  padding: 7px 11px;
   border: 0;
-  border-radius: 999px;
   background: rgba(36, 37, 31, 0.82);
   color: var(--paper);
-  font: 600 12px/1.2 var(--sans);
-  cursor: pointer;
 }
-.keeper-action:hover { background: rgba(36, 37, 31, 0.92); }
+.keeper-action:hover, .keeper-action:active { background: rgba(36, 37, 31, 0.94); }
 .keeper-action-ghost {
-  background: rgba(255, 252, 246, 0.55);
+  background: rgba(255, 252, 246, 0.62);
   color: var(--green);
   border: 1px solid rgba(36, 37, 31, 0.16);
 }
-.keeper-action-ghost:hover { background: rgba(255, 252, 246, 0.85); }
+.keeper-action-ghost:hover, .keeper-action-ghost:active { background: rgba(255, 252, 246, 0.92); }
+@media (max-width: 640px) {
+  .keeper-anchor { width: min(340px, calc(100vw - 16px)); }
+  .keeper-cloud { max-height: min(58vh, 460px); padding: 12px 12px 14px; }
+  .keeper-topic, .keeper-action { min-height: 44px; font-size: 13px; padding: 10px 14px; }
+  .keeper-answer { font-size: 13.5px; }
+}
 
 /* ---------- 토스트 ---------- */
 .toasts {
