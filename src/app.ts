@@ -6,7 +6,10 @@ import { Sfx } from './audio/sfx';
 import { Crowd, type Actor } from './avatar/crowd';
 import { OVERLAY_LAYER } from './avatar/nameplate';
 import { Cat } from './avatar/cat';
-import { placeAtSeat, spawnNpcs, syncNpcVisibility, updateNpcGreets } from './avatar/npc';
+import {
+  COUNTER_FRONT_SEAT, keeperBowHome, keeperBowToward, placeAtSeat, spawnNpcs,
+  syncNpcVisibility, updateKeeperFacing,
+} from './avatar/npc';
 import { CAM_PRESETS, FollowCamera, applyPreset, createCamera } from './controls/camera';
 import { CanvasInput, isTyping } from './controls/input';
 import { Movement } from './controls/movement';
@@ -121,12 +124,66 @@ export async function startApp(
   let catCam: [number, number, number] | null = null;
   /** 디버그: 내 아바타를 가까이서 보는 카메라 오프셋 */
   let meCam: [number, number, number] | null = null;
+  /** 서점지기 첫 입장 눈인사(세션당 1회) */
+  let keeperEntryGreeted = false;
+  /** 카운터 앞 눈인사를 이미 한 손님 id(일어나면 초기화) */
+  let keeperCounterGuestId: string | null = null;
   const refreshNpcs = () => {
     const on = params.npc && settings.npc;
     syncNpcVisibility(npcs, currentSpaceId(), on);
     cat?.setVisible(on && currentSpaceId() === 'hub');
   };
   refreshNpcs();
+
+  function maybeKeeperEntryGreet(): void {
+    if (keeperEntryGreeted) return;
+    if (currentSpaceId() !== 'hub') return;
+    if (!(params.npc && settings.npc)) return;
+    if (!keeperBowHome(npcs)) return;
+    keeperEntryGreeted = true;
+    toasts.show('서점지기가 눈인사를 했습니다');
+    sfx.play('nod');
+  }
+
+  /** 카운터 앞 하이체어에 누가 앉으면 그 사람을 보고 조용히 눈인사(알림 없음). */
+  function maybeKeeperCounterGreet(t: number): void {
+    if (currentSpaceId() !== 'hub') {
+      keeperCounterGuestId = null;
+      return;
+    }
+    if (!(params.npc && settings.npc)) return;
+
+    let guestId: string | null = null;
+    let gx = 0;
+    let gz = 0;
+    if (movement.seatId === COUNTER_FRONT_SEAT) {
+      guestId = myId;
+      gx = me.root.position.x;
+      gz = me.root.position.z;
+    } else {
+      for (const [id, s] of peers) {
+        if (s.seatId !== COUNTER_FRONT_SEAT) continue;
+        guestId = id;
+        const a = crowd.get(id);
+        if (a) {
+          gx = a.root.position.x;
+          gz = a.root.position.z;
+        } else {
+          gx = s.position[0];
+          gz = s.position[2];
+        }
+        break;
+      }
+    }
+
+    if (!guestId) {
+      keeperCounterGuestId = null;
+      return;
+    }
+    if (guestId === keeperCounterGuestId) return;
+    if (!keeperBowToward(npcs, gx, gz, t)) return;
+    keeperCounterGuestId = guestId;
+  }
 
   let lastSentAt = 0;
   // HUD·presence가 만들어지기 전에 이동 상태가 바뀌어도 보내지 않게 한다.
@@ -1097,7 +1154,8 @@ export async function startApp(
       follow.update(dt);
     }
     crowd.update(dt, t, camera);
-    updateNpcGreets(npcs, t);
+    updateKeeperFacing(npcs, t, dt);
+    maybeKeeperCounterGreet(t);
     cat?.update(dt, t, camera);
     if (catCam && cat) {
       const p = cat.root.position;
@@ -1217,6 +1275,8 @@ export async function startApp(
   await loading.finish(reducedMotion());
   window.__BBOOKS_READY = true;
   console.info(`[bbooks] 품질 ${q.level}, 책 ${store.stats.books}권, NPC ${npcs.length}명, ${presenceMode} 모드`);
+  // 입장 직후 서점지기 눈인사(한 번)
+  window.setTimeout(() => maybeKeeperEntryGreet(), 900);
 }
 
 const round = (v: number) => Math.round(v * 1000) / 1000;

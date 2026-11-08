@@ -27,6 +27,9 @@ export interface NpcSpot {
   hair?: HairStyle;
 }
 
+/** 손님용 카운터 앞 하이체어 */
+export const COUNTER_FRONT_SEAT = 'counter-1';
+
 /** 중앙 홀 독자 2 · 서점지기 1 · 세미나 1 · 계단식 강연 1 */
 export const NPC_SPOTS: NpcSpot[] = [
   // 허브 왼쪽 서가 통로
@@ -57,10 +60,12 @@ export interface NpcReader {
   actor: Actor;
   space: SpaceId;
   spotId: string;
-  /** 눈인사로 손님 맞이(서점지기) */
-  greet?: boolean;
-  /** 다음 눈인사 시각(초) */
-  nextGreetAt?: number;
+  /** 서점지기 */
+  keeper?: boolean;
+  /** 기본 앉은 방향(좌석 ry) */
+  homeRy?: number;
+  /** 이 시각(초) 이후 기본 방향으로 되돌림 */
+  faceUntil?: number;
 }
 
 export function placeAtSeat(actor: Actor, seat: Seat): void {
@@ -71,6 +76,10 @@ export function placeAtSeat(actor: Actor, seat: Seat): void {
 function placeStanding(actor: Actor, spot: NpcSpot): void {
   actor.root.position.set(spot.x, 0, spot.z);
   actor.root.rotation.y = spot.ry;
+}
+
+export function findKeeper(npcs: NpcReader[]): NpcReader | undefined {
+  return npcs.find((n) => n.keeper);
 }
 
 /** 시드로 고정 NPC를 두고, 독자는 서로 다른 베스트셀러를 쥐게 한다. */
@@ -112,8 +121,8 @@ export function spawnNpcs(crowd: Crowd, rng: Rng): NpcReader[] {
         actor,
         space: spot.space,
         spotId: spot.id,
-        greet: true,
-        nextGreetAt: 4 + r.float() * 4,
+        keeper: true,
+        homeRy: spot.ry,
       };
     }
 
@@ -132,14 +141,42 @@ export function spawnNpcs(crowd: Crowd, rng: Rng): NpcReader[] {
   });
 }
 
-/** 서점지기가 가끔 눈인사로 손님을 맞이한다. t는 경과 초. */
-export function updateNpcGreets(npcs: NpcReader[], t: number): void {
+/** 서점지기가 기본 방향을 본 채 눈인사. 성공하면 true. */
+export function keeperBowHome(npcs: NpcReader[]): boolean {
+  const k = findKeeper(npcs);
+  if (!k?.actor.root.visible) return false;
+  if (k.homeRy !== undefined) k.actor.root.rotation.y = k.homeRy;
+  k.faceUntil = undefined;
+  k.actor.avatar.anim.bow();
+  return true;
+}
+
+/** 서점지기가 대상을 보고 눈인사(알림 없음). t는 경과 초. */
+export function keeperBowToward(npcs: NpcReader[], x: number, z: number, t: number): boolean {
+  const k = findKeeper(npcs);
+  if (!k?.actor.root.visible) return false;
+  const dx = x - k.actor.root.position.x;
+  const dz = z - k.actor.root.position.z;
+  if (Math.hypot(dx, dz) > 0.02) k.actor.root.rotation.y = Math.atan2(dx, dz);
+  k.actor.avatar.anim.bow();
+  k.faceUntil = t + 1.0;
+  return true;
+}
+
+/** 눈인사 후 기본 앉은 방향으로 되돌린다. */
+export function updateKeeperFacing(npcs: NpcReader[], t: number, dt: number): void {
   for (const n of npcs) {
-    if (!n.greet || !n.actor.root.visible) continue;
-    const at = n.nextGreetAt ?? 0;
-    if (t < at) continue;
-    n.actor.avatar.anim.bow();
-    n.nextGreetAt = t + 7 + Math.random() * 8;
+    if (!n.keeper || n.homeRy === undefined || n.faceUntil === undefined) continue;
+    if (t < n.faceUntil) continue;
+    const cur = n.actor.root.rotation.y;
+    let d = n.homeRy - cur;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    if (Math.abs(d) < 0.02) {
+      n.actor.root.rotation.y = n.homeRy;
+      n.faceUntil = undefined;
+    } else {
+      n.actor.root.rotation.y = cur + d * Math.min(1, 5 * dt);
+    }
   }
 }
 
