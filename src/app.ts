@@ -7,8 +7,8 @@ import { Crowd, type Actor } from './avatar/crowd';
 import { OVERLAY_LAYER } from './avatar/nameplate';
 import { Cat } from './avatar/cat';
 import {
-  COUNTER_FRONT_SEAT, findKeeper, keeperBowHome, keeperBowToward, placeAtSeat, spawnNpcs,
-  syncNpcVisibility, updateKeeperFacing, updateKeeperPatrol,
+  COUNTER_FRONT_SEAT, findKeeper, keeperBowHome, placeAtSeat, spawnNpcs,
+  syncNpcVisibility, updateKeeperAttend, updateKeeperFacing, updateKeeperPatrol,
 } from './avatar/npc';
 import { CAM_PRESETS, FollowCamera, applyPreset, createCamera } from './controls/camera';
 import { CanvasInput, isTyping } from './controls/input';
@@ -126,8 +126,6 @@ export async function startApp(
   let meCam: [number, number, number] | null = null;
   /** 서점지기 첫 입장 눈인사(세션당 1회) */
   let keeperEntryGreeted = false;
-  /** 카운터 앞 눈인사를 이미 한 손님 id(일어나면 초기화) */
-  let keeperCounterGuestId: string | null = null;
   const refreshNpcs = () => {
     const on = params.npc && settings.npc;
     syncNpcVisibility(npcs, currentSpaceId(), on);
@@ -145,44 +143,30 @@ export async function startApp(
     sfx.play('nod');
   }
 
-  /** 카운터 앞 하이체어에 누가 앉으면 그 사람을 보고 조용히 눈인사(알림 없음). */
-  function maybeKeeperCounterGreet(t: number): void {
-    if (currentSpaceId() !== 'hub') {
-      keeperCounterGuestId = null;
+  /**
+   * 카운터 앞에 손님이 앉으면 책을 내려놓고 응대(눈인사·바라보기, 알림 없음).
+   * 손님이 일어나면 다시 책을 든다.
+   */
+  function maybeKeeperCounterAttend(dt: number): void {
+    if (currentSpaceId() !== 'hub' || !(params.npc && settings.npc)) {
+      updateKeeperAttend(npcs, null, dt);
       return;
     }
-    if (!(params.npc && settings.npc)) return;
 
-    let guestId: string | null = null;
-    let gx = 0;
-    let gz = 0;
+    let guest: { x: number; z: number } | null = null;
     if (movement.seatId === COUNTER_FRONT_SEAT) {
-      guestId = myId;
-      gx = me.root.position.x;
-      gz = me.root.position.z;
+      guest = { x: me.root.position.x, z: me.root.position.z };
     } else {
       for (const [id, s] of peers) {
         if (s.seatId !== COUNTER_FRONT_SEAT) continue;
-        guestId = id;
         const a = crowd.get(id);
-        if (a) {
-          gx = a.root.position.x;
-          gz = a.root.position.z;
-        } else {
-          gx = s.position[0];
-          gz = s.position[2];
-        }
+        guest = a
+          ? { x: a.root.position.x, z: a.root.position.z }
+          : { x: s.position[0], z: s.position[2] };
         break;
       }
     }
-
-    if (!guestId) {
-      keeperCounterGuestId = null;
-      return;
-    }
-    if (guestId === keeperCounterGuestId) return;
-    if (!keeperBowToward(npcs, gx, gz, t)) return;
-    keeperCounterGuestId = guestId;
+    updateKeeperAttend(npcs, guest, dt);
   }
 
   let lastSentAt = 0;
@@ -1167,7 +1151,7 @@ export async function startApp(
       params.debug ? 90 : undefined,
       params.debug ? 60 : undefined,
     );
-    maybeKeeperCounterGreet(t);
+    maybeKeeperCounterAttend(dt);
     cat?.update(dt, t, camera);
     if (catCam && cat) {
       const p = cat.root.position;

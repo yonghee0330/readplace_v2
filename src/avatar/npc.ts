@@ -1,6 +1,7 @@
 // NPC 독자: 로컬 연출. 서가 앞에 서서 최근 베스트셀러를 읽고, 가끔 페이지를 넘긴다.
 // 접속자 수·알림에서 빠진다. 머리 위 책 배지를 누르면 표지·소개를 볼 수 있다.
-// 서점지기는 카운터에서 책을 읽다, 한 시간에 한 번 1분간 서가를 돌며 챙긴 뒤 돌아온다.
+// 서점지기는 카운터에서 책을 읽다 손님이 앉으면 책을 내려놓고 응대한다.
+// 한 시간에 한 번 1분간 서가를 돌며 챙긴 뒤 돌아온다.
 import { Rng } from '../core/rng';
 import { HAIR_STYLES, OUTFIT_COLORS } from '../core/storage';
 import { randomNickname } from '../net/nickname';
@@ -95,6 +96,8 @@ export interface NpcReader {
   phaseFrom?: { x: number; y: number; z: number; ry: number };
   phaseTo?: { x: number; y: number; z: number; ry: number };
   keeperBook?: { title: string; author: string; publisher: string; blurb: string };
+  /** 카운터 앞 손님 응대 중(책 내려놓음) */
+  attending?: boolean;
 }
 
 export function placeAtSeat(actor: Actor, seat: Seat): void {
@@ -137,6 +140,7 @@ function resumeReading(k: NpcReader): void {
   k.patrolPhase = 'read';
   k.patrolPath = [];
   k.faceUntil = undefined;
+  k.attending = false;
   k.actor.setState('read', seat.id);
   const b = k.keeperBook;
   if (b) {
@@ -145,6 +149,14 @@ function resumeReading(k: NpcReader): void {
       b.blurb,
     );
   }
+}
+
+/** 책을 내려놓고 손님을 본다. */
+function putBookDown(k: NpcReader): void {
+  const seat = k.homeSeat!;
+  k.attending = true;
+  k.faceUntil = undefined;
+  k.actor.setState('sit', seat.id);
 }
 
 function buildPath(grid: NavGrid, from: Pt, to: Pt): Pt[] {
@@ -309,22 +321,45 @@ export function keeperBowHome(npcs: NpcReader[]): boolean {
   return true;
 }
 
-/** 서점지기가 대상을 보고 눈인사(알림 없음). */
-export function keeperBowToward(npcs: NpcReader[], x: number, z: number, t: number): boolean {
+/**
+ * 카운터 앞 손님 응대: 책을 내려놓고 바라보며 답한다.
+ * guest가 있으면 응대 유지, 없으면 다시 책을 든다.
+ * 처음 말을 걸면 true(눈인사 1회).
+ */
+export function updateKeeperAttend(
+  npcs: NpcReader[],
+  guest: { x: number; z: number } | null,
+  dt: number,
+): boolean {
   const k = findKeeper(npcs);
-  if (!k?.actor.root.visible || !keeperAtDesk(npcs)) return false;
-  const dx = x - k.actor.root.position.x;
-  const dz = z - k.actor.root.position.z;
-  if (Math.hypot(dx, dz) > 0.02) k.actor.root.rotation.y = Math.atan2(dx, dz);
-  k.actor.avatar.anim.bow();
-  k.faceUntil = t + 1.0;
-  return true;
+  if (!k?.actor.root.visible || !k.homeSeat || !keeperAtDesk(npcs)) return false;
+
+  if (guest) {
+    const dx = guest.x - k.actor.root.position.x;
+    const dz = guest.z - k.actor.root.position.z;
+    const want = Math.hypot(dx, dz) > 0.02 ? Math.atan2(dx, dz) : k.actor.root.rotation.y;
+    const first = !k.attending;
+    if (first) {
+      putBookDown(k);
+      k.actor.root.rotation.y = want;
+      k.actor.avatar.anim.bow();
+      return true;
+    }
+    // 응대 중에는 손님을 계속 보고, 책은 내려둔 채
+    if (k.actor.avatar.state === 'read') putBookDown(k);
+    k.actor.root.rotation.y = angleLerp(k.actor.root.rotation.y, want, Math.min(1, 4 * dt));
+    return false;
+  }
+
+  if (k.attending) resumeReading(k);
+  return false;
 }
 
-/** 눈인사 후 기본 앉은 방향으로 되돌린다. */
+/** 눈인사 후 기본 앉은 방향으로 되돌린다(응대 중이 아닐 때만). */
 export function updateKeeperFacing(npcs: NpcReader[], t: number, dt: number): void {
   for (const n of npcs) {
     if (!n.keeper || n.homeRy === undefined || n.faceUntil === undefined) continue;
+    if (n.attending) continue;
     if (n.patrolPhase && n.patrolPhase !== 'read') continue;
     if (t < n.faceUntil) continue;
     const cur = n.actor.root.rotation.y;
@@ -363,6 +398,11 @@ export function updateKeeperPatrol(
   const phase = k.patrolPhase ?? 'read';
 
   if (phase === 'read') {
+    // 손님 응대 중에는 순회를 미룬다
+    if (k.attending) {
+      if (t >= k.nextPatrolAt) k.nextPatrolAt = t + 8;
+      return;
+    }
     if (t >= k.nextPatrolAt) {
       k.patrolUntil = t + durationSec;
       k.patrolLoopI = 0;
