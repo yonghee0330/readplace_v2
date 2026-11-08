@@ -7,8 +7,8 @@ import { Crowd, type Actor } from './avatar/crowd';
 import { OVERLAY_LAYER } from './avatar/nameplate';
 import { Cat } from './avatar/cat';
 import {
-  COUNTER_FRONT_SEAT, keeperBowHome, keeperBowToward, placeAtSeat, spawnNpcs,
-  syncNpcVisibility, updateKeeperFacing,
+  COUNTER_FRONT_SEAT, findKeeper, keeperBowHome, keeperBowToward, placeAtSeat, spawnNpcs,
+  syncNpcVisibility, updateKeeperFacing, updateKeeperPatrol,
 } from './avatar/npc';
 import { CAM_PRESETS, FollowCamera, applyPreset, createCamera } from './controls/camera';
 import { CanvasInput, isTyping } from './controls/input';
@@ -188,7 +188,14 @@ export async function startApp(
   let lastSentAt = 0;
   // HUD·presence가 만들어지기 전에 이동 상태가 바뀌어도 보내지 않게 한다.
   let wired = false;
-  const movement = new Movement(me, () => crowd.takenSeats(myId), () => wired && pushState(true));
+  /** 서점지기 카운터 자리는 순회 중에도 예약으로 둔다 */
+  const seatsTaken = (exceptId?: string) => {
+    const s = crowd.takenSeats(exceptId);
+    const k = findKeeper(npcs);
+    if (k?.reserveSeatId && k.actor.root.visible) s.add(k.reserveSeatId);
+    return s;
+  };
+  const movement = new Movement(me, () => seatsTaken(myId), () => wired && pushState(true));
   // 첫 번째 사람은 기본 자리, 그 뒤는 id에 따라 다른 자리(연결 후 피어가 있으면 다시 고른다)
   movement.place(SPAWN.x, SPAWN.z, SPAWN.ry);
   const startSeat = params.seat ? SEATS.find((s) => s.id === params.seat) : undefined;
@@ -248,7 +255,7 @@ export async function startApp(
   // 서점 고양이 치즈(허브 전용 NPC)
   cat = new Cat(rng.fork('cat'), {
     player: () => ({ x: me.root.position.x, z: me.root.position.z }),
-    seatTaken: (id) => crowd.takenSeats().has(id),
+    seatTaken: (id) => seatsTaken().has(id),
     grid: () => movement.grid,
     labelsHidden: () => me.hideLabel,
     onMeow: () => sfx.play('meow'),
@@ -1155,6 +1162,11 @@ export async function startApp(
     }
     crowd.update(dt, t, camera);
     updateKeeperFacing(npcs, t, dt);
+    updateKeeperPatrol(
+      npcs, t, dt, movement.grid, currentSpaceId(),
+      params.debug ? 90 : undefined,
+      params.debug ? 60 : undefined,
+    );
     maybeKeeperCounterGreet(t);
     cat?.update(dt, t, camera);
     if (catCam && cat) {
