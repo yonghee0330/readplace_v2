@@ -1206,21 +1206,23 @@ export async function startApp(
     );
     keeperGuide.update(dt);
     {
-      const head = keeperHeadScreen();
       const uiRect = ui.getBoundingClientRect();
       const canvasRect = canvas.getBoundingClientRect();
-      if (head && keeperGuide.active) {
-        keeperGuide.setScreenPos(
-          head.x + (canvasRect.left - uiRect.left),
-          head.y + (canvasRect.top - uiRect.top),
-          uiRect.width,
-          uiRect.height,
-          true,
-        );
-      } else {
-        keeperGuide.setScreenPos(0, 0, uiRect.width, uiRect.height, false);
+      if (keeperGuide.active) {
+        const head = keeperHeadScreen();
+        if (head) {
+          keeperGuide.setScreenPos(
+            head.x + (canvasRect.left - uiRect.left),
+            head.y + (canvasRect.top - uiRect.top),
+            uiRect.width,
+            uiRect.height,
+            true,
+          );
+        } else {
+          keeperGuide.setScreenPos(0, 0, uiRect.width, uiRect.height, false);
+        }
+        if (currentSpaceId() !== 'hub') keeperGuide.close();
       }
-      if (keeperGuide.active && currentSpaceId() !== 'hub') keeperGuide.close();
     }
     maybeKeeperCounterAttend(dt);
     cat?.update(dt, t, camera);

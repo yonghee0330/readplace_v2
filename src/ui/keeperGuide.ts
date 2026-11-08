@@ -97,6 +97,7 @@ export class KeeperGuide {
   private greeted = false;
   private boxW = 300;
   private boxH = 160;
+  private lastActAt = 0;
   onOpenLink: ((url: string, toast: string) => void) | null = null;
   onActiveChange: ((active: boolean) => void) | null = null;
 
@@ -115,12 +116,20 @@ export class KeeperGuide {
     this.el.appendChild(this.anchor);
     root.appendChild(this.el);
 
-    // 캔버스 카메라·이동으로 터치가 새지 않게
-    const stop = (e: Event) => e.stopPropagation();
-    for (const type of ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'click'] as const) {
-      this.anchor.addEventListener(type, stop, { capture: true });
-    }
-    this.cloud.addEventListener('click', (e) => this.onClick(e));
+    // 버블 단계에서만 막고, 버튼 클릭은 받도록 한다(capture stop은 클릭을 삼킴).
+    const stopBubble = (e: Event) => e.stopPropagation();
+    this.anchor.addEventListener('pointerdown', stopBubble);
+    this.anchor.addEventListener('touchstart', stopBubble, { passive: true });
+    // pointerup으로 동작(모바일 클릭 지연·누락 대비). 이어지는 click은 무시.
+    this.cloud.addEventListener('pointerup', (e) => this.onAct(e));
+    this.cloud.addEventListener('click', (e) => {
+      if (performance.now() - this.lastActAt < 450) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      this.onAct(e);
+    });
   }
 
   get active(): boolean {
@@ -148,11 +157,20 @@ export class KeeperGuide {
     this.onActiveChange?.(false);
   }
 
-  /** 머리 위 화면 좌표. 화면 밖으로 안 나가게 붙잡는다. */
+  /**
+   * 머리 위 화면 좌표. visible=false여도 안내가 열려 있으면 위치만 유지하고
+   * 클릭은 계속 받게 한다(머리가 잠깐 가려져도 버튼이 죽지 않게).
+   */
   setScreenPos(x: number, y: number, viewW: number, viewH: number, visible: boolean): void {
-    if (!visible || this.el.hidden) {
+    if (this.el.hidden) {
       this.anchor.style.opacity = '0';
       this.anchor.style.pointerEvents = 'none';
+      return;
+    }
+    if (!visible) {
+      // 마지막 자리 유지, 입력은 살림
+      this.anchor.style.opacity = '1';
+      this.anchor.style.pointerEvents = 'auto';
       return;
     }
     this.measure();
@@ -224,11 +242,12 @@ export class KeeperGuide {
     requestAnimationFrame(() => this.measure());
   }
 
-  private onClick(e: Event): void {
+  private onAct(e: Event): void {
     const t = (e.target as HTMLElement | null)?.closest('[data-kg]') as HTMLElement | null;
-    if (!t) return;
+    if (!t || !this.cloud.contains(t)) return;
     e.preventDefault();
     e.stopPropagation();
+    this.lastActAt = performance.now();
     const act = t.dataset.kg;
     if (act === 'topic') {
       const topic = GUIDE_TOPICS.find((x) => x.id === t.dataset.id);
