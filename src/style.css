@@ -441,7 +441,7 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
 .keeper-line {
   margin: 0;
   font: 600 13.5px/1.45 var(--sans);
-  color: #2c281f;
+  color: #000;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 .keeper-greet { margin-bottom: 10px; }
@@ -451,6 +451,7 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   line-height: 1.6;
   text-align: left;
   white-space: normal;
+  color: #000;
 }
 .keeper-topics {
   display: flex;
