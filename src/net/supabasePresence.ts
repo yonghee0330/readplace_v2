@@ -2,12 +2,13 @@
 // 위치는 초당 여러 번이라 Presence track 대신 Broadcast를 쓴다(공식 권장).
 // track은 입장할 때와 닉네임·색·머리·책이 바뀔 때만, 5초에 한 번 이하로 보낸다.
 // (track을 자주 보내면 서버가 "Client presence rate limit exceeded"로 채널을 닫는다.)
-// 채널이 닫히거나 끊기면 1·2·4·8·15초 간격으로 다시 붙는다.
+// 채널이 닫히거나 끊기면 1·2·4·8·15초 간격으로 다시 붙는다(온라인 복귀·화면 복귀 때는 바로).
+// 무료 플랜 예산: 혼자면 위치를 보내지 않고, 사람이 늘면 전송 간격을 늘리고, 하트비트는 15초.
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { MAX_SPACE_CAPACITY, ROOM_CAPACITY } from '../core/params';
 import { getSupabase } from './supabaseClient';
 import {
-  HEARTBEAT_MS, PeerTracker, STATE_INTERVAL_MS, channelName, fitsCapacity, isPlayerState,
+  FULL_RETRY_MS, PeerTracker, REALTIME_HEARTBEAT_MS, channelName, fitsCapacity, isPlayerState, stateIntervalFor,
   type ActionEvent, type Presence, type PlayerState,
 } from './presence';
 
@@ -15,6 +16,9 @@ type PresenceMeta = PlayerState & { joinedAt: number };
 
 const TRACK_MIN_MS = 5000;
 const BACKOFF = [1000, 2000, 4000, 8000, 15000];
+
+/** 위치·자세·자리·책이 같으면 같은 상태로 본다(보낸 시각 t는 뺀다) */
+const motionKey = (s: PlayerState) => JSON.stringify([s.position, s.rotationY, s.state, s.seatId, s.book?.title ?? null, s.nickname, s.color, s.hair]);
 
 /** presence에 실어 둘 만큼 자주 안 바뀌는 값들(위치 제외) */
 const identity = (s: PlayerState) => JSON.stringify([s.nickname, s.color, s.hair, s.book ?? null]);
@@ -36,10 +40,22 @@ export class SupabasePresence extends PeerTracker implements Presence {
   private trackTimer = 0;
   private retry = 0;
   private attempt = 0;
+  /** 다시 붙기 예약을 구분하는 번호. 밖에서 disconnect하면 올라가 옛 예약을 무효로 만든다. */
+  private retryToken = 0;
+  private retryFn: (() => void) | null = null;
+  /** 같은 채널의 다른 사람 수(presence 명단 기준) */
+  private others = 0;
+  /** 마지막으로 보낸 위치·상태(같은 상태를 다시 보내지 않도록) */
+  private lastSentKey = '';
 
   constructor(capacity = ROOM_CAPACITY) {
     super();
     this.capacity = capacity;
+    // 기다리는 동안 네트워크가 돌아오거나 화면으로 돌아오면 바로 다시 붙는다
+    addEventListener('online', this.retryNow);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') this.retryNow();
+    });
   }
 
   setCapacity(n: number): void {
@@ -47,7 +63,7 @@ export class SupabasePresence extends PeerTracker implements Presence {
   }
 
   async connect(room: string, instance: number, me: PlayerState): Promise<'ok' | 'full'> {
-    this.disconnect();
+    this.teardown();
     const supabase = getSupabase();
     if (!supabase) {
       this.setStatus('connected');
@@ -119,7 +135,7 @@ export class SupabasePresence extends PeerTracker implements Presence {
     await new Promise((r) => setTimeout(r, 400));
     if (gen !== this.generation) return 'full';
     if (!this.fitsFromPresence(me.id, this.joinedAt)) {
-      this.disconnect();
+      this.teardown();
       return 'full';
     }
 
@@ -129,23 +145,31 @@ export class SupabasePresence extends PeerTracker implements Presence {
     if (gen !== this.generation) return 'full';
     if (!this.fitsFromPresence(me.id, this.joinedAt)) {
       await ch.untrack().catch(() => {});
-      this.disconnect();
+      this.teardown();
       return 'full';
     }
 
     this.admitted = true;
     this.attempt = 0;
     this.setStatus('connected');
-    this.broadcastState(me);
-    // 하트비트는 broadcast로(멈춰 있는 사람의 위치도 늦게 온 사람에게 전해지게)
+    if (this.others > 0) this.broadcastState(me);
+    // 하트비트는 broadcast로, 같이 있는 사람이 있을 때만(혼자면 받는 사람이 없어 메시지만 쓴다)
     this.heartbeat = window.setInterval(() => {
-      if (this.me && this.ch) this.broadcastState({ ...this.me, t: Date.now() });
-    }, HEARTBEAT_MS);
+      if (this.me && this.ch && this.others > 0) this.broadcastState({ ...this.me, t: Date.now() });
+    }, REALTIME_HEARTBEAT_MS);
     addEventListener('pagehide', this.onHide);
     return 'ok';
   }
 
+  /** 밖에서 부르는 연결 끊기(공간 이동·페이지 숨김). 예약된 다시 붙기도 취소한다. */
   disconnect(): void {
+    this.retryToken++;
+    this.retryFn = null;
+    this.teardown();
+  }
+
+  /** 채널과 타이머만 정리한다(다시 붙기 예약은 건드리지 않는다). */
+  private teardown(): void {
     clearTimeout(this.retry);
     clearTimeout(this.trackTimer);
     this.trackTimer = 0;
@@ -163,6 +187,8 @@ export class SupabasePresence extends PeerTracker implements Presence {
       const sb = getSupabase();
       if (sb) void sb.removeChannel(ch);
     }
+    this.others = 0;
+    this.lastSentKey = '';
     this.clear();
     this.setStatus('connecting');
   }
@@ -171,8 +197,13 @@ export class SupabasePresence extends PeerTracker implements Presence {
     this.me = s;
     if (!this.admitted || !this.ch) return;
     if (identity(s) !== this.trackedIdentity) this.scheduleTrack();
+    // 혼자면 보내지 않는다. 누가 들어오면 join 때 지금 상태를 바로 보낸다.
+    if (this.others === 0) return;
+    if (motionKey(s) === this.lastSentKey && !this.pending) return;
     const now = performance.now();
-    const wait = STATE_INTERVAL_MS - (now - this.lastSent);
+    let walking = 1;
+    for (const p of this.peers.values()) if (p.state === 'walk') walking++;
+    const wait = stateIntervalFor(this.others + 1, walking) - (now - this.lastSent);
     if (wait <= 0) {
       this.lastSent = now;
       this.broadcastState(s);
@@ -196,15 +227,45 @@ export class SupabasePresence extends PeerTracker implements Presence {
   private scheduleRetry(): void {
     const { room, instance, me } = this;
     if (!me) return;
-    this.disconnect();
+    this.teardown();
     this.me = me;
     this.admitted = true;
     this.setStatus('reconnecting');
     const wait = BACKOFF[Math.min(this.attempt, BACKOFF.length - 1)];
     this.attempt++;
     // 성공하면 connect가 attempt를 0으로 되돌리고, 또 실패하면 connect가 다시 여기로 온다
-    this.retry = window.setTimeout(() => void this.connect(room, instance, this.me ?? me), wait);
+    const token = ++this.retryToken;
+    this.armRetry(() => void this.runRetry(token, room, instance, me), wait);
   }
+
+  private armRetry(fn: () => void, wait: number): void {
+    this.retryFn = fn;
+    this.retry = window.setTimeout(() => {
+      this.retryFn = null;
+      fn();
+    }, wait);
+  }
+
+  private async runRetry(token: number, room: string, instance: number, me: PlayerState): Promise<void> {
+    if (token !== this.retryToken) return;
+    const result = await this.connect(room, instance, this.me ?? me);
+    // 그사이 정원이 찼으면 혼자 둘러보며 30초마다 다시 본다(공간 이동 등으로 취소됐으면 그만둔다)
+    if (result === 'full' && token === this.retryToken) {
+      this.me = this.me ?? me;
+      this.admitted = true;
+      this.setStatus('reconnecting');
+      this.armRetry(() => void this.runRetry(token, room, instance, me), FULL_RETRY_MS);
+    }
+  }
+
+  /** 기다리는 중이면 지금 바로 다시 붙어 본다 */
+  private retryNow = (): void => {
+    if (this.status !== 'reconnecting' || !this.retryFn) return;
+    clearTimeout(this.retry);
+    const fn = this.retryFn;
+    this.retryFn = null;
+    fn();
+  };
 
   private async trackNow(s: PlayerState): Promise<void> {
     if (!this.ch) return;
@@ -228,7 +289,9 @@ export class SupabasePresence extends PeerTracker implements Presence {
   }
 
   private broadcastState(s: PlayerState): void {
-    void this.ch?.send({ type: 'broadcast', event: 'state', payload: s });
+    if (!this.ch) return;
+    this.lastSentKey = motionKey(s);
+    void this.ch.send({ type: 'broadcast', event: 'state', payload: s });
   }
 
   private presenceRoster(): { id: string; joinedAt: number; state: PlayerState | null }[] {
@@ -256,6 +319,7 @@ export class SupabasePresence extends PeerTracker implements Presence {
 
   private onPresenceSync(): void {
     const roster = this.presenceRoster();
+    this.others = roster.filter((r) => r.id !== this.selfId).length;
     const ids = new Set(roster.map((r) => r.id));
     for (const id of [...this.peers.keys()]) if (!ids.has(id)) this.remove(id);
     for (const r of roster) {

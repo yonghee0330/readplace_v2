@@ -12,6 +12,7 @@
     "server": "tsx server/index.ts",
     "test:e2e": "playwright test",
     "perf": "vite build && tsx scripts/perf.ts",
+    "loadtest": "vite build && tsx scripts/loadtest.ts",
     "icons": "tsx scripts/icons.ts"
   },
   "dependencies": {

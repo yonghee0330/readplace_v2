@@ -61,6 +61,27 @@ export const STATE_INTERVAL_MS = 100; // 10Hz
 export const HEARTBEAT_MS = 2000;
 export const PEER_TIMEOUT_MS = 6000;
 
+// ---- Supabase 무료 플랜 예산 ----
+// 무료 플랜은 프로젝트 전체 초당 100메시지, 월 200만 메시지다(2026-11 공식 문서 확인).
+// broadcast 한 번은 "보낸 1건 + 받는 사람 수"로 센다. 그래서 사람이 늘수록 위치를 덜 자주 보낸다.
+/** 한 방이 쓸 초당 메시지 목표(다른 공간·여유분을 남긴다) */
+export const REALTIME_BUDGET_PER_SEC = 60;
+/** 멈춰 있는 사람의 하트비트. 새로 온 사람에게는 join 때 바로 알려 주므로 길게 둔다. */
+export const REALTIME_HEARTBEAT_MS = 15000;
+/** 정원이 차서 다시 붙지 못할 때 다시 시도하는 간격 */
+export const FULL_RETRY_MS = 30000;
+
+/**
+ * 방 인원(나 포함)과 지금 걷는 사람 수(나 포함)에 맞춘 위치 전송 간격(ms). 2~10Hz.
+ * 걷는 사람 × 전송률 × 인원 ≤ 예산이 되게 한다. 걷는 사람을 모르면 인원의 1/3로 잡는다.
+ */
+export function stateIntervalFor(roomSize: number, walking = roomSize / 3): number {
+  const n = Math.max(1, Math.round(roomSize));
+  const walkers = Math.max(1, walking);
+  const hz = REALTIME_BUDGET_PER_SEC / (n * walkers);
+  return Math.round(1000 / Math.min(10, Math.max(2, hz)));
+}
+
 export function channelName(room: string, instance: number): string {
   return `bbooks:${room}:${instance}`;
 }

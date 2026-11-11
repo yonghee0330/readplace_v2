@@ -33,6 +33,10 @@ export class Actor {
   hideLabel = false;
   /** 다른 방문객의 위치 기록(받은 시각 기준) */
   snapshots: Snapshot[] = [];
+  /** 마지막으로 기록한 상태의 보낸 시각(같은 상태를 두 번 기록하지 않도록) */
+  private lastRemoteT = -1;
+  /** 위치 기록이 도착하는 평균 간격(ms). 보내는 쪽이 사람 수에 따라 간격을 늘리므로 따라 맞춘다. */
+  private remoteGap = 100;
   private lastPos = new THREE.Vector3();
 
   constructor(readonly id: string, readonly kind: ActorKind, nickname: string, look: AvatarLook) {
@@ -86,8 +90,16 @@ export class Actor {
 
   /** 다른 방문객: 받은 상태를 기록해 둔다. */
   pushRemote(s: PlayerState, now: number): void {
-    this.snapshots.push({ at: now, x: s.position[0], y: s.position[1], z: s.position[2], ry: s.rotationY });
-    if (this.snapshots.length > 30) this.snapshots.shift();
+    // 피어 목록은 누가 움직여도 통째로 다시 오므로, 이 사람의 새 상태일 때만 위치를 기록한다
+    if (s.t !== this.lastRemoteT) {
+      const last = this.snapshots[this.snapshots.length - 1];
+      const gap = last ? now - last.at : 0;
+      // 멈춰 있다가 다시 걷는 긴 공백은 평균에 넣지 않는다
+      if (gap > 0 && gap < 1500) this.remoteGap = this.remoteGap * 0.7 + gap * 0.3;
+      this.lastRemoteT = s.t;
+      this.snapshots.push({ at: now, x: s.position[0], y: s.position[1], z: s.position[2], ry: s.rotationY });
+      if (this.snapshots.length > 30) this.snapshots.shift();
+    }
     this.nickname = s.nickname;
     this.accent = s.color;
     this.isManager = s.role === 'manager';
@@ -104,9 +116,9 @@ export class Actor {
     }
   }
 
-  /** 100ms 늦게 재생해 두 기록 사이를 보간한다. */
+  /** 도착 간격보다 조금 늦게(100~700ms) 재생해 두 기록 사이를 보간한다. */
   interpolate(now: number, dt: number): void {
-    const renderAt = now - 100;
+    const renderAt = now - THREE.MathUtils.clamp(this.remoteGap * 1.3, 100, 700);
     const s = this.snapshots;
     if (!s.length) return;
     let a = s[0], b = s[s.length - 1];

@@ -1189,6 +1189,19 @@ export async function startApp(
     pushState(true);
   }
 
+  // 뒤로가기 캐시(bfcache)로 돌아오면 pagehide 때 끊은 연결을 다시 붙인다
+  addEventListener('pageshow', (e) => {
+    if (!e.persisted || switchingSpace) return;
+    presence.disconnect();
+    for (const a of crowd.list('peer')) crowd.remove(a.id);
+    peers = new Map();
+    hud.setCount(1);
+    void connect().then((r) => {
+      if (r === 'full') toasts.show('자리가 다 차서 지금은 혼자 둘러보는 중이에요');
+      else pushState(true);
+    });
+  });
+
   // ---------- 루프 ----------
   const loop = new Loop(() => fx.render(), renderer, params.debug);
   loop.add((dt, t) => {
