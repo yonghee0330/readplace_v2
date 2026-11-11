@@ -33,6 +33,7 @@ import { BookCard } from './ui/bookCard';
 import { BookBadgeHits } from './ui/bookBadgeHits';
 import { BookPeekSheet } from './ui/bookPeek';
 import { BookSheet } from './ui/bookSheet';
+import { CurationSheet } from './ui/curationSheet';
 import { CinemaWatch } from './ui/cinemaWatch';
 import { DrinkSheet } from './ui/drinkSheet';
 import { KeeperGuide } from './ui/keeperGuide';
@@ -250,6 +251,7 @@ export async function startApp(
   const bookCard = new BookCard(ui);
   const bookSheet = new BookSheet();
   const bookPeek = new BookPeekSheet();
+  const curationSheet = new CurationSheet();
   let currentBook: ReadingBook | null = loadBook();
   // 카카오 표지: 명시 api → Supabase Edge → 로컬 ws 서버 → Vite 프록시
   const presenceMode = resolvePresence(params.presence, location.search, hasSupabaseConfig());
@@ -987,6 +989,20 @@ export async function startApp(
       -((clientY - rect.top) / rect.height) * 2 + 1,
     );
     ray.setFromCamera(ndc, camera);
+    const curationHits = currentSpaceId() === 'hub' ? store.spaces.hub.curation?.hits : undefined;
+    if (curationHits) {
+      // 매대의 책·안내판이 직접 보이면 가장 가까운 것을 연다(매대 자체 충돌 상자는 무시)
+      let best: { index: number; d: number } | null = null;
+      for (const h of curationHits) {
+        const ih = ray.intersectObject(h.mesh, false)[0];
+        if (ih && (!best || ih.distance < best.d)) best = { index: h.index, d: ih.distance };
+      }
+      if (best) {
+        sfx.play('page');
+        curationSheet.open(best.index);
+        return;
+      }
+    }
     const posterHits = currentSpaceId() === 'hub' ? store.spaces.hub.poster?.hits : undefined;
     const posterPick = posterHits?.find((h) => ray.intersectObject(h.mesh, false).length);
     if (posterPick) {
@@ -1065,6 +1081,11 @@ export async function startApp(
       -((e.clientY - rect.top) / rect.height) * 2 + 1,
     );
     ray.setFromCamera(ndc, camera);
+    const curMeshes = currentSpaceId() === 'hub' ? store.spaces.hub.curation?.hits.map((h) => h.mesh) : undefined;
+    if (curMeshes?.some((m) => ray.intersectObject(m, false).length)) {
+      canvas.style.cursor = 'pointer';
+      return;
+    }
     const posterMeshes = currentSpaceId() === 'hub' ? store.spaces.hub.poster?.hits.map((h) => h.mesh) : undefined;
     if (posterMeshes) {
       const ph = ray.intersectObjects([...posterMeshes, ...hitGroup.children], false);
@@ -1337,6 +1358,7 @@ export async function startApp(
     },
     postits: () => postitStore.list(),
     openPostitWall: () => setPostitWall(true),
+    openCuration: (i: number) => curationSheet.open(i),
   };
 
   // 첫 프레임(그림자 포함)이 그려진 뒤 로딩을 걷고 준비 완료 표시

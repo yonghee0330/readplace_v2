@@ -99,6 +99,8 @@ export interface SpaceLayout {
   /** 가오픈 포스트잇 이벤트 보드(허브 창가) */
   eventBoard: { x: number; z: number; ry: number; w: number; h: number } | null;
   counter: (Placement & { w: number; d: number; h: number }) | null;
+  /** 큐레이션 매대(허브). 앞(+로컬 z)이 손님 쪽 */
+  curation: (Placement & { w: number; d: number; h: number }) | null;
   floorLamps: Placement[];
   pendants: { x: number; z: number; drop: number }[];
   floorPlants: { x: number; z: number; scale: number }[];
@@ -150,30 +152,32 @@ function emptyBase(id: SpaceId, label: string, room: RoomBounds): Omit<SpaceLayo
     seminarTable: null, seminarChairs: [], whiteboard: null, seminarMonitor: null,
     soloDesk: null, soloChair: null,
     sofa: null, coffeeTable: null, rug: null, screen: null,
-    theaters: [], theater: null, stage: null, bench: null, barTable: null, eventBoard: null, counter: null,
+    theaters: [], theater: null, stage: null, bench: null, barTable: null, eventBoard: null, counter: null, curation: null,
   };
 }
 
 /** 중앙 허브 — 테이블·서가·창가 바·매대·소파만 */
 function makeHub(): SpaceLayout {
   const room = roomOf(9, 7);
-  // 8인 중앙 테이블(긴 변 3석 + 양끝 1석)
+  // 8인 중앙 테이블(긴 변 3석 + 양끝 1석). 오른쪽에 큐레이션 매대를 두려고 왼쪽으로 옮김
+  const tableX = -0.95;
   const tableW = 2.45;
   const tableD = 1.12;
   const seatOff = 0.5;
   const along = 0.78;
   const chairs: Placement[] = [
-    { x: -along, z: -(tableD / 2 + seatOff), ry: 0 },
-    { x: 0, z: -(tableD / 2 + seatOff), ry: 0 },
-    { x: along, z: -(tableD / 2 + seatOff), ry: 0 },
-    { x: -along, z: tableD / 2 + seatOff, ry: Math.PI },
-    { x: 0, z: tableD / 2 + seatOff, ry: Math.PI },
-    { x: along, z: tableD / 2 + seatOff, ry: Math.PI },
-    { x: -(tableW / 2 + seatOff), z: 0, ry: Math.PI / 2 },
-    { x: tableW / 2 + seatOff, z: 0, ry: -Math.PI / 2 },
+    { x: tableX - along, z: -(tableD / 2 + seatOff), ry: 0 },
+    { x: tableX, z: -(tableD / 2 + seatOff), ry: 0 },
+    { x: tableX + along, z: -(tableD / 2 + seatOff), ry: 0 },
+    { x: tableX - along, z: tableD / 2 + seatOff, ry: Math.PI },
+    { x: tableX, z: tableD / 2 + seatOff, ry: Math.PI },
+    { x: tableX + along, z: tableD / 2 + seatOff, ry: Math.PI },
+    { x: tableX - (tableW / 2 + seatOff), z: 0, ry: Math.PI / 2 },
+    { x: tableX + tableW / 2 + seatOff, z: 0, ry: -Math.PI / 2 },
   ];
   const sofa = { x: 3.05, z: 2.05, ry: -Math.PI / 2, w: 1.85, d: 0.85 };
-  const spawn = { x: 0.2, z: 2.55, ry: Math.PI };
+  // 입구에서 들어서면 오른쪽 앞 큐레이션 매대가 먼저 보이게 살짝 오른쪽을 봄
+  const spawn = { x: 0.2, z: 2.55, ry: Math.PI - 0.45 };
   // 측벽(+서가가 비는 칸)에 붙인 문형 포털. 벽면 x≈±4.5
   const doorX = 4.32;
   const portals: PortalDef[] = [
@@ -199,10 +203,10 @@ function makeHub(): SpaceLayout {
       { x: -3.0, z: 3.28, ry: Math.PI, w: 1.2, wing: 'A' },
       { x: 3.0, z: 3.28, ry: Math.PI, w: 1.2, wing: 'C' },
     ],
-    islands: [
-      { x: -2.35, z: 0.15, ry: 0.08, w: 1.05, d: 0.68, h: 0.78, kind: 'flat' },
-    ],
-    readingTable: { x: 0, z: 0, ry: 0, w: tableW, d: tableD, h: 0.74 },
+    islands: [],
+    readingTable: { x: tableX, z: 0, ry: 0, w: tableW, d: tableD, h: 0.74 },
+    // 들어오면 먼저 마주하는 큐레이션 매대(0.1평 문학상 후보작). 앞면이 입구(+z)를 봄
+    curation: { x: 2.3, z: -0.3, ry: -0.3, w: 1.85, d: 0.8, h: 0.82 },
     chairs,
     barTable: { x: 0.15, z: -3.05, ry: 0, w: 2.4, d: 0.42, h: 1.05 },
     // 창가 바테이블 중심 뒤 벽 — 포스트잇 코르크 보드
@@ -213,8 +217,7 @@ function makeHub(): SpaceLayout {
     rug: { x: 2.45, z: 2.05, w: 2.0, d: 2.0 },
     floorLamps: [{ x: 3.65, z: 2.85, ry: 0 }],
     pendants: [
-      { x: 0, z: 0, drop: 0.95 },
-      { x: -2.35, z: 0.15, drop: 0.9 },
+      { x: tableX, z: 0, drop: 0.95 },
       { x: 2.45, z: 2.05, drop: 1.0 },
     ],
     floorPlants: [
@@ -480,6 +483,7 @@ export function applyLayout(id: SpaceId): SpaceLayout {
   assignOrClear(BAR_TABLE, L.barTable);
   assignOrClear(EVENT_BOARD, L.eventBoard);
   assignOrClear(COUNTER, L.counter);
+  assignOrClear(CURATION, L.curation);
   PORTALS.splice(0, PORTALS.length, ...L.portals);
   return L;
 }
@@ -541,6 +545,7 @@ export const EVENT_BOARD: { x: number; z: number; ry: number; w: number; h: numb
   ...(HUB.eventBoard!),
 };
 export const COUNTER: Placement & { w: number; d: number; h: number } = { ...(HUB.counter!) };
+export const CURATION: Placement & { w: number; d: number; h: number } = { ...(HUB.curation!) };
 export const FLOOR_LAMPS: Placement[] = [...HUB.floorLamps];
 export const PENDANTS: { x: number; z: number; drop: number }[] = [...HUB.pendants];
 export const FLOOR_PLANTS: { x: number; z: number; scale: number }[] = [...HUB.floorPlants];
@@ -609,6 +614,7 @@ export function colliders(): Collider[] {
     rect(SOFA.x, SOFA.z, SOFA.w, SOFA.d, SOFA.ry, 0.85, sofaIds);
   }
   if (isPresent(COUNTER)) rect(COUNTER.x, COUNTER.z, COUNTER.w, COUNTER.d, COUNTER.ry, COUNTER.h);
+  if (isPresent(CURATION)) rect(CURATION.x, CURATION.z, CURATION.w, CURATION.d + 0.05, CURATION.ry, CURATION.h + 0.3);
   if (isPresent(BENCH)) {
     const ids = SEATS.filter((s) => s.id.startsWith('bench-')).map((s) => s.id);
     rect(BENCH.x, BENCH.z, BENCH.w, BENCH.d, 0, BENCH.h + 0.06, ids);

@@ -20,6 +20,7 @@ import { buildLamps } from './props/lamps';
 import { buildPlant } from './props/plants';
 import { buildEventBoard, type EventBoardProp } from './props/eventBoard';
 import { buildMoimPoster, type MoimPosterProp } from './props/moimPoster';
+import { buildCurationBooks, buildCurationFrame, type CurationProp } from './props/curationTable';
 import { buildCounterSign } from './props/counterSign';
 import { buildPortalGlow, buildPortals, type PortalGlow } from './props/portals';
 import { buildCeiling, buildFloor, buildWalls } from './props/room';
@@ -39,6 +40,7 @@ export interface SpaceView {
   portalGlow: PortalGlow;
   eventBoard: EventBoardProp | null;
   poster: MoimPosterProp | null;
+  curation: CurationProp | null;
 }
 
 export interface Bookstore {
@@ -109,6 +111,7 @@ function buildOneSpace(
   buildTheater(bucket, rng);
   buildScreen(bucket, rng);
   buildRug(bucket);
+  buildCurationFrame(bucket, rng);
   buildPortals(bucket);
   buildContactShadows(bucket);
   const lamps = buildLamps(bucket);
@@ -124,12 +127,14 @@ function buildOneSpace(
   if (eventBoard) group.add(eventBoard.group);
   const poster = id === 'hub' ? buildMoimPoster() : null;
   if (poster) group.add(poster.group);
+  const curation = id === 'hub' ? buildCurationBooks() : null;
+  if (curation) group.add(curation.group);
   const counterSign = id === 'hub' ? buildCounterSign() : null;
   if (counterSign) group.add(counterSign);
   const floor = group.getObjectByName('merged:floor')!;
   floor.name = `merged:floor:${id}`;
   return {
-    view: { id, group, floor, portalGlow, eventBoard, poster },
+    view: { id, group, floor, portalGlow, eventBoard, poster, curation },
     books: books.items.length,
     planks,
     lamps,

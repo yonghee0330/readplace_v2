@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { MergeBucket, trs } from '../geom';
 import {
-  BAR_TABLE, BENCH, CHAIRS, COFFEE_TABLE, COUNTER, FLOOR_LAMPS, FLOOR_PLANTS, ISLANDS,
+  BAR_TABLE, BENCH, CHAIRS, COFFEE_TABLE, COUNTER, CURATION, FLOOR_LAMPS, FLOOR_PLANTS, ISLANDS,
   READING_TABLE, SEMINAR_CHAIRS, SEMINAR_TABLE, SHELF, SHELVES, SOFA, SOLO_CHAIR,
   SOLO_DESK, STAGE, STORE_CHAIRS, STORE_TABLE, THEATERS, isPresent,
 } from '../layout';
@@ -17,6 +17,7 @@ export function buildContactShadows(bucket: MergeBucket): void {
   const pad = 0.06;
   for (const s of SHELVES) add(s.x + Math.sin(s.ry) * 0.04, s.z + Math.cos(s.ry) * 0.04, s.w + pad, SHELF.d + pad, s.ry, 0.9);
   for (const isl of ISLANDS) add(isl.x, isl.z, isl.w + pad, isl.d + pad, isl.ry, 0.88);
+  if (isPresent(CURATION)) add(CURATION.x, CURATION.z, CURATION.w + pad, CURATION.d + pad, CURATION.ry, 0.7);
   if (isPresent(READING_TABLE)) add(READING_TABLE.x, READING_TABLE.z, READING_TABLE.w + pad, READING_TABLE.d + pad, 0, 0.85);
   if (isPresent(STORE_TABLE)) add(STORE_TABLE.x, STORE_TABLE.z, STORE_TABLE.w + pad, STORE_TABLE.d + pad, 0, 0.88);
   if (isPresent(SEMINAR_TABLE)) add(SEMINAR_TABLE.x, SEMINAR_TABLE.z, SEMINAR_TABLE.w + pad, SEMINAR_TABLE.d + pad, 0, 0.88);
