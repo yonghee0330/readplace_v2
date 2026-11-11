@@ -76,7 +76,8 @@ export class CurationSheet {
     this.countEl.textContent = `후보작 ${this.index + 1} / ${n}`;
     this.titleEl.textContent = b.title;
     this.subEl.textContent = b.author;
-    this.shelfEl.textContent = `0.1평서점 ${b.shelf}`;
+    // 0.1평 칸 번호(A-14 등)가 있을 때만 '0.1평서점'을 붙인다
+    this.shelfEl.textContent = /^[A-Z]-\d/.test(b.shelf) ? `0.1평서점 ${b.shelf}` : b.shelf;
     this.pickEl.textContent = b.pick;
     this.introEl.textContent = b.intro;
     this.extraEl.hidden = !b.extra;
