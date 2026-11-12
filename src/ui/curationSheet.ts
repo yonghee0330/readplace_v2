@@ -15,6 +15,7 @@ export class CurationSheet {
   private introEl: HTMLElement;
   private extraEl: HTMLElement;
   private tagsEl: HTMLElement;
+  private linksEl: HTMLElement;
 
   constructor() {
     this.sheet.el.classList.add('curation-sheet');
@@ -35,6 +36,7 @@ export class CurationSheet {
       </div>
       <p class="curation-intro" data-intro></p>
       <p class="curation-extra" data-extra hidden></p>
+      <div class="curation-links" data-links hidden></div>
       <p class="curation-tags" data-tags></p>
       <p class="curation-note">${AWARD_SHELF.note}</p>
       <div class="sheet-actions curation-nav">
@@ -50,6 +52,7 @@ export class CurationSheet {
     this.introEl = b.querySelector('[data-intro]')!;
     this.extraEl = b.querySelector('[data-extra]')!;
     this.tagsEl = b.querySelector('[data-tags]')!;
+    this.linksEl = b.querySelector('[data-links]')!;
     b.querySelector('[data-act="prev"]')!.addEventListener('click', () => this.show(this.index - 1));
     b.querySelector('[data-act="next"]')!.addEventListener('click', () => this.show(this.index + 1));
     this.sheet.el.addEventListener('keydown', (e) => {
@@ -83,6 +86,18 @@ export class CurationSheet {
     this.extraEl.hidden = !b.extra;
     this.extraEl.textContent = b.extra ?? '';
     this.tagsEl.textContent = b.tags.map((t) => `#${t}`).join(' ');
+    // 점주·작가 인스타그램 버튼(새 창). 계정이 없으면 숨김
+    this.linksEl.replaceChildren(...(b.instagram ?? []).map((l) => {
+      const a = document.createElement('a');
+      a.className = 'curation-ig';
+      a.href = l.url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = `인스타그램 @${l.handle} ↗`;
+      a.setAttribute('aria-label', `${b.title} 점주·작가 인스타그램 @${l.handle} 열기`);
+      return a;
+    }));
+    this.linksEl.hidden = !b.instagram?.length;
     this.sheet.body.scrollTop = 0;
   }
 }

@@ -1270,3 +1270,12 @@ button.pill:hover { background: rgba(36, 37, 31, 0.72); }
   .curation-cover { width: 112px; }
   .curation-nav { display: grid; grid-template-columns: 1fr 1fr; }
 }
+
+.curation-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
+.curation-links[hidden] { display: none; }
+.curation-ig {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 999px;
+  background: linear-gradient(135deg, #f58529, #dd2a7b 55%, #8134af); color: #fff; text-decoration: none;
+  font: 700 14px/1 var(--sans); touch-action: manipulation;
+}
+.curation-ig:focus-visible { outline: 2px solid #8a5a22; outline-offset: 2px; }
