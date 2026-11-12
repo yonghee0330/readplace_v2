@@ -8,6 +8,7 @@ const TH = 860;
 const BW = 720;
 const BH = 900;
 export const POINT_URL = 'https://bbooks.co.kr/point';
+export const YOUTH_URL = 'https://youth.bbooks.co.kr/adult.html';
 export const BTALK_URL = 'https://bbooks.co.kr/moim/m/btalk-seogyul-2611/';
 
 export interface PosterHit { mesh: THREE.Mesh; url: string; toast: string }
@@ -171,6 +172,43 @@ function paintPoint(ctx: CanvasRenderingContext2D, cap: HTMLImageElement | null)
   ctx.fillText('눌러서 독서포인트 주문서 보기 →', TW / 2, by + bh / 2 + 1);
 }
 
+function paintYouth(ctx: CanvasRenderingContext2D, art: HTMLImageElement | null): void {
+  const sans = '"Pretendard", "Apple SD Gothic Neo", system-ui, sans-serif';
+  const BLUE = '#afc0c4', MAROON = '#4a1a22', SALMON = '#e29c7b', CREAM = '#fdf5ea';
+  ctx.fillStyle = BLUE;
+  ctx.fillRect(0, 0, TW, 640);
+  ctx.fillStyle = SALMON;
+  ctx.fillRect(0, 640, TW, TH - 640);
+  ctx.fillStyle = MAROON;
+  ctx.fillRect(0, 636, TW, 8);
+  // 핵심 키워드: 멀리서도 읽히게 크게
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = MAROON;
+  ctx.font = `800 54px ${sans}`;
+  ctx.fillText('청 소 년', TW / 2, 92);
+  ctx.font = `900 188px ${sans}`;
+  ctx.fillText('책사줄게', TW / 2, 262);
+  if (art) {
+    const aw = 600, ah = aw * (art.naturalHeight / art.naturalWidth);
+    ctx.drawImage(art, (TW - aw) / 2 + 10, 636 - ah, aw, ah);
+  }
+  ctx.fillStyle = MAROON;
+  ctx.font = `800 31px ${sans}`;
+  ctx.fillText('부천의 어른들이, 부천의 청소년에게,', TW / 2, 700);
+  ctx.fillText('책 한 권.', TW / 2, 742);
+  // 안내 버튼
+  const bx = 56, by = 772, bw = TW - 112, bh = 66;
+  ctx.fillStyle = MAROON;
+  ctx.beginPath();
+  ctx.roundRect(bx, by, bw, bh, 33);
+  ctx.fill();
+  ctx.fillStyle = CREAM;
+  ctx.font = `700 31px ${sans}`;
+  ctx.textBaseline = 'middle';
+  ctx.fillText('어른 · 책값 먼저 내기 →', TW / 2, by + bh / 2 + 1);
+}
+
 function makeFrame(pw: number, ph: number, lx: number, ly: number, group: THREE.Group, face: THREE.Mesh): void {
   const frameMat = new THREE.MeshStandardMaterial({ color: 0x3a2a20, roughness: 0.6 });
   const t = 0.014;
@@ -251,10 +289,26 @@ export function buildMoimPoster(): MoimPosterProp | null {
   capImg.src = `${import.meta.env.BASE_URL}posters/point-capture.png`;
   void document.fonts?.ready.then(() => c.redraw());
 
+  // 독서포인트 포스터 왼쪽(카운터 쪽) 빈 벽의 청소년 책사줄게 캠페인 포스터. 클릭하면 어른 참여 페이지
+  const yg = new THREE.Group();
+  yg.name = 'youth-poster';
+  yg.position.set(-2.02, 1.75, 3.42);
+  yg.rotation.y = Math.PI;
+  root.add(yg);
+  let art: HTMLImageElement | null = null;
+  const d = canvasFace(TW, TH, pw, ph1, (cx) => paintYouth(cx, art), 'youth-poster-face');
+  d.mesh.userData.moimPoster = true;
+  makeFrame(pw, ph1, 0, 0, yg, d.mesh);
+  const artImg = new Image();
+  artImg.onload = () => { art = artImg; d.redraw(); };
+  artImg.src = `${import.meta.env.BASE_URL}posters/chaeksajulge-art.png`;
+  void document.fonts?.ready.then(() => d.redraw());
+
   return {
     group: root,
     hits: [
       { mesh: c.mesh, url: POINT_URL, toast: '독서포인트 주문서 페이지를 열어요' },
+      { mesh: d.mesh, url: YOUTH_URL, toast: '청소년 책사줄게 참여 페이지를 열어요' },
       { mesh: a.mesh, url: MOIM_URL, toast: '11월 비모임 페이지를 열어요' },
       { mesh: b.mesh, url: BTALK_URL, toast: '서귤 북토크 페이지를 열어요' },
     ],
