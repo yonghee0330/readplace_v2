@@ -277,7 +277,7 @@ export function buildMoimPoster(): MoimPosterProp | null {
   // 카운터 뒤 앞벽(출입문과 서가 사이 빈 벽)의 독서포인트 안내 포스터
   const pg = new THREE.Group();
   pg.name = 'point-poster';
-  pg.position.set(-1.45, 1.75, 3.42);
+  pg.position.set(-1.14, 1.75, 3.42);
   pg.rotation.y = Math.PI;
   root.add(pg);
   let cap: HTMLImageElement | null = null;
@@ -292,7 +292,7 @@ export function buildMoimPoster(): MoimPosterProp | null {
   // 독서포인트 포스터 왼쪽(카운터 쪽) 빈 벽의 청소년 책사줄게 캠페인 포스터. 클릭하면 어른 참여 페이지
   const yg = new THREE.Group();
   yg.name = 'youth-poster';
-  yg.position.set(-2.02, 1.75, 3.42);
+  yg.position.set(-1.78, 1.75, 3.42);
   yg.rotation.y = Math.PI;
   root.add(yg);
   let art: HTMLImageElement | null = null;
