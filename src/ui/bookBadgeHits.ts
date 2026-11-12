@@ -8,9 +8,9 @@ const PAD_PX = 14;
 export class BookBadgeHits {
   readonly root: HTMLElement;
   private buttons = new Map<string, HTMLButtonElement>();
-  private onPick: (actorId: string) => void;
+  private onPick: (actorId: string, clientX: number, clientY: number) => void;
 
-  constructor(parent: HTMLElement, onPick: (actorId: string) => void) {
+  constructor(parent: HTMLElement, onPick: (actorId: string, clientX: number, clientY: number) => void) {
     this.onPick = onPick;
     this.root = document.createElement('div');
     this.root.className = 'book-badge-hits';
@@ -72,7 +72,7 @@ export class BookBadgeHits {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      this.onPick(id);
+      this.onPick(id, e.clientX, e.clientY);
     });
     this.root.appendChild(btn);
     this.buttons.set(id, btn);

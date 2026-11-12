@@ -955,20 +955,41 @@ export async function startApp(
     return true;
   }
 
-  const badgeHits = new BookBadgeHits(ui, (actorId) => {
-    if (focus.active || anySheetOpen()) return;
-    const actor = crowd.get(actorId);
-    if (actor) openBookPeek(actor);
-  });
-
   function openPosterLink(url: string, msg: string): void {
     toasts.show(msg);
     window.open(url, '_blank', 'noopener');
   }
 
+  /** 허브 벽 포스터 클릭. 책 배지 HTML이 화면에서 겹쳐도 포스터를 우선한다. */
+  function tryOpenPosterAt(clientX: number, clientY: number): boolean {
+    if (currentSpaceId() !== 'hub') return false;
+    const posterHits = store.spaces.hub.poster?.hits;
+    if (!posterHits?.length) return false;
+    const rect = canvas.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    ray.setFromCamera(ndc, camera);
+    const posterPick = posterHits.find((h) => ray.intersectObject(h.mesh, false).length);
+    if (!posterPick) return false;
+    openPosterLink(posterPick.url, posterPick.toast);
+    return true;
+  }
+
+  const badgeHits = new BookBadgeHits(ui, (actorId, clientX, clientY) => {
+    if (focus.active || anySheetOpen()) return;
+    // 서점지기 책 배지가 카운터 뒤 포스터를 가려도 포스터 링크가 되게
+    if (tryOpenPosterAt(clientX, clientY)) return;
+    const actor = crowd.get(actorId);
+    if (actor) openBookPeek(actor);
+  });
+
   function clickAt(clientX: number, clientY: number): void {
     if (focus.active || cinemaWatch.active || postitWall.active || anySheetOpen()) return;
     const rect = canvas.getBoundingClientRect();
+    // 벽 포스터는 머리 위 책 배지·서점지기보다 먼저(배지 오버레이가 가려도 링크 가능)
+    if (tryOpenPosterAt(clientX, clientY)) return;
     // 머리 위 책 배지: 화면 좌표 히트(오버레이 레이어·빌보드 뒷면 문제 없음)
     const badgeActor = crowd.pickBookBadge(clientX, clientY, camera, rect);
     if (badgeActor && openBookPeek(badgeActor)) return;
@@ -1002,12 +1023,6 @@ export async function startApp(
         curationSheet.open(best.index);
         return;
       }
-    }
-    const posterHits = currentSpaceId() === 'hub' ? store.spaces.hub.poster?.hits : undefined;
-    const posterPick = posterHits?.find((h) => ray.intersectObject(h.mesh, false).length);
-    if (posterPick) {
-      openPosterLink(posterPick.url, posterPick.toast);
-      return;
     }
     const boardMesh = store.eventBoard?.hitMesh;
     const targets = boardMesh && currentSpaceId() === 'hub'
@@ -1068,6 +1083,19 @@ export async function startApp(
       return;
     }
     const rect = canvas.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    ray.setFromCamera(ndc, camera);
+    const posterMeshes = currentSpaceId() === 'hub' ? store.spaces.hub.poster?.hits.map((h) => h.mesh) : undefined;
+    if (posterMeshes) {
+      const ph = ray.intersectObjects([...posterMeshes, ...hitGroup.children], false);
+      if (ph[0] && posterMeshes.includes(ph[0].object as THREE.Mesh)) {
+        canvas.style.cursor = 'pointer';
+        return;
+      }
+    }
     if (crowd.pickBookBadge(e.clientX, e.clientY, camera, rect)) {
       canvas.style.cursor = 'pointer';
       return;
@@ -1076,23 +1104,10 @@ export async function startApp(
       canvas.style.cursor = 'pointer';
       return;
     }
-    const ndc = new THREE.Vector2(
-      ((e.clientX - rect.left) / rect.width) * 2 - 1,
-      -((e.clientY - rect.top) / rect.height) * 2 + 1,
-    );
-    ray.setFromCamera(ndc, camera);
     const curMeshes = currentSpaceId() === 'hub' ? store.spaces.hub.curation?.hits.map((h) => h.mesh) : undefined;
     if (curMeshes?.some((m) => ray.intersectObject(m, false).length)) {
       canvas.style.cursor = 'pointer';
       return;
-    }
-    const posterMeshes = currentSpaceId() === 'hub' ? store.spaces.hub.poster?.hits.map((h) => h.mesh) : undefined;
-    if (posterMeshes) {
-      const ph = ray.intersectObjects([...posterMeshes, ...hitGroup.children], false);
-      if (ph[0] && posterMeshes.includes(ph[0].object as THREE.Mesh)) {
-        canvas.style.cursor = 'pointer';
-        return;
-      }
     }
     if (currentSpaceId() === 'hub') {
       const board = store.eventBoard?.hitMesh;
