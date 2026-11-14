@@ -21,7 +21,7 @@ import { MANAGER_COLOR, MANAGER_NICKNAME } from './core/manager';
 import { loadAuthorId, loadProfile, loadSettings, saveSettings, type Profile, type Settings } from './core/storage';
 import { LocalPresence } from './net/localPresence';
 import { randomNickname } from './net/nickname';
-import { newId, sanitizeSharedBook, type ActionEvent, type Presence, type PlayerState, type SharedBook } from './net/presence';
+import { MAX_PATH_POINTS, newId, sanitizeSharedBook, type ActionEvent, type Presence, type PlayerState, type SharedBook } from './net/presence';
 import { hasSupabaseConfig, supabaseKakaoApiBase } from './net/supabaseClient';
 import { SupabasePresence } from './net/supabasePresence';
 import { WsPresence } from './net/wsPresence';
@@ -431,6 +431,12 @@ export async function startApp(
       coverUrl: currentBook.coverUrl?.startsWith('https://') ? currentBook.coverUrl : null,
     });
   }
+  /** 클릭해서 걷는 중이면 남은 경로(받는 쪽이 따라 걷는다) */
+  function myRoute(): { path: [number, number][] | null; pathId: number | null } {
+    const r = movement.route;
+    if (!r || r.points.length > MAX_PATH_POINTS) return { path: null, pathId: null };
+    return { path: r.points.map((p) => [round(p.x), round(p.z)] as [number, number]), pathId: r.id };
+  }
   function myState(): PlayerState {
     const p = me.root.position;
     return {
@@ -444,6 +450,7 @@ export async function startApp(
       seatId: movement.seatId,
       book: sharedBook(),
       role: isManager ? 'manager' : null,
+      ...myRoute(),
       t: Date.now(),
     };
   }
@@ -1241,7 +1248,9 @@ export async function startApp(
       }
       waterAt = null;
     }
-    if (movement.moving) pushState();
+    // 클릭 경로로 걷는 동안은 경로를 한 번 보냈으므로 위치를 계속 보내지 않는다.
+    // 앉기·일어나기는 시작·끝·자세가 바뀔 때만(movement가 알려 준다), 키보드 걷기만 계속 보낸다.
+    if (movement.steering) pushState();
     if (!fixedCam) {
       follow.follow(me.root.position);
       follow.update(dt);
@@ -1336,6 +1345,8 @@ export async function startApp(
     toasts: () => [...toasts.log],
     peers: () => [...peers.values()].map((p) => ({ id: p.id, nickname: p.nickname, state: p.state, seatId: p.seatId, book: p.book })),
     visiblePeerAvatars: () => crowd.list('peer').filter((a) => a.root.visible && a.root.parent).map((a) => ({ id: a.id, nickname: a.nickname, nameplate: !!a.nameplate?.mesh.visible })),
+    /** 다른 방문객이 이 화면에서 실제로 그려지는 위치(동기화 검증용) */
+    peerPositions: () => crowd.list('peer').map((a) => ({ id: a.id, x: a.root.position.x, z: a.root.position.z })),
     cat: () => (cat ? { mode: cat.mood, x: cat.root.position.x, y: cat.root.position.y, z: cat.root.position.z, visible: cat.root.visible } : null),
     teleport: (x: number, z: number, ry = 0) => movement.place(x, z, ry),
     catCam: (o: [number, number, number] | null) => { catCam = o; me.root.visible = !o; if (me.nameplate) me.nameplate.mesh.visible = !o; },

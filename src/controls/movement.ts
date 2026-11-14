@@ -29,6 +29,8 @@ export class Movement {
   /** 키보드 입력(-1..1). 카메라 기준 방향. */
   keyInput = new THREE.Vector2();
   cameraYaw = 0;
+  /** 클릭 경로마다 올라가는 번호(다른 사람에게 경로를 한 번만 보내려고 쓴다) */
+  private routeSeq = 0;
 
   constructor(private me: Actor, private takenSeats: () => Set<string>, private onChange: () => void) {}
 
@@ -58,6 +60,16 @@ export class Movement {
     return this.phase.kind !== 'idle' || this.keyInput.lengthSq() > 0.01;
   }
 
+  /** 키보드로 직접 걷는 중(경로가 없어 위치를 계속 보내야 한다) */
+  get steering(): boolean {
+    return this.phase.kind === 'idle' && this.keyInput.lengthSq() > 0.01;
+  }
+
+  /** 클릭해서 걷는 중이면 남은 경로와 경로 번호 */
+  get route(): { id: number; points: Pt[] } | null {
+    return this.phase.kind === 'path' && this.phase.points.length ? { id: this.routeSeq, points: this.phase.points } : null;
+  }
+
   /** 바닥의 한 점으로 걸어간다. */
   walkTo(p: Pt): Pt | null {
     this.reading = false;
@@ -65,6 +77,7 @@ export class Movement {
     const from = { x: this.me.root.position.x, z: this.me.root.position.z };
     const path = this.grid.findPath(from, p);
     if (!path) return null;
+    this.routeSeq++;
     this.phase = { kind: 'path', points: path.slice(1), seat: null };
     this.sync();
     return path[path.length - 1];
@@ -117,6 +130,7 @@ export class Movement {
     const from = { x: this.me.root.position.x, z: this.me.root.position.z };
     const path = this.grid.findPath(from, ap);
     if (!path) return false;
+    this.routeSeq++;
     this.phase = { kind: 'path', points: path.slice(1), seat };
     this.sync();
     return true;

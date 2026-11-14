@@ -37,6 +37,9 @@ export class Actor {
   private lastRemoteT = -1;
   /** 위치 기록이 도착하는 평균 간격(ms). 보내는 쪽이 사람 수에 따라 간격을 늘리므로 따라 맞춘다. */
   private remoteGap = 100;
+  /** 다른 방문객이 보낸 걷기 경로. 있으면 위치 기록 대신 이 길을 같은 속도로 따라 걷는다. */
+  private route: { id: number; points: { x: number; z: number }[]; rush: boolean; since: number } | null = null;
+  private lastRouteId = -1;
   private lastPos = new THREE.Vector3();
 
   constructor(readonly id: string, readonly kind: ActorKind, nickname: string, look: AvatarLook) {
@@ -91,6 +94,26 @@ export class Actor {
   /** 다른 방문객: 받은 상태를 기록해 둔다. */
   pushRemote(s: PlayerState, now: number): void {
     // 피어 목록은 누가 움직여도 통째로 다시 오므로, 이 사람의 새 상태일 때만 위치를 기록한다
+    if (s.t !== this.lastRemoteT && s.path?.length && s.pathId != null) {
+      this.lastRemoteT = s.t;
+      // 같은 경로를 다시 받은 것(하트비트 등)이면 걷던 대로 둔다
+      if (s.pathId !== this.lastRouteId || !this.route) {
+        this.lastRouteId = s.pathId;
+        const cur = this.root.position;
+        const start = { x: s.position[0], z: s.position[2] };
+        // 내가 그리고 있는 위치가 보낸 쪽 위치와 가까우면 바로 경로로, 멀면 먼저 그 위치로 간다
+        const near = Math.hypot(cur.x - start.x, cur.z - start.z) < 0.25;
+        this.route = { id: s.pathId, points: [...(near ? [] : [start]), ...s.path.map(([x, z]) => ({ x, z }))], rush: false, since: now };
+        cur.y = 0;
+      }
+    } else if (s.t !== this.lastRemoteT && this.route) {
+      // 경로가 끝났거나 바뀌었다. 끝 지점 근처에 도착한 소식이면 남은 길을 서둘러 마저 걷고,
+      // 중간에 멈춘 것이면 경로를 버리고 받은 위치로 간다.
+      const end = this.route.points[this.route.points.length - 1];
+      const arrived = end && Math.hypot(s.position[0] - end.x, s.position[2] - end.z) < 0.5;
+      if (arrived) this.route.rush = true;
+      else this.endRoute(now);
+    }
     if (s.t !== this.lastRemoteT) {
       const last = this.snapshots[this.snapshots.length - 1];
       const gap = last ? now - last.at : 0;
@@ -116,8 +139,51 @@ export class Actor {
     }
   }
 
+  /** 경로 걷기를 끝내고, 지금 보이는 위치에서 위치 기록 보간으로 자연스럽게 넘어간다 */
+  private endRoute(now: number): void {
+    const since = this.route?.since ?? now;
+    this.route = null;
+    this.remoteGap = 100;
+    const p = this.root.position;
+    // 경로를 걷는 동안 도착한 기록(도착·앉기)만 남기고, 지금 보이는 위치에서 이어 간다
+    const keep = this.snapshots.filter((x) => x.at > since);
+    const shift = keep.length ? now - keep[0].at : 0;
+    this.snapshots = [
+      { at: now - 130, x: p.x, y: p.y, z: p.z, ry: this.root.rotation.y },
+      ...keep.map((x) => ({ ...x, at: x.at + shift })),
+    ];
+  }
+
+  /** 받은 경로를 보낸 사람과 같은 속도로 따라 걷는다. 끝나면 false. */
+  private followRoute(now: number, dt: number): boolean {
+    const route = this.route;
+    if (!route) return false;
+    const r = this.root;
+    // 전송 지연만큼 늦게 출발하므로 조금 빠르게, 도착 소식이 먼저 왔으면 더 서두른다
+    let remaining = REMOTE_WALK_SPEED * (route.rush ? 2.5 : 1.08) * dt;
+    while (remaining > 0 && route.points.length) {
+      const target = route.points[0];
+      const dx = target.x - r.position.x, dz = target.z - r.position.z;
+      const d = Math.hypot(dx, dz);
+      if (d < 1e-3) { route.points.shift(); continue; }
+      const step = Math.min(d, remaining);
+      r.position.x += (dx / d) * step;
+      r.position.z += (dz / d) * step;
+      remaining -= step;
+      const turn = Math.atan2(Math.sin(Math.atan2(dx, dz) - r.rotation.y), Math.cos(Math.atan2(dx, dz) - r.rotation.y));
+      r.rotation.y += turn * (1 - Math.exp(-10 * dt));
+      if (step >= d) route.points.shift();
+    }
+    if (!route.points.length) this.endRoute(now);
+    return true;
+  }
+
   /** 도착 간격보다 조금 늦게(100~700ms) 재생해 두 기록 사이를 보간한다. */
   interpolate(now: number, dt: number): void {
+    if (this.followRoute(now, dt)) {
+      this.updateSpeed(dt);
+      return;
+    }
     const renderAt = now - THREE.MathUtils.clamp(this.remoteGap * 1.3, 100, 700);
     const s = this.snapshots;
     if (!s.length) return;
@@ -146,6 +212,9 @@ export class Actor {
     this.lastPos.copy(p);
   }
 }
+
+/** 다른 방문객이 경로를 따라 걷는 속도(controls/movement.ts의 WALK_SPEED와 같게) */
+const REMOTE_WALK_SPEED = 1.25;
 
 const _v = new THREE.Vector3();
 const _m = new THREE.Matrix4();

@@ -110,6 +110,23 @@ try {
   }, { seconds: SECONDS, seed: i + 1 })));
   await new Promise((r) => setTimeout(r, SECONDS * 1000 + 1500));
   const elapsed = (Date.now() - measureFrom) / 1000;
+  measureFrom = 0;
+  // 모두 멈춘 뒤, 각자의 실제 위치와 다른 사람 화면에 그려진 위치가 맞는지 본다
+  await new Promise((r) => setTimeout(r, 9000));
+  type Pos = { id: string; x: number; z: number };
+  const views = await Promise.all(inside.map((b) => b.page.evaluate(() => {
+    const api = (window as unknown as { __BBOOKS: { me(): { id: string; position: number[] }; peerPositions(): Pos[] } }).__BBOOKS;
+    const me = api.me();
+    return { me: { id: me.id, x: me.position[0], z: me.position[2] }, peers: api.peerPositions() };
+  })));
+  const truth = new Map(views.map((v) => [v.me.id, v.me]));
+  let maxDrift = 0;
+  for (const v of views) {
+    for (const p of v.peers) {
+      const t = truth.get(p.id);
+      if (t) maxDrift = Math.max(maxDrift, Math.hypot(p.x - t.x, p.z - t.z));
+    }
+  }
 
   const rows = await Promise.all(inside.map(async (b) => {
     const r = await b.page.evaluate(() => {
@@ -142,6 +159,8 @@ try {
     billablePerSec: +billable.toFixed(1),
     /** 이 상태가 하루 8시간 이어질 때 한 달(30일) 메시지 수. 무료 한도 200만 건 */
     monthlyIf8hPerDay: Math.round(billable * 3600 * 8 * 30),
+    /** 멈춘 뒤 내 실제 위치와 남의 화면 속 내 위치의 최대 차이(m) */
+    maxDriftM: +maxDrift.toFixed(3),
     fpsAvg: +(rows.reduce((s, r) => s + r.frames, 0) / rows.length / elapsed).toFixed(1),
     consoleErrors: errors.length,
   };
@@ -153,7 +172,7 @@ try {
   writeFileSync(out, `${JSON.stringify([...prev, result], null, 2)}\n`);
 
   const okCap = CAP ? result.admitted === Math.min(CAP, BOTS) : result.rejected === 0;
-  const pass = result.allSeeEachOther && okCap && errors.length === 0 && (PRESENCE !== 'supabase' || billable < 100);
+  const pass = result.allSeeEachOther && maxDrift < 0.15 && okCap && errors.length === 0 && (PRESENCE !== 'supabase' || billable < 100);
   console.log(pass ? '통과' : '미통과');
   process.exitCode = pass ? 0 : 1;
 } finally {

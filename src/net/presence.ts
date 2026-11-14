@@ -28,8 +28,18 @@ export interface PlayerState {
   book: SharedBook | null;
   /** 매니저면 'manager'. 옛 클라이언트는 필드 없음. */
   role?: PlayerRole | null;
+  /**
+   * 클릭해서 걷는 중이면 남은 경로([x, z] 목록)와 그 경로의 번호.
+   * 받는 쪽이 같은 속도로 이 길을 따라 걷게 해서, 걷는 동안 위치를 계속 보내지 않는다.
+   * 옛 클라이언트는 필드 없음(위치 기록 보간으로 움직인다).
+   */
+  path?: [number, number][] | null;
+  pathId?: number | null;
   t: number;
 }
+
+/** 경로 점 수 상한(길찾기가 시야선으로 줄여 주므로 보통 2~8개) */
+export const MAX_PATH_POINTS = 24;
 
 export type ActionType = 'nod' | 'join' | 'leave' | 'drink';
 export interface ActionEvent {
@@ -67,7 +77,7 @@ export const PEER_TIMEOUT_MS = 6000;
 /** 한 방이 쓸 초당 메시지 목표(다른 공간·여유분을 남긴다) */
 export const REALTIME_BUDGET_PER_SEC = 60;
 /** 멈춰 있는 사람의 하트비트. 새로 온 사람에게는 join 때 바로 알려 주므로 길게 둔다. */
-export const REALTIME_HEARTBEAT_MS = 15000;
+export const REALTIME_HEARTBEAT_MS = 30000;
 /** 정원이 차서 다시 붙지 못할 때 다시 시도하는 간격 */
 export const FULL_RETRY_MS = 30000;
 
@@ -130,7 +140,10 @@ export function sanitizePlayerState(s: PlayerState): PlayerState {
   const role = s.role === 'manager' ? 'manager' : null;
   // 예전 버전 브라우저가 아직 보내는 옛 표기(서든리)를 받는 쪽에서 바로잡는다
   const nickname = s.nickname.replace(/서든리/g, '써든리');
-  return { ...s, nickname, book, role };
+  const okPath = s.state === 'walk' && Array.isArray(s.path) && s.path.length > 0 && s.path.length <= MAX_PATH_POINTS
+    && Number.isFinite(s.pathId)
+    && s.path.every((p) => Array.isArray(p) && p.length === 2 && p.every((v) => Number.isFinite(v) && Math.abs(v) < 100));
+  return { ...s, nickname, book, role, path: okPath ? s.path : null, pathId: okPath ? s.pathId : null };
 }
 
 /** 받은 데이터가 PlayerState 모양인지 확인한다(다른 탭·서버에서 온 값은 믿지 않는다). */
@@ -143,6 +156,8 @@ export function isPlayerState(v: unknown): v is PlayerState {
   if (s.role != null && s.role !== 'manager') return false;
   // book은 없거나 null이거나 객체. 내용은 sanitizeSharedBook에서 다시 검사한다.
   if (s.book != null && typeof s.book !== 'object') return false;
+  // path 내용은 sanitizePlayerState에서 검사한다(모양이 틀리면 버리고 위치 보간으로 움직인다).
+  if (s.path != null && !Array.isArray(s.path)) return false;
   return true;
 }
 
